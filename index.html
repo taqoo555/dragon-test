@@ -92,7 +92,7 @@
 
 
 const CONFIG = {
-  VERSION: 'v33',
+  VERSION: 'v34',
 
   
   
@@ -2396,14 +2396,30 @@ const ART = {
 
 const ENEMY_ART = {
   
+  
+  1:  { key: 'enemy-1-1', file: 'img/enemy-1-1.webp' },
+  2:  { key: 'enemy-1-2', file: 'img/enemy-1-2.webp' },
+  3:  { key: 'enemy-1-3', file: 'img/enemy-1-3.webp' },
+  4:  { key: 'enemy-1-4', file: 'img/enemy-1-4.webp' },
+  5:  { key: 'enemy-1-5', file: 'img/enemy-1-5.webp' },
+  6:  { key: 'enemy-2-1', file: 'img/enemy-2-1.webp' },
+  7:  { key: 'enemy-2-2', file: 'img/enemy-2-2.webp' },
+  8:  { key: 'enemy-2-3', file: 'img/enemy-2-3.webp' },
+  9:  { key: 'enemy-2-4', file: 'img/enemy-2-4.webp' },
+  10: { key: 'enemy-2-5', file: 'img/enemy-2-5.webp' },
 };
 
 const ENEMY_STAGE_ART = {
   
 };
 
+const ENEMY_BOSS_ART = {
+  1: { key: 'enemy-1-boss', file: 'img/enemy-1-boss.webp' },
+  2: { key: 'enemy-2-boss', file: 'img/enemy-2-boss.webp' },
+};
+
 const ENEMY_GROUP = [0, 0, 0, 0, 1, 1];
-[ENEMY_ART, ENEMY_STAGE_ART].forEach(t => Object.keys(t).forEach(k => loadImg(t[k].key, t[k].file)));
+[ENEMY_ART, ENEMY_STAGE_ART, ENEMY_BOSS_ART].forEach(t => Object.keys(t).forEach(k => loadImg(t[k].key, t[k].file)));
 
 
 function enemyFor(stageId){
@@ -2985,6 +3001,8 @@ function bossBag(gi){
 }
 
 function bossArt(gi){
+  const own = ENEMY_BOSS_ART[gi + 1];
+  if (own) return { img: own.key, c1: own.c1 || '#2a2430', c2: own.c2 || '#6b3f7a', eye: own.eye || '#ffc23d', horn: own.horn || 1, tint: null, tintA: 0 };
   const list = pageStages(gi);
   const a = enemyFor(list[list.length - 1].id);
   return Object.assign({}, a, { tint: null, tintA: 0 });
