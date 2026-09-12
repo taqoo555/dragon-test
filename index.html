@@ -23,6 +23,15 @@
     touch-action: none;
     font-family: -apple-system, BlinkMacSystemFont, "Helvetica Neue", Arial, sans-serif;
   }
+  
+  #sa {
+    position: fixed; left: 0; top: 0; width: 0; height: 0;
+    padding-top: env(safe-area-inset-top, 0px);
+    padding-bottom: env(safe-area-inset-bottom, 0px);
+    padding-left: env(safe-area-inset-left, 0px);
+    padding-right: env(safe-area-inset-right, 0px);
+    pointer-events: none; visibility: hidden;
+  }
   #c {
     position: absolute; left: 0; top: 0;
     -webkit-touch-callout: none;
@@ -67,6 +76,7 @@
 </head>
 <body>
 <canvas id="c"></canvas>
+<div id="sa"></div>
 <div id="ovl"><div id="ovlBox">
   <p id="ovlTtl">きろくコード</p>
   <input id="ovlIn" type="text" autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false">
@@ -82,7 +92,7 @@
 
 
 const CONFIG = {
-  VERSION: 'v31',
+  VERSION: 'v32',
 
   
   
@@ -212,10 +222,20 @@ const CONFIG = {
 
 const W = 360, BASE_H = 640;
 
+
+function safeInsets(){
+  const el = document.getElementById('sa');
+  if (!el) return { t: 0, b: 0, l: 0, r: 0 };
+  const c = getComputedStyle(el);
+  const n = (v) => Math.max(0, Math.round(parseFloat(v) || 0));
+  return { t: n(c.paddingTop), b: n(c.paddingBottom), l: n(c.paddingLeft), r: n(c.paddingRight) };
+}
 let H = BASE_H;
 (function initH(){
-  const vw = (window.innerWidth || 360), vh = (window.innerHeight || 640);
-  H = Math.round(Math.min(800, Math.max(620, W * vh / vw)));
+  const ins = safeInsets();
+  const vw = (window.innerWidth || 360) - ins.l - ins.r;
+  const vh = (window.innerHeight || 640) - ins.t - ins.b;
+  H = Math.round(Math.min(800, Math.max(620, W * vh / Math.max(1, vw))));
 })();
 
 
@@ -240,9 +260,12 @@ let scale = 1, offX = 0, offY = 0, dpr = 1;
 function resize(){
   const vw = window.innerWidth, vh = window.innerHeight;
   dpr = Math.min(window.devicePixelRatio || 1, 2.5);
-  scale = Math.min(vw / W, vh / H);
+  
+  const ins = safeInsets();
+  const aw = Math.max(1, vw - ins.l - ins.r), ah = Math.max(1, vh - ins.t - ins.b);
+  scale = Math.min(aw / W, ah / H);
   const dw = W * scale, dh = H * scale;
-  offX = (vw - dw) / 2; offY = (vh - dh) / 2;
+  offX = ins.l + (aw - dw) / 2; offY = ins.t + (ah - dh) / 2;
   cv.style.width = vw + 'px';
   cv.style.height = vh + 'px';
   cv.width = Math.round(vw * dpr);
@@ -5777,7 +5800,7 @@ resize();
 requestAnimationFrame(frame);
 
 
-window.__cube = { CONFIG, S, genShape, shapeTotal, allTopsVisible, noInvisibleAddition, playBasis, basisIso, basisOblique, STAGES, mapRect, onDown, submit, visibleCubeCount, columnCount, cubeList, cubeFaces, visibleFlags, pointInPoly, figArea, choiceRect, get H(){ return H; }, visiblePerColumn, teachStep, introList, introTabRects, teachArea, QUIT_BTN, quitPanel, bossBarRect, mapTabletRect, enemyFor, ENEMY_ART, ENEMY_STAGE_ART, ENEMY_GROUP, isPerfect, perfectSlots, dragonGold, lineGen, balGen, pairGen, weekGen, WEEK, weekName, sfxHit, sfxSlash, sfxCritical, sfxHurt, sfxPiece, sfxCorrect, sfxWrong, sfxDefeat, sfxIntro, audioCtl: { set(a){ audio = a; master = null; }, get(){ return audio; } }, bgmRender, bgmStart, bgmStop, BGM, clearedSlots, groupSize, dragonDone, curPage, setPage, pageStages, DRAGONS, dragonName, startBoss, bossState, bossOpen, bossBag, finishBoss, bossWinButtons, PIECE_SHAPES, makeKindBag, nextQuestion, newQuestion, newBattle, enterStage, startIntro, teachNext, magicGen, magicLines, magicHas, stageLv, save, makeCode, makeKidCode, applyKidCode, applyCode, openCode, BTN_EXPORT, BTN_IMPORT };
+window.__cube = { CONFIG, S, genShape, shapeTotal, allTopsVisible, noInvisibleAddition, playBasis, basisIso, basisOblique, STAGES, mapRect, onDown, submit, visibleCubeCount, columnCount, cubeList, cubeFaces, visibleFlags, pointInPoly, figArea, choiceRect, get H(){ return H; }, visiblePerColumn, teachStep, introList, introTabRects, teachArea, toLocal, get offX(){ return offX; }, get offY(){ return offY; }, get scale(){ return scale; }, QUIT_BTN, quitPanel, bossBarRect, mapTabletRect, enemyFor, ENEMY_ART, ENEMY_STAGE_ART, ENEMY_GROUP, isPerfect, perfectSlots, dragonGold, lineGen, balGen, pairGen, weekGen, WEEK, weekName, sfxHit, sfxSlash, sfxCritical, sfxHurt, sfxPiece, sfxCorrect, sfxWrong, sfxDefeat, sfxIntro, audioCtl: { set(a){ audio = a; master = null; }, get(){ return audio; } }, bgmRender, bgmStart, bgmStop, BGM, clearedSlots, groupSize, dragonDone, curPage, setPage, pageStages, DRAGONS, dragonName, startBoss, bossState, bossOpen, bossBag, finishBoss, bossWinButtons, PIECE_SHAPES, makeKindBag, nextQuestion, newQuestion, newBattle, enterStage, startIntro, teachNext, magicGen, magicLines, magicHas, stageLv, save, makeCode, makeKidCode, applyKidCode, applyCode, openCode, BTN_EXPORT, BTN_IMPORT };
 </script>
 </body>
 </html>
