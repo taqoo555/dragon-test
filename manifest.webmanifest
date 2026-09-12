@@ -1,0 +1,30 @@
+{
+ "name": "ドラゴンテスト",
+ "short_name": "ドラゴンテスト",
+ "description": "とけばドラゴンが もどってくる。さんすうのバトル。",
+ "start_url": "./index.html",
+ "scope": "./",
+ "display": "standalone",
+ "orientation": "portrait",
+ "background_color": "#1a1430",
+ "theme_color": "#1a1430",
+ "lang": "ja",
+ "icons": [
+  {
+   "src": "img/icon180.png",
+   "sizes": "180x180",
+   "type": "image/png"
+  },
+  {
+   "src": "img/icon512.png",
+   "sizes": "512x512",
+   "type": "image/png"
+  },
+  {
+   "src": "img/icon512.png",
+   "sizes": "512x512",
+   "type": "image/png",
+   "purpose": "maskable"
+  }
+ ]
+}
