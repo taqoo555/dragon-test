@@ -92,7 +92,7 @@
 
 
 const CONFIG = {
-  VERSION: 'v61',
+  VERSION: 'v62',
 
   
   
@@ -1369,17 +1369,23 @@ function magicRuleText(area, g){
        W / 2, area.y + 18, 14, CONFIG.C_INK_SOFT, 'center', '700');
 }
 
+
 function magicAddDrawQ(area, g, opt){
   opt = opt || {};
   const gap = 30, half = (area.w - gap) / 2 - 6;
   const la = { x: area.x + 6, y: area.y, w: half, h: area.h };
   const ra = { x: area.x + 6 + half + gap, y: area.y, w: half, h: area.h };
-  const lg = magicDrawGrid(la, { n: 3, m: g.base, hidden: [], ask: null }, { lit: opt.lit });
-  const rg = magicDrawGrid(ra, g, { lit: opt.lit, reveal: opt.reveal, pop: opt.pop });
+  
+  const rgG = (opt.hiddenR != null) ? Object.assign({}, g, { hidden: opt.hiddenR }) : g;
+  const lg = magicDrawGrid(la, { n: 3, m: g.base, hidden: [], ask: null }, { lit: opt.litL || opt.lit });
+  const rg = magicDrawGrid(ra, rgG, { lit: opt.litR || opt.lit, reveal: opt.reveal, pop: opt.pop });
   text((g.op === 'add' ? '＋' : '×') + g.k, area.x + 6 + half + gap / 2,
        lg.oy + lg.cs * 1.5, 19, CONFIG.C_GOLD, 'center', '800');
   text('もと', lg.ox + lg.cs * 1.5, lg.oy - 15, 12, CONFIG.C_INK_SOFT, 'center', '700');
   text('できた', rg.ox + rg.cs * 1.5, rg.oy - 15, 12, CONFIG.C_INK_SOFT, 'center', '700');
+  
+  if (opt.sumL) text(opt.sumL, lg.ox + lg.cs * 1.5, lg.oy + lg.cs * 3 + 16, 15, CONFIG.C_GOLD, 'center', '800');
+  if (opt.sumR) text(opt.sumR, rg.ox + rg.cs * 1.5, rg.oy + rg.cs * 3 + 16, 15, CONFIG.C_OK, 'center', '800');
 }
 function magicDrawQ(area){
   const g = S.g;
@@ -1438,23 +1444,47 @@ function magicAddTeachBegin(){
   const g = S.g;
   const opWord = g.op === 'add' ? 'たす' : 'かける';
   const opSign = g.op === 'add' ? '＋' : '×';
-  const msgs = [
-    '同じ数を ' + (g.op === 'add' ? 'たしても' : 'かけても') + ' 3方陣の まま',
-    'もとの 同じ 場所は ' + g.bv + '。\nそこに ' + g.k + ' を ' + opWord,
-    g.bv + ' ' + opSign + ' ' + g.k + ' ＝ ' + g.answer,
-  ];
-  const labels = ['', 'もとは' + g.bv, String(g.answer)];
-  return makeTeach(2, msgs, labels, { g, mk: 'add' });
+  const r = g.ask.r;
+  const msgs = ['同じ数を ' + (g.op === 'add' ? 'たしても' : 'かけても') + ' 3方陣の まま'];
+  const labels = [''];
+  for (let c = 0; c < 3; c++) {
+    msgs.push(g.base[r][c] + ' ' + opSign + ' ' + g.k + ' ＝ ' + g.m[r][c]);
+    labels.push(String(g.m[r][c]));
+  }
+  msgs.push('のこりの マスも 同じように ' + opWord);
+  labels.push('のこりも');
+  const sumB = g.base[r][0] + g.base[r][1] + g.base[r][2];
+  msgs.push('もとの この列は ' + g.base[r].join('＋') + ' ＝ ' + sumB);
+  labels.push('もと ' + sumB);
+  msgs.push('できた この列は ' + g.m[r].join('＋') + ' ＝ ' + g.sum + '。\nどの列も ' + g.sum + '。だから 3方陣の まま');
+  labels.push('できた ' + g.sum);
+  return makeTeach(msgs.length - 1, msgs, labels, { g, mk: 'add', row: r, sumB });
 }
 function magicAddTeachDraw(area, T){
-  const g = T.g, n = T.shown, last = T.total;
+  const g = T.g, n = T.shown, r = T.row;
   const a = { x: 0, y: area.y + TEACH_BAR_H + 6, w: W, h: area.h - TEACH_BAR_H - TEACH_FOOT_H - TEACH_MSG_H - 12 };
   magicRuleText(a, g);
   const gridArea = { x: a.x, y: a.y + 46, w: a.w, h: a.h - 50 };
-  const reveal = (n >= last) ? g.answer : null;
   
-  const lit = (n >= 1) ? { [g.ask.r + ',' + g.ask.c]: CONFIG.C_HI_T } : null;
-  magicAddDrawQ(gridArea, g, { reveal, lit, pop: reveal != null ? Math.min(1, Math.max(0, S.t) / 0.2) : null });
+  let hiddenR = [];
+  if (n < 4) {
+    for (let rr = 0; rr < 3; rr++) for (let cc = 0; cc < 3; cc++) {
+      const filled = (rr === r && cc < n);
+      if (!filled) hiddenR.push({ r: rr, c: cc });
+    }
+  }
+  const rowLit = {}; for (let cc = 0; cc < 3; cc++) rowLit[r + ',' + cc] = CONFIG.C_HI_T;
+  const opt = { hiddenR };                     
+  if (n >= 1 && n <= 3) {                       
+    const c = n - 1;
+    opt.litL = { [r + ',' + c]: CONFIG.C_HI_T };
+    opt.litR = { [r + ',' + c]: CONFIG.C_HI_T };
+  } else if (n >= 5) {                          
+    opt.litL = rowLit;
+    opt.sumL = 'たすと ' + T.sumB;
+    if (n >= 6) { opt.litR = rowLit; opt.sumR = 'たすと ' + g.sum; }
+  }
+  magicAddDrawQ(gridArea, g, opt);
 }
 function magicTeachBegin(){
   if (S.kind === 'add') return magicAddTeachBegin();
@@ -4590,9 +4620,11 @@ function u13LineZu(area, per, bags){
 }
 
 function u13KufuRow(area, g, opt){
-  const n = g.nums.length;
-  const s = Math.min(36, (area.w - 40) / n);
+  const n = g.nums.length, GAP = 15;
+  const box = Math.max(20, Math.min(34, (area.w - 40 - (n - 1) * GAP) / n));
+  const s = box + GAP;                                  
   const ox = W / 2 - (n - 1) * s / 2, oy = area.y + area.h / 2;
+  const fs = Math.round(box * 0.5), pfs = Math.max(14, Math.round(box * 0.46));
   const lvd = opt.leveled || 0;
   const disp = g.nums.slice();
   if (g.t !== 'group') for (let i = 0; i < lvd; i++) { disp[i] = g.mid; disp[n - 1 - i] = g.mid; }
@@ -4600,20 +4632,20 @@ function u13KufuRow(area, g, opt){
     const x = ox + i * s;
     const moved = (g.t !== 'group') && (i < lvd || i >= n - lvd);
     const on = !!opt.allHi || moved;
-    rrect(x - s * 0.4, oy - s * 0.4, s * 0.8, s * 0.8, 6);
+    rrect(x - box / 2, oy - box / 2, box, box, 6);
     ctx.fillStyle = on ? CONFIG.C_HI_T : '#ffffff'; ctx.fill();
     ctx.strokeStyle = on ? CONFIG.C_GOLD : CONFIG.C_GRID; ctx.lineWidth = on ? 2.2 : 1.4; ctx.stroke();
-    text(String(v), x, oy + 1, Math.round(s * 0.42), CONFIG.C_INK);
-    if (i < n - 1) text('＋', x + s / 2, oy + 1, 12, CONFIG.C_INK_SOFT);
+    text(String(v), x, oy + 1, fs, CONFIG.C_INK);
+    if (i < n - 1) text('＋', x + s / 2, oy + 1, pfs, CONFIG.C_INK, 'center', '800');
   });
   if (opt.arcPair != null) {
     const i = opt.arcPair;
     const a = i, b = (g.t === 'group') ? (g.cnt + i) : (n - 1 - i);
-    const x1 = ox + a * s, x2 = ox + b * s, top = oy - s * 0.5 - 16;
+    const x1 = ox + a * s, x2 = ox + b * s, top = oy - box * 0.5 - 16;
     ctx.save();
     ctx.strokeStyle = CONFIG.C_GOLD; ctx.lineWidth = 2.2;
-    ctx.beginPath(); ctx.moveTo(x1, oy - s * 0.45);
-    ctx.quadraticCurveTo((x1 + x2) / 2, top - 8, x2, oy - s * 0.45); ctx.stroke();
+    ctx.beginPath(); ctx.moveTo(x1, oy - box * 0.55);
+    ctx.quadraticCurveTo((x1 + x2) / 2, top - 8, x2, oy - box * 0.55); ctx.stroke();
     ctx.restore();
     text(g.t === 'group' ? ('1くみ ' + g.mid) : ('どちらも ' + g.mid),
          (x1 + x2) / 2, top - 6, 13, CONFIG.C_GOLD, 'center', '800');
