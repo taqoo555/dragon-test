@@ -92,7 +92,7 @@
 
 
 const CONFIG = {
-  VERSION: 'v59',
+  VERSION: 'v60',
 
   
   
@@ -1257,10 +1257,13 @@ function magicAddGen(lv){
   const base = magicSym(MAGIC_BASE, randInt(0, 7), 3);
   const op = (lv <= 1) ? 'add' : (Math.random() < 0.5 ? 'add' : 'mul');
   const k = (op === 'add') ? randInt(2, 9) : randInt(2, 5);
+  const a = (op === 'add') ? 1 : k, b = (op === 'add') ? k : 0;
+  const m = base.map(row => row.map(v => a * v + b));      
+  const sum = 3 * (5 * a + b);
   const r0 = randInt(0, 2), c0 = randInt(0, 2);
-  const bv = base[r0][c0];
-  const answer = (op === 'add') ? bv + k : bv * k;
-  const g = { n: 3, m: base, hidden: [{ r: r0, c: c0 }], ask: { r: r0, c: c0 }, op, k, answer };
+  const bv = base[r0][c0];                                  
+  const answer = m[r0][c0];
+  const g = { n: 3, m, hidden: [{ r: r0, c: c0 }], ask: { r: r0, c: c0 }, op, k, answer, sum };
   const wrongs = (op === 'add')
     ? [bv, bv * k, answer + 1, Math.max(1, answer - 1), answer + 2, Math.max(1, bv - k)]
     : [bv, bv + k, answer + 1, Math.max(1, answer - 1), bv * (k + 1), Math.max(1, bv * (k - 1))];
@@ -1362,9 +1365,9 @@ function magicDrawGrid(area, g, opt){
 }
 
 function magicRuleText(area, g){
-  const t1 = '全部に ' + g.k + ' を ' + (g.op === 'add' ? 'たす' : 'かける') + 'と';
+  const t1 = 'もとの 3方陣に 全部 ' + g.k + ' を ' + (g.op === 'add' ? 'たして' : 'かけて');
   text(t1, W / 2, area.y + 16, 14, CONFIG.C_INK_SOFT, 'center', '700');
-  text('3方陣に なる', W / 2, area.y + 36, 14, CONFIG.C_INK_SOFT, 'center', '700');
+  text('できた 3方陣', W / 2, area.y + 36, 14, CONFIG.C_INK_SOFT, 'center', '700');
 }
 function magicDrawQ(area){
   const g = S.g;
@@ -1420,16 +1423,21 @@ function magicKindIcon(kind, x, y, s){
 
 
 function magicAddTeachBegin(){
-  const g = S.g, bv = g.m[g.ask.r][g.ask.c];
-  const opWord = g.op === 'add' ? 'たす' : 'かける';
-  const opSign = g.op === 'add' ? '＋' : '×';
+  const g = S.g;
+  const opWord = g.op === 'add' ? 'たして' : 'かけて';
+  const lines = magicLines(g.n);
+  const thru = lines.filter(L => L.cells.some(p => p.r === g.ask.r && p.c === g.ask.c));
+  const L = thru.find(L => L.kind === 'row') || thru.find(L => L.kind === 'col') || thru[0];
+  const knownCells = L.cells.filter(p => !(p.r === g.ask.r && p.c === g.ask.c));
+  const knownVals = knownCells.map(p => g.m[p.r][p.c]);
+  const knownStr = knownVals.join('＋');
   const msgs = [
-    '全部に ' + g.k + ' を ' + opWord,
-    'この マスは もと ' + bv,
-    bv + ' ' + opSign + ' ' + g.k + ' ＝ ' + g.answer,
+    'もとの 3方陣に 全部 ' + g.k + ' を ' + opWord + '\nできた 3方陣',
+    'この列も ' + g.sum + '。\n' + knownStr + '＋？＝' + g.sum,
+    g.sum + ' － ' + knownVals.join(' － ') + ' ＝ ' + g.answer,
   ];
-  const labels = ['', String(bv), String(g.answer)];
-  return makeTeach(2, msgs, labels, { g, mk: 'add' });
+  const labels = ['', 'この列も' + g.sum, String(g.answer)];
+  return makeTeach(2, msgs, labels, { g, mk: 'add', L });
 }
 function magicAddTeachDraw(area, T){
   const g = T.g, n = T.shown, last = T.total;
@@ -1437,7 +1445,10 @@ function magicAddTeachDraw(area, T){
   magicRuleText(a, g);
   const gridArea = { x: a.x, y: a.y + 48, w: a.w, h: a.h - 52 };
   const reveal = (n >= last) ? g.answer : null;
-  magicDrawGrid(gridArea, g, { reveal, pop: reveal != null ? Math.min(1, Math.max(0, S.t) / 0.2) : null, big: true });
+  
+  let lit = null;
+  if (n >= 1 && T.L) { lit = {}; T.L.cells.forEach(p => { lit[p.r + ',' + p.c] = CONFIG.C_HI_T; }); }
+  magicDrawGrid(gridArea, g, { reveal, lit, pop: reveal != null ? Math.min(1, Math.max(0, S.t) / 0.2) : null, big: true });
 }
 function magicTeachBegin(){
   if (S.kind === 'add') return magicAddTeachBegin();
@@ -4348,17 +4359,30 @@ function u11Draw(area, opt){
   opt = opt || {};
   const g = opt.g || S.g;
   ctx.save();
-  text(g.stmt, W / 2, area.y + area.h * 0.3, 26, CONFIG.C_INK, 'center', '800');
-  const y = area.y + area.h * 0.62, x0 = W / 2 - 100, w = 210;
+  
+  text(g.stmt, W / 2, area.y + area.h * 0.22, 26, CONFIG.C_INK, 'center', '800');
+  
+  const y = area.y + area.h * 0.48, x0 = W / 2 - 105, w = 190;
   const ratioA = Math.min(0.85, Math.max(0.15, g.A / (g.A + g.B)));
   const cut = w * ratioA;
   if (opt.parts) {
-    const aLab = (g.unknown === 'A') ? '□' : String(g.A);
-    const bLab = (g.unknown === 'B') ? '□' : String(g.B);
-    u11Seg(x0, x0 + cut - 6, y, g.unknown !== 'A', aLab);
-    u11Seg(x0 + cut + 6, x0 + w, y, g.unknown !== 'B', bLab);
     
-    u11Seg(x0, x0 + w, y - 30, g.unknown !== 'W', (g.unknown === 'W') ? '□' : String(g.W));
+    if (g.unknown === 'W') {
+      u11Seg(x0, x0 + cut - 6, y, true, String(g.A));
+      u11Seg(x0 + cut + 6, x0 + w, y, true, String(g.B));
+      text('＝ □', x0 + w + 20, y + 1, 18, CONFIG.C_GOLD, 'left', '800');
+    } else {
+      const knownVal = (g.unknown === 'A') ? g.B : g.A;
+      const knownLen = w * Math.min(0.92, Math.max(0.08, knownVal / g.W));
+      const yTop = y - 20, yBot = y + 20;
+      u11Seg(x0, x0 + w, yTop, true, String(g.W));
+      u11Seg(x0, x0 + knownLen, yBot, true, String(knownVal));
+      ctx.save();
+      ctx.strokeStyle = CONFIG.C_GOLD; ctx.lineWidth = 2.4; ctx.setLineDash([6, 4]); ctx.lineCap = 'round';
+      ctx.beginPath(); ctx.moveTo(x0 + knownLen, yBot); ctx.lineTo(x0 + w, yTop); ctx.stroke();
+      ctx.restore();
+      text('□', (x0 + knownLen + x0 + w) / 2 + 12, (yTop + yBot) / 2 - 6, 18, CONFIG.C_GOLD, 'center', '800');
+    }
   } else {
     ctx.save(); ctx.setLineDash([5, 4]); ctx.strokeStyle = CONFIG.C_GRID; ctx.lineWidth = 2;
     ctx.beginPath(); ctx.moveTo(x0, y); ctx.lineTo(x0 + w, y); ctx.stroke();
@@ -4378,7 +4402,7 @@ function u11TeachBegin(){
     : (g.W + ' － ' + known + ' ＝ ' + g.ans);
   const msgs = [
     g.stmt,
-    '3つの 数を 線の 長さで あらわす',
+    '2本の 線で あらわす',
     isWhole
       ? '2本を たすと □ の 長さに なる\n' + calc
       : '長い線から みじかい線を 引くと □ の 長さに なる\n' + calc,
@@ -4488,21 +4512,26 @@ function u13Gen(lv, kind){
     return { g: { per, bags, k }, answer: correct, kind: 'pic', choices };
   }
   
-  let mid, cnt, d, key;
+  let mid, cnt, step, seq, key;
   for (let tries = 0; tries < 30; tries++){
     mid = randInt(4, 6);
-    cnt = randInt(4, 6);
-    
-    if (cnt === mid) cnt = (cnt === 6) ? 4 : cnt + 1;
-    d = randInt(1, Math.min(2, mid - 2));
-    key = mid + ':' + cnt + ':' + d;
+    cnt = (Math.random() < 0.5) ? 3 : 5;                  
+    if (cnt === mid) cnt = (cnt === 5) ? 3 : 5;           
+    seq = (lv >= 3 && Math.random() < 0.5);                
+    const half = (cnt - 1) / 2;
+    const stepMax = Math.max(1, Math.floor((mid - 1) / half));
+    step = seq ? randInt(1, Math.min(2, stepMax)) : Math.min(2, mid - 2);
+    key = seq + ':' + mid + ':' + cnt + ':' + step;
     if (!U13_PAIR_LAST.includes(key)) break;
   }
   U13_PAIR_LAST.push(key); if (U13_PAIR_LAST.length > 3) U13_PAIR_LAST.shift();
-  const nums = [mid - d, ...Array.from({ length: cnt - 2 }, () => mid), mid + d];
+  const half = (cnt - 1) / 2;
+  const nums = seq
+    ? Array.from({ length: cnt }, (_, i) => mid + (i - half) * step)   
+    : [mid - step, ...Array.from({ length: cnt - 2 }, () => mid), mid + step];  
   const correct = mid + '×' + cnt;
-  const choices = txtChoices(correct, [cnt + '×' + mid, (mid * cnt) + '＋' + d, mid + '×' + (cnt - 1)]);
-  return { g: { nums, mid, cnt, d, k: 'pair' }, answer: correct, kind: 'pair', choices };
+  const choices = txtChoices(correct, [cnt + '×' + mid, (mid * cnt) + '＋' + step, mid + '×' + (cnt - 1)]);
+  return { g: { nums, mid, cnt, d: step, seq, k: 'pair' }, answer: correct, kind: 'pair', choices };
 }
 function u13Draw(area, opt){
   opt = opt || {};
@@ -4515,21 +4544,16 @@ function u13Draw(area, opt){
     
     const s = Math.min(38, (area.w - 40) / g.nums.length);
     const ox = W / 2 - (g.nums.length - 1) * s / 2, oy = area.y + area.h / 2;
+    const midIdx = Math.floor(g.nums.length / 2);
     g.nums.forEach((v, i) => {
       const x = ox + i * s;
-      const on = opt.pair && (i === 0 || i === g.nums.length - 1);
+      const on = opt.midHi && i === midIdx;
       rrect(x - s * 0.4, oy - s * 0.4, s * 0.8, s * 0.8, 6);
-      ctx.fillStyle = opt.even ? CONFIG.C_HI_T : (on ? CONFIG.C_HI_T : '#ffffff'); ctx.fill();
-      ctx.strokeStyle = (on || opt.even) ? CONFIG.C_GOLD : CONFIG.C_GRID; ctx.lineWidth = (on || opt.even) ? 2.2 : 1.4; ctx.stroke();
-      text(String(opt.even ? g.mid : v), x, oy + 1, Math.round(s * 0.42), CONFIG.C_INK);
+      ctx.fillStyle = on ? CONFIG.C_HI_T : '#ffffff'; ctx.fill();
+      ctx.strokeStyle = on ? CONFIG.C_GOLD : CONFIG.C_GRID; ctx.lineWidth = on ? 2.2 : 1.4; ctx.stroke();
+      text(String(v), x, oy + 1, Math.round(s * 0.42), CONFIG.C_INK);
       if (i < g.nums.length - 1) text('＋', x + s / 2, oy + 1, 13, CONFIG.C_INK_SOFT);
     });
-    if (opt.pair) {
-      const x1 = ox, x2 = ox + (g.nums.length - 1) * s;
-      ctx.strokeStyle = CONFIG.C_GOLD; ctx.lineWidth = 2;
-      ctx.beginPath(); ctx.moveTo(x1, oy - s * 0.45); ctx.quadraticCurveTo(W / 2, oy - s * 1.3, x2, oy - s * 0.45); ctx.stroke();
-      text('あわせて ' + (g.mid * 2), W / 2, oy - s * 1.15, 13, CONFIG.C_GOLD, 'center', '800');
-    }
   }
   if (opt.reveal) text(opt.reveal, W / 2, area.y + area.h - 12, 18, CONFIG.C_OK);
   ctx.restore();
@@ -4545,20 +4569,21 @@ function u13TeachBegin(){
     ];
     return makeTeach(3, msgs, ['', 'たて' + g.bags, g.per + '×' + g.bags, 'いみが ちがう'], { g });
   }
+  
   const msgs = [
-    (g.mid - g.d) + ' と ' + (g.mid + g.d) + ' を あわせると ' + (g.mid * 2),
-    (g.mid * 2) + ' ＝ ' + g.mid + ' が 2つ',
-    'ぜんぶ ' + g.mid + ' に そろった',
-    g.mid + ' が ' + g.cnt + 'つ → ' + g.mid + '×' + g.cnt,
+    'まんなかの 数を さがす',
+    'まんなかは ' + g.mid,
+    g.mid + ' が ' + g.cnt + 'こぶん → ' + g.mid + '×' + g.cnt,
   ];
-  return makeTeach(3, msgs, ['', g.mid + '×2', 'そろった', g.mid + '×' + g.cnt], { g });
+  return makeTeach(2, msgs, ['', String(g.mid), g.mid + '×' + g.cnt], { g });
 }
 function u13TeachDraw(area, T){
   const g = T.g, n = T.shown;
   const ans = (g.k === 'pic') ? (g.per + '×' + g.bags) : (g.mid + '×' + g.cnt);
-  u13Draw(teachFigArea(area), { g, pair: g.k === 'pair' && n >= 1 && n < 2, even: g.k === 'pair' && n >= 2,
+  const last = (g.k === 'pic') ? 3 : 2;
+  u13Draw(teachFigArea(area), { g, midHi: g.k === 'pair' && n >= 1,
     rowHi: (g.k === 'pic' && n === 1) ? 0 : null,
-    reveal: n >= 3 ? ans : null });
+    reveal: n >= last ? ans : null });
 }
 function u13KindIcon(kind, x, y, s){
   ctx.save();
@@ -5756,6 +5781,8 @@ const BUILT = {
 };
 const BOSS_TINTS = [null, '#2f6fd6', '#b3452f', '#2f8f6a', '#8a5a2f', '#5a3f8f', '#2f7f8f', '#8f2f5a'];
 STAGES.length = 0;
+
+const STILL_LOCKED = [14, 15, 16, 17, 18, 19, 20, 22, 23, 24, 25, 26, 27, 28, 29];
 UNITS.forEach(([no, name, learn], i) => {
   const base = BUILT[no] || { id: 'r' + no, unlocked: false };
   const st = Object.assign(base, {
@@ -5763,6 +5790,7 @@ UNITS.forEach(([no, name, learn], i) => {
     dragon: Math.floor(i / CONFIG.PIECES_PER_DRAGON),
     slot: i % CONFIG.PIECES_PER_DRAGON,
     boss: { tint: BOSS_TINTS[i % BOSS_TINTS.length] },
+    unlocked: STILL_LOCKED.includes(no) ? false : base.unlocked,
   });
   STAGES.push(st);
 });
