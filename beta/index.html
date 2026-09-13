@@ -92,7 +92,7 @@
 
 
 const CONFIG = {
-  VERSION: 'v50',
+  VERSION: 'v51',
 
   
   
@@ -2567,8 +2567,10 @@ function ordTeachDraw(area, T){
   const ar = teachFigArea(area);
   const full = (n <= 1) ? 0 : (n === 2 ? 1 : n === 3 ? 2 : 3);
   const hi1 = (n === 1) ? 0 : -1;
+  
   const showMiss = n >= 6 && g && !g.count;
-  const rows = showMiss ? 7 : 6;
+  const missTail = showMiss ? (g.fixed != null ? g.miss.slice(1) : g.miss) : null;
+  const rows = 6;
   const s = Math.min(12, (ar.h - 30) / rows / 2.6);
   const rowH = Math.min(38, (ar.h - 30) / rows);
   const top = ar.y + (ar.h - rowH * rows) / 2 + rowH / 2;
@@ -2583,28 +2585,31 @@ function ordTeachDraw(area, T){
     const rest = a.filter(v => v !== a[i]);
     const y1 = top + (i * 2 + 0.5) * rowH;
     const on = (i < full) || (i === hi1);
-    ctx.save(); ctx.globalAlpha = on ? 1 : 0.22;
+    ctx.save(); ctx.globalAlpha = (showMiss ? 1 : (on ? 1 : 0.22));
     ctx.strokeStyle = on ? CONFIG.C_GOLD : CONFIG.C_GRID; ctx.lineWidth = 1.6;
     ctx.beginPath(); ctx.moveTo(x0 + s * 0.6, top + rowH * 2.5); ctx.lineTo(x1 - s, y1); ctx.stroke();
     ordItem(a[i], x1, y1, s);
     ctx.restore();
-    if (i >= full) continue;
+    if (!showMiss && i >= full) continue;
     for (let j = 0; j < 2; j++) {
       const y2 = top + (i * 2 + j) * rowH;
-      ctx.strokeStyle = CONFIG.C_GOLD; ctx.lineWidth = 1.5;
+      const isMiss = showMiss && missTail[0] === a[i] && missTail[1] === rest[j] && missTail[2] === rest[1 - j];
+      ctx.save(); ctx.globalAlpha = showMiss ? (isMiss ? 1 : 0.22) : 1;
+      ctx.strokeStyle = (showMiss ? (isMiss ? CONFIG.C_GOLD : CONFIG.C_GRID) : CONFIG.C_GOLD);
+      ctx.lineWidth = isMiss ? 2.4 : 1.5;
       ctx.beginPath(); ctx.moveTo(x1 + s, y1); ctx.lineTo(x2 - s, y2); ctx.stroke();
-      ordItem(rest[j], x2, y2, s);
+      ordItem(rest[j], x2, y2, isMiss ? s * 1.15 : s);
       ctx.beginPath(); ctx.moveTo(x2 + s, y2); ctx.lineTo(x3 - s, y2); ctx.stroke();
-      ordItem(rest[1 - j], x3, y2, s);
+      ordItem(rest[1 - j], x3, y2, isMiss ? s * 1.15 : s);
+      if (isMiss) {
+        rrect(x1 - s * 1.5, y2 - s * 0.9, x3 - x1 + s * 3, s * 1.8, 8);
+        ctx.strokeStyle = CONFIG.C_GOLD; ctx.lineWidth = 2; ctx.stroke();
+      }
+      ctx.restore();
     }
   }
-  if (n >= 5) text(g.count ? 'ぜんぶで 6とおり' : 'まず ぜんぶで 6とおり', W / 2, top + rowH * 5.9, 14, CONFIG.C_OK, 'center', '800');
-  
-  if (showMiss) {
-    const yy = top + rowH * 7.0;
-    ordRow(g.miss, W / 2, yy, Math.min(s * 1.15, 14));
-    text('これが ぬけていた', W / 2, yy + rowH * 0.62, 12, CONFIG.C_GOLD, 'center', '800');
-  }
+  if (n >= 5 && !showMiss) text(g.count ? 'ぜんぶで 6とおり' : 'まず ぜんぶで 6とおり', W / 2, top + rowH * 5.9, 14, CONFIG.C_OK, 'center', '800');
+  if (showMiss) text('これが ぬけていた', W / 2, top + rowH * 5.9, 15, CONFIG.C_GOLD, 'center', '800');
   ctx.restore();
 }
 function ordKindIcon(kind, x, y, s){
@@ -2697,23 +2702,36 @@ function chooseList(ids, k, cx, top, s, rowH, label){
   return list.length;
 }
 
+
 function chooseTeachBegin(){
   const g = S.g, n = g.n, k = g.k, k2 = n - k, ans = S.answer;
-  const msgs = [
-    'この ' + n + 'つ の うち から ' + k + 'こ えらぶ',
-    k + 'こ えらぶ ＝ **' + k2 + 'こ えらばない** を きめる こと',
-    'えらび方を 書き出すと ' + '**' + ans + 'とおり**',
-    'えらぶ ＝ **えらばない を 決める**',
-  ];
-  const labels = ['', '言いかえ', String(ans), String(ans)];
-  return makeTeach(3, msgs, labels, { g, listK: Math.min(k, k2), mk: 'choose' });
+  const useReframe = k > k2;
+  const listK = useReframe ? k2 : k;
+  let msgs, labels;
+  if (useReframe) {
+    msgs = [
+      'この ' + n + 'つ の うち から ' + k + 'こ えらぶ',
+      k + 'こ えらぶ ＝ **' + k2 + 'こ えらばない** を きめる ほうが\n書く 数が すくない',
+      k2 + 'こ の 書き方を 書き出すと **' + ans + 'とおり**',
+      'だから ' + k + 'こ えらぶも **' + ans + 'とおり**',
+    ];
+    labels = ['', '言いかえ', String(ans), String(ans)];
+  } else {
+    msgs = [
+      'この ' + n + 'つ の うち から ' + k + 'こ えらぶ',
+      k + 'こ の えらび方を そのまま 書き出す',
+      '書き出すと **' + ans + 'とおり**',
+    ];
+    labels = ['', '書き出す', String(ans)];
+  }
+  return makeTeach(msgs.length - 1, msgs, labels, { g, listK, mk: 'choose' });
 }
 function chooseTeachDraw(area, T){
   const g = T.g, n = T.shown;
   const ar = teachFigArea(area);
   ctx.save();
   chooseRow(g.ids, g.ids.map((_, i) => i), W / 2, ar.y + 18, 12);
-  if (n >= 2) {
+  if (n >= T.total - 1) {
     const rowsCount = combos(g.n, T.listK).length;
     const top = ar.y + 58;
     const rowH = Math.max(14, Math.min(26, (ar.h - top + ar.y - 34) / rowsCount));
@@ -2818,7 +2836,8 @@ function codeDraw(area, opt){
   
   
   const legendBottom = area.y + 6 + boxH + 12;
-  const showVals = !!opt.vals || (S.mode === 'play' && S.lv <= 1);
+  
+  const showVals = !!opt.vals;
   const topPad = showVals ? 1.5 : 0.7;                 
   const bottomUnits = g.add
     ? (opt.reveal != null ? 8.0 : 4.4)
