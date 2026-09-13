@@ -92,7 +92,7 @@
 
 
 const CONFIG = {
-  VERSION: 'v63',
+  VERSION: 'v64',
 
   
   
@@ -3299,11 +3299,20 @@ function mulKindIcon(kind, x, y, s){
 }
 
 
-const PER_LV = [[8, 2], [12, 3], [16, 4], [20, 4], [24, 6]];
+
+const PER_LV = [[15, 3], [12, 3], [16, 4], [20, 4], [24, 6]];
+
+const PER_LAST = [];
 function perGen(lv){
   const [maxTotal, maxGroup] = PER_LV[Math.min(lv, PER_LV.length - 1)];
-  const groups = randInt(2, maxGroup);
-  const per = randInt(2, Math.max(2, Math.floor(maxTotal / groups)));
+  let groups, per, key;
+  for (let tries = 0; tries < 30; tries++){
+    groups = randInt(2, maxGroup);
+    per = randInt(2, Math.max(2, Math.floor(maxTotal / groups)));
+    key = groups + ':' + per;
+    if (!PER_LAST.includes(key)) break;
+  }
+  PER_LAST.push(key); if (PER_LAST.length > 4) PER_LAST.shift();
   const total = per * groups;
   return { g: { total, groups, per }, answer: per,
     choices: numChoices(per, [total, groups, total - groups, per + groups]) };
@@ -3335,6 +3344,67 @@ function perKindIcon(kind, x, y, s){
     rrect(x - s * 0.3 + i * s * 0.3, y - s * 0.16, s * 0.22, s * 0.32, 5);
     ctx.fillStyle = '#8fb8e8'; ctx.fill(); ctx.strokeStyle = CONFIG.C_EDGE; ctx.lineWidth = 1; ctx.stroke();
   }
+  ctx.restore();
+}
+
+const U14_REM_LAST = [];
+function u14RemGen(lv){
+  const [maxTotal, maxGroup] = PER_LV[Math.min(lv, PER_LV.length - 1)];
+  let groups, q, rem, key;
+  for (let tries = 0; tries < 30; tries++){
+    groups = randInt(2, maxGroup);
+    q = randInt(2, Math.max(2, Math.floor(maxTotal / groups)));
+    rem = randInt(1, groups - 1);
+    key = groups + ':' + q + ':' + rem;
+    if (!U14_REM_LAST.includes(key)) break;
+  }
+  U14_REM_LAST.push(key); if (U14_REM_LAST.length > 3) U14_REM_LAST.shift();
+  const total = groups * q + rem;
+  return { g: { total, groups, q, rem, k: 'rem' }, answer: q, kind: 'rem',
+    choices: numChoices(q, [q + 1, Math.max(1, q - 1), q + rem, Math.max(1, q - rem), total]) };
+}
+function u14RemDraw(area, opt){
+  opt = opt || {};
+  const g = opt.g || S.g;
+  ctx.save();
+  const gridArea = { x: area.x, y: area.y, w: area.w, h: area.h * 0.66 };
+  
+  dotGrid(gridArea, g.q, g.groups, { rowLabel: g.q, colLabel: g.groups });
+  
+  const ry = area.y + area.h * 0.86;
+  const rs = 22;
+  text('あまり', W / 2 - (g.rem - 1) * rs / 2 - 30, ry, 13, CONFIG.C_INK_SOFT, 'right', '700');
+  for (let i = 0; i < g.rem; i++) {
+    const x = W / 2 - (g.rem - 1) * rs / 2 + i * rs;
+    ctx.beginPath(); ctx.arc(x, ry, 9, 0, Math.PI * 2);
+    ctx.fillStyle = opt.remHi ? CONFIG.C_GOLD : '#ffffff'; ctx.fill();
+    ctx.strokeStyle = opt.remHi ? CONFIG.C_GOLD : CONFIG.C_GRID; ctx.lineWidth = 1.6; ctx.stroke();
+  }
+  if (opt.reveal != null) text(opt.reveal, W / 2, area.y + area.h - 4, 18, CONFIG.C_OK, 'center', '800');
+  ctx.restore();
+}
+function u14RemTeachBegin(){
+  const g = S.g;
+  const msgs = [
+    g.total + 'こを ' + g.groups + '人で 同じ数ずつ 分ける',
+    g.groups + '人に ' + g.q + 'こずつ 配れる',
+    'のこりは ' + g.rem + 'こ。' + g.groups + '人には もう 配れない＝あまり',
+    g.total + '÷' + g.groups + '＝' + g.q + ' あまり ' + g.rem,
+  ];
+  return makeTeach(3, msgs, ['', g.q + 'こずつ', 'あまり' + g.rem, String(g.q)], { g, mk: 'rem' });
+}
+function u14RemTeachDraw(area, T){
+  const g = T.g, n = T.shown;
+  u14RemDraw(teachFigArea(area), { g, remHi: n >= 2, reveal: n >= 3 ? (g.q + 'こ　あまり' + g.rem) : null });
+}
+function u14RemKindIcon(kind, x, y, s){
+  ctx.save();
+  for (let i = 0; i < 2; i++) {
+    rrect(x - s * 0.3 + i * s * 0.3, y - s * 0.16, s * 0.22, s * 0.32, 5);
+    ctx.fillStyle = '#8fb8e8'; ctx.fill(); ctx.strokeStyle = CONFIG.C_EDGE; ctx.lineWidth = 1; ctx.stroke();
+  }
+  ctx.beginPath(); ctx.arc(x + s * 0.32, y - s * 0.02, s * 0.09, 0, Math.PI * 2);
+  ctx.fillStyle = CONFIG.C_GOLD; ctx.fill(); ctx.strokeStyle = CONFIG.C_EDGE; ctx.lineWidth = 1; ctx.stroke();
   ctx.restore();
 }
 
@@ -3379,42 +3449,84 @@ function groupKindIcon(kind, x, y, s){
 }
 
 
-const MIX_LV = [[5, 3], [8, 4], [10, 5], [12, 6], [15, 8]];
-function mixGen(lv){
-  const [maxA, maxBC] = MIX_LV[Math.min(lv, MIX_LV.length - 1)];
-  const a = randInt(1, maxA), b = randInt(2, maxBC), c = randInt(2, maxBC);
-  const plusFirst = Math.random() < 0.5;
-  const bc = b * c;
-  const answer = plusFirst ? a + bc : a - bc + (bc > a ? bc : 0); 
-  let g;
-  if (plusFirst) g = { a, b, c, op: '+', answer: a + bc };
-  else { const a2 = bc + randInt(1, maxA); g = { a: a2, b, c, op: '−', answer: a2 - bc }; }
-  return { g, answer: g.answer,
-    choices: numChoices(g.answer, [(g.op === '+' ? g.a + b : g.a - b) * c, g.a + b + c, g.a - b - c, bc]) };
+const U16_PAIRS = [[2, 5], [4, 25], [5, 20], [2, 50], [4, 5]]; 
+const U16_LAST = [];
+function u16Gen(lv){
+  let p, q, c, key, arr, defs;
+  for (let tries = 0; tries < 60; tries++){
+    [p, q] = U16_PAIRS[randInt(0, Math.min(U16_PAIRS.length - 1, 1 + lv))];
+    
+    c = randInt(2, 7 + lv * 3);
+    if (c === p || c === q) continue;             
+    key = p + ':' + q + ':' + c;
+    if (U16_LAST.includes(key)) continue;
+    arr = [p, q, c];
+    for (let i = arr.length - 1; i > 0; i--) { const j = randInt(0, i); const t = arr[i]; arr[i] = arr[j]; arr[j] = t; }
+    const pairIdx = [[0, 1], [1, 2], [0, 2]];
+    const niceVal = new Set([p, q]);
+    defs = pairIdx.map(([i, j]) => ({ i, j, label: arr[i] + 'と' + arr[j],
+      nice: niceVal.has(arr[i]) && niceVal.has(arr[j]) }));
+    
+    if (new Set(defs.map(d => d.label)).size === 3) break;
+    defs = null;                                   
+  }
+  if (!defs) {                                      
+    [p, q] = U16_PAIRS[0]; c = 3;
+    arr = [p, q, c];
+    const pairIdx = [[0, 1], [1, 2], [0, 2]];
+    const niceVal = new Set([p, q]);
+    defs = pairIdx.map(([i, j]) => ({ i, j, label: arr[i] + 'と' + arr[j],
+      nice: niceVal.has(arr[i]) && niceVal.has(arr[j]) }));
+    key = p + ':' + q + ':' + c;
+  }
+  U16_LAST.push(key); if (U16_LAST.length > 4) U16_LAST.shift();
+  const correctDef = defs.find(d => d.nice) || defs[0];
+  const total = p * q * c;
+  const choices = shuffleArr(defs.map(d => ({ v: d.label, txt: d.label })));
+  return { g: { arr, p, q, c, total, niceIdx: [correctDef.i, correctDef.j] },
+    answer: correctDef.label, kind: 'u16', choices };
 }
-function mixDraw(area, opt){
+function u16Draw(area, opt){
   opt = opt || {};
   const g = opt.g || S.g;
+  const n = g.arr.length, GAP = 18;
+  const box = Math.max(30, Math.min(64, (area.w - 40 - (n - 1) * GAP) / n));
+  const s = box + GAP;
+  const ox = W / 2 - (n - 1) * s / 2, oy = area.y + area.h / 2;
   ctx.save();
-  text(g.a + ' ' + g.op + ' ' + g.b + '×' + g.c, W / 2, area.y + area.h / 2 - 14, 28, CONFIG.C_INK, 'center', '800');
-  if (opt.step >= 1) text(g.b + '×' + g.c + '＝' + (g.b * g.c) + ' を さきに', W / 2, area.y + area.h / 2 + 30, 16, CONFIG.C_GOLD, 'center', '700');
-  if (opt.reveal != null) text('＝' + opt.reveal, W / 2, area.y + area.h / 2 + 66, 20, CONFIG.C_OK, 'center', '800');
+  g.arr.forEach((v, i) => {
+    const x = ox + i * s;
+    const on = opt.hiPair && opt.hiPair.includes(i);
+    rrect(x - box / 2, oy - box / 2, box, box, 8);
+    ctx.fillStyle = on ? CONFIG.C_HI_T : '#ffffff'; ctx.fill();
+    ctx.strokeStyle = on ? CONFIG.C_GOLD : CONFIG.C_GRID; ctx.lineWidth = on ? 2.4 : 1.6; ctx.stroke();
+    text(String(v), x, oy + 1, Math.round(box * 0.42), CONFIG.C_INK);
+    if (i < n - 1) text('×', x + s / 2, oy + 1, Math.max(16, box * 0.36), CONFIG.C_INK, 'center', '800');
+  });
+  if (opt.reveal != null) text(opt.reveal, W / 2, area.y + area.h - 14, 18, CONFIG.C_OK, 'center', '800');
   ctx.restore();
 }
-function mixTeachBegin(){
+function u16TeachBegin(){
   const g = S.g;
-  const msgs = ['＋・－ より ×・÷ を さきに 計算する'];
-  const labels = [''];
-  msgs.push(g.b + '×' + g.c + '＝' + (g.b * g.c)); labels.push(g.b + '×' + g.c);
-  msgs.push(g.a + ' ' + g.op + ' ' + (g.b * g.c) + '＝' + g.answer); labels.push(String(g.answer));
-  return makeTeach(msgs.length - 1, msgs, labels, { g });
+  const [i, j] = g.niceIdx;
+  const nice = g.arr[i] * g.arr[j];
+  const msgs = [
+    'さきに 計算すると 楽な 2つを さがす',
+    g.arr[i] + 'と' + g.arr[j] + 'で ちょうど ' + nice,
+    nice + ' × ' + g.arr[3 - i - j] + ' ＝ ' + g.total,
+  ];
+  return makeTeach(2, msgs, ['', g.arr[i] + '×' + g.arr[j], String(g.total)], { g, mk: 'u16' });
 }
-function mixTeachDraw(area, T){
-  const g = T.g, n = T.shown, last = T.total;
-  mixDraw(teachFigArea(area), { g, step: n >= 1 ? 1 : 0, reveal: n >= last ? g.answer : null });
+function u16TeachDraw(area, T){
+  const g = T.g, n = T.shown;
+  u16Draw(teachFigArea(area), { g, hiPair: n >= 1 ? g.niceIdx : null, reveal: n >= 2 ? String(g.total) : null });
 }
-function mixKindIcon(kind, x, y, s){
-  ctx.save(); text('×÷', x, y, s * 0.3, CONFIG.C_GOLD, 'center', '800'); ctx.restore();
+function u16KindIcon(kind, x, y, s){
+  ctx.save();
+  text('×', x, y, s * 0.4, CONFIG.C_INK_SOFT, 'center', '800');
+  ctx.strokeStyle = CONFIG.C_GOLD; ctx.lineWidth = 2; ctx.lineCap = 'round';
+  ctx.beginPath(); ctx.arc(x, y, s * 0.32, Math.PI * 0.15, Math.PI * 0.85); ctx.stroke();
+  ctx.restore();
 }
 
 
@@ -4754,17 +4866,27 @@ function u13KindIcon(kind, x, y, s){
 }
 
 const U15_LV = [[2, 3], [2, 4], [3, 5], [3, 6], [4, 7]];
+
+const U15_LAST = [];
 function u15Gen(lv){
   const [dLo, dHi] = U15_LV[Math.min(lv, U15_LV.length - 1)];
-  let div, tens, ones;
-  for (let t = 0; t < 60; t++) {
-    div = randInt(dLo, dHi);
-    const tCand = [], oCand = [];
-    for (let k = 1; k <= 9; k++) if ((k * 10) % div === 0) tCand.push(k * 10);
-    for (let k = 1; k <= 9; k++) if (k % div === 0) oCand.push(k);
-    if (tCand.length && oCand.length) { tens = tCand[randInt(0, tCand.length - 1)]; ones = oCand[randInt(0, oCand.length - 1)]; break; }
+  let div, tens, ones, key;
+  for (let outer = 0; outer < 15; outer++){
+    div = null;
+    for (let t = 0; t < 60; t++) {
+      const d = randInt(dLo, dHi);
+      const tCand = [], oCand = [];
+      for (let k = 1; k <= 9; k++) if ((k * 10) % d === 0) tCand.push(k * 10);
+      for (let k = 1; k <= 9; k++) if (k % d === 0) oCand.push(k);
+      if (tCand.length && oCand.length) {
+        div = d; tens = tCand[randInt(0, tCand.length - 1)]; ones = oCand[randInt(0, oCand.length - 1)]; break;
+      }
+    }
+    if (div == null) { div = 2; tens = 80; ones = 4; }
+    key = div + ':' + tens + ':' + ones;
+    if (!U15_LAST.includes(key)) break;
   }
-  if (tens == null) { div = 2; tens = 80; ones = 4; }
+  U15_LAST.push(key); if (U15_LAST.length > 5) U15_LAST.shift();
   const total = tens + ones;
   const correct = tens + 'と' + ones;
   const wrong = [Math.floor(tens / 10) + 'と' + ones, (tens / 2) + 'と' + (total - tens / 2), total + 'のまま'];
@@ -5585,13 +5707,16 @@ const STAGES = [
     icon(x, y, s){ mulKindIcon('mul', x, y, s * 1.3); },
   },
   {
+    
     id: 'per', unlocked: true,
-    kinds: ['per', 'per', 'per', 'per', 'per', 'per'],
+    kinds: ['per', 'per', 'rem', 'per', 'rem', 'per'],
     intros: [{ kind: 'per', label: '1あたり', g: { total: 12, groups: 3, per: 4 }, answer: 4 }],
-    txt: { per: ['1人ぶんは ', ['何','なん'], 'こ？'] },
-    gen: perGen,
-    drawQ(area){ qWrap(area, () => perDraw(area, {})); },
-    kindIcon: perKindIcon, teachBegin: perTeachBegin, teachDraw: perTeachDraw,
+    txt: { per: ['1人ぶんは ', ['何','なん'], 'こ？'], rem: ['1人 何こまで ', ['分','わ'], 'けられる？'] },
+    gen(lv, kind){ return (kind === 'rem') ? u14RemGen(lv) : perGen(lv); },
+    drawQ(area){ qWrap(area, () => (S.kind === 'rem') ? u14RemDraw(area, {}) : perDraw(area, {})); },
+    kindIcon(kind, x, y, s){ return (kind === 'rem') ? u14RemKindIcon(kind, x, y, s) : perKindIcon(kind, x, y, s); },
+    teachBegin(){ return (S.kind === 'rem') ? u14RemTeachBegin() : perTeachBegin(); },
+    teachDraw(area, T){ return (T.mk === 'rem') ? u14RemTeachDraw(area, T) : perTeachDraw(area, T); },
     icon(x, y, s){ perKindIcon('per', x, y, s * 1.3); },
   },
   {
@@ -5606,13 +5731,14 @@ const STAGES = [
   },
   {
     id: 'mix', unlocked: true,
-    kinds: ['mix', 'mix', 'mix', 'mix', 'mix', 'mix'],
-    intros: [{ kind: 'mix', label: 'どれから', g: { a: 2, b: 3, c: 4, op: '+', answer: 14 }, answer: 14 }],
-    txt: { mix: ['こたえは ', ['何','なん'], '？'] },
-    gen: mixGen,
-    drawQ(area){ qWrap(area, () => mixDraw(area, {})); },
-    kindIcon: mixKindIcon, teachBegin: mixTeachBegin, teachDraw: mixTeachDraw,
-    icon(x, y, s){ mixKindIcon('mix', x, y, s * 1.3); },
+    kinds: ['u16', 'u16', 'u16', 'u16', 'u16', 'u16'],
+    intros: [{ kind: 'u16', label: 'さきに2つ',
+      g: { arr: [9, 5, 2], p: 5, q: 2, c: 9, total: 90, niceIdx: [1, 2] }, answer: '5と2' }],
+    txt: { u16: ['さきに 計算する 2つは？'] },
+    gen: u16Gen,
+    drawQ(area){ qWrap(area, () => u16Draw(area, {})); },
+    kindIcon: u16KindIcon, teachBegin: u16TeachBegin, teachDraw: u16TeachDraw,
+    icon(x, y, s){ u16KindIcon('u16', x, y, s * 1.3); },
   },
   {
     id: 'change', unlocked: true,
@@ -5942,7 +6068,8 @@ const BUILT = {
 const BOSS_TINTS = [null, '#2f6fd6', '#b3452f', '#2f8f6a', '#8a5a2f', '#5a3f8f', '#2f7f8f', '#8f2f5a'];
 STAGES.length = 0;
 
-const STILL_LOCKED = [14, 15, 16, 17, 18, 19, 20, 22, 23, 24, 25, 26, 27, 28, 29];
+
+const STILL_LOCKED = [17, 18, 19, 20, 22, 23, 24, 25, 26, 27, 28, 29];
 UNITS.forEach(([no, name, learn], i) => {
   const base = BUILT[no] || { id: 'r' + no, unlocked: false };
   const st = Object.assign(base, {
