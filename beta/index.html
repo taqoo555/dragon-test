@@ -92,7 +92,7 @@
 
 
 const CONFIG = {
-  VERSION: 'v36',
+  VERSION: 'v37',
 
   
   
@@ -2047,6 +2047,1193 @@ function weekKindIcon(kind, x, y, s){
   ctx.restore();
 }
 
+
+
+function dotGrid(area, rows, cols, opt){
+  opt = opt || {};
+  const s = Math.min(20, (area.w - 40) / Math.max(cols, 1), (area.h - 40) / Math.max(rows, 1) / 1.15);
+  const gx = s * 1.9, gy = s * 2.1;
+  const ox = W / 2 - (cols - 1) * gx / 2, oy = area.y + area.h / 2 - (rows - 1) * gy / 2;
+  ctx.save();
+  for (let r = 0; r < rows; r++) for (let c = 0; c < cols; c++) {
+    const x = ox + c * gx, y = oy + r * gy;
+    const dim = opt.upTo != null && (r * cols + c) >= opt.upTo;
+    ctx.beginPath(); ctx.arc(x, y, s * 0.62, 0, Math.PI * 2);
+    ctx.fillStyle = dim ? '#ffffff' : (opt.rowHi === r ? CONFIG.C_HI_T : '#8fb8e8');
+    ctx.fill();
+    ctx.strokeStyle = CONFIG.C_EDGE; ctx.lineWidth = dim ? 1 : 1.4; ctx.globalAlpha = dim ? 0.35 : 1; ctx.stroke();
+    ctx.globalAlpha = 1;
+  }
+  if (opt.reveal != null) text(opt.reveal, W / 2, oy + rows * gy - gy / 2 + 30, 18, CONFIG.C_OK);
+  ctx.restore();
+}
+
+function lineSegs(area, segs, opt){
+  opt = opt || {};
+  
+  const labelW = 70;
+  const barX = area.x + labelW;
+  const maxLen = Math.max(...segs.map(s => s.len), 1);
+  const barW = Math.max(40, area.w - labelW - 46), unit = barW / maxLen;
+  const rowH = 40, top = area.y + (area.h - rowH * segs.length) / 2;
+  ctx.save();
+  segs.forEach((sg, i) => {
+    const y = top + i * rowH + rowH / 2;
+    const w = sg.len * unit;
+    rrect(barX, y - 12, w, 24, 6);
+    ctx.fillStyle = sg.hi ? CONFIG.C_HI_T : '#8fb8e8'; ctx.fill();
+    ctx.strokeStyle = CONFIG.C_EDGE; ctx.lineWidth = 1.4; ctx.stroke();
+    text(sg.label, barX - 12, y, 13, CONFIG.C_INK, 'right', '700');
+    if (sg.mark != null) {
+      const mx = barX + sg.mark * unit;
+      ctx.strokeStyle = CONFIG.C_GOLD; ctx.lineWidth = 2; ctx.beginPath();
+      ctx.moveTo(mx, y - 16); ctx.lineTo(mx, y + 16); ctx.stroke();
+    }
+    if (opt.reveal && i === segs.length - 1) text(opt.reveal, barX + w + 30, y, 15, CONFIG.C_OK, 'left', '800');
+  });
+  ctx.restore();
+}
+
+function numberRow(area, nums, hi, opt){
+  opt = opt || {};
+  const s = Math.min(40, (area.w - 40) / nums.length);
+  const ox = W / 2 - (nums.length - 1) * s / 2, oy = area.y + area.h / 2;
+  ctx.save();
+  nums.forEach((n, i) => {
+    const x = ox + i * s;
+    const on = hi && hi.includes(i);
+    rrect(x - s * 0.42, oy - s * 0.42, s * 0.84, s * 0.84, 8);
+    ctx.fillStyle = on ? CONFIG.C_HI_T : '#ffffff'; ctx.fill();
+    ctx.strokeStyle = on ? CONFIG.C_GOLD : CONFIG.C_GRID; ctx.lineWidth = on ? 2.4 : 1.4; ctx.stroke();
+    if (n != null) text(String(n), x, oy + 1, Math.round(s * 0.42), CONFIG.C_INK);
+  });
+  if (opt.arc) {
+    const [a, b] = opt.arc;
+    const x1 = ox + a * s, x2 = ox + b * s, midY = oy - s * 0.5 - 14;
+    ctx.strokeStyle = CONFIG.C_GOLD; ctx.lineWidth = 2;
+    ctx.beginPath(); ctx.moveTo(x1, oy - s * 0.42); ctx.quadraticCurveTo((x1 + x2) / 2, midY, x2, oy - s * 0.42); ctx.stroke();
+  }
+  if (opt.reveal != null) text(opt.reveal, W / 2, oy + s * 0.8 + 20, 17, CONFIG.C_OK);
+  ctx.restore();
+}
+
+function markTable(area, rowsLbl, colsLbl, marks, opt){
+  opt = opt || {};
+  const R = rowsLbl.length, C = colsLbl.length;
+  const cw = Math.min(46, (area.w - 70) / C), ch = Math.min(40, (area.h - 50) / (R + 1));
+  const ox = W / 2 - (C * cw) / 2 + 55, oy = area.y + (area.h - (R + 1) * ch) / 2;
+  ctx.save();
+  for (let c = 0; c < C; c++) text(colsLbl[c], ox + c * cw + cw / 2, oy + ch / 2, 12, CONFIG.C_INK_SOFT, 'center', '700');
+  for (let r = 0; r < R; r++) {
+    const y = oy + (r + 1) * ch + ch / 2;
+    text(rowsLbl[r], ox - 12, y, 12, CONFIG.C_INK_SOFT, 'right', '700');
+    for (let c = 0; c < C; c++) {
+      const x = ox + c * cw + cw / 2;
+      rrect(x - cw / 2 + 3, y - ch / 2 + 3, cw - 6, ch - 6, 6);
+      ctx.fillStyle = '#ffffff'; ctx.fill(); ctx.strokeStyle = CONFIG.C_GRID; ctx.lineWidth = 1.2; ctx.stroke();
+      const m = marks[r][c];
+      if (m === 'o') { ctx.strokeStyle = CONFIG.C_OK; ctx.lineWidth = 2.6; ctx.beginPath(); ctx.arc(x, y, cw * 0.3, 0, Math.PI * 2); ctx.stroke(); }
+      else if (m === 'x') {
+        ctx.strokeStyle = '#c15c4e'; ctx.lineWidth = 2.6; ctx.lineCap = 'round';
+        ctx.beginPath(); ctx.moveTo(x - cw * 0.22, y - cw * 0.22); ctx.lineTo(x + cw * 0.22, y + cw * 0.22); ctx.stroke();
+        ctx.beginPath(); ctx.moveTo(x + cw * 0.22, y - cw * 0.22); ctx.lineTo(x - cw * 0.22, y + cw * 0.22); ctx.stroke();
+      }
+    }
+  }
+  if (opt.reveal != null) text(opt.reveal, W / 2, oy + (R + 1) * ch + 22, 16, CONFIG.C_OK);
+  ctx.restore();
+}
+
+
+const TREE_LV = [[2, 2], [2, 3], [3, 2], [3, 3], [3, 4]];
+function treeGen(lv){
+  const [n1, n2] = TREE_LV[Math.min(lv, TREE_LV.length - 1)];
+  const answer = n1 * n2;
+  return { g: { n1, n2 }, answer, kind: 'tree',
+    choices: numChoices(answer, [n1 + n2, n1 * n2 + n1, n1 * n2 - n2, (n1 + 1) * n2, n1 * (n2 + 1)]) };
+}
+function treeDraw(area, opt){
+  opt = opt || {};
+  const g = opt.g || S.g;
+  const s = Math.min(16, (area.h - 30) / g.n1 / 2.1);
+  const x0 = W / 2 - 96, x1 = W / 2 - 4, x2 = W / 2 + 88;
+  const rowH = s * 2.3, top = area.y + (area.h - rowH * g.n1) / 2 + rowH / 2;
+  ctx.save();
+  for (let i = 0; i < g.n1; i++) {
+    const y1 = top + i * rowH;
+    ctx.strokeStyle = CONFIG.C_GRID; ctx.lineWidth = 1.6;
+    ctx.beginPath(); ctx.moveTo(x0, area.y + area.h / 2); ctx.lineTo(x1, y1); ctx.stroke();
+    ctx.beginPath(); ctx.arc(x1, y1, s * 0.66, 0, Math.PI * 2); ctx.fillStyle = '#8fb8e8'; ctx.fill();
+    ctx.strokeStyle = CONFIG.C_EDGE; ctx.lineWidth = 1.4; ctx.stroke();
+    const show = !opt.step || i <= opt.step.i;
+    if (!show) continue;
+    const upto = (i === opt.step?.i) ? opt.step.j + 1 : g.n2;
+    const spread = (g.n2 - 1) * s * 0.95;
+    for (let j = 0; j < upto; j++) {
+      const y2 = y1 - spread / 2 + j * s * 0.95;
+      ctx.strokeStyle = 'rgba(201,150,63,0.85)'; ctx.lineWidth = 1.6;
+      ctx.beginPath(); ctx.moveTo(x1 + s * 0.66, y1); ctx.lineTo(x2 - s * 0.5, y2); ctx.stroke();
+      ctx.beginPath(); ctx.rect(x2 - s * 0.5, y2 - s * 0.5, s, s); ctx.fillStyle = '#f0b070'; ctx.fill();
+      ctx.strokeStyle = CONFIG.C_EDGE; ctx.lineWidth = 1.2; ctx.stroke();
+    }
+  }
+  if (opt.reveal != null) text(g.n1 + '×' + g.n2 + '＝' + opt.reveal + 'とおり', W / 2, area.y + area.h - 14, 16, CONFIG.C_OK);
+  ctx.restore();
+}
+function treeTeachBegin(){
+  const g = S.g;
+  const msgs = ['ぼうしが ' + g.n1 + 'しゅるい'];
+  const labels = [''];
+  for (let i = 0; i < g.n1; i++) {
+    msgs.push((i + 1) + 'こめの ぼうしに、\nくつが ' + g.n2 + 'とおり ずつ');
+    labels.push('+' + g.n2);
+  }
+  msgs.push(g.n1 + '×' + g.n2 + '＝' + (g.n1 * g.n2) + 'とおり');
+  labels.push(g.n1 + '×' + g.n2);
+  return makeTeach(msgs.length - 1, msgs, labels, { g });
+}
+function treeTeachDraw(area, T){
+  const g = T.g, n = T.shown, last = T.total;
+  treeDraw(teachFigArea(area), { g,
+    step: (n >= 1 && n < last) ? { i: n - 1, j: g.n2 - 1 } : (n >= last ? { i: g.n1 - 1, j: g.n2 - 1 } : null),
+    reveal: n >= last ? g.n1 * g.n2 : null });
+}
+function treeKindIcon(kind, x, y, s){
+  ctx.save();
+  ctx.strokeStyle = CONFIG.C_GRID; ctx.lineWidth = 1.4;
+  ctx.beginPath(); ctx.moveTo(x - s * 0.3, y); ctx.lineTo(x, y - s * 0.28); ctx.lineTo(x + s * 0.3, y - s * 0.36); ctx.stroke();
+  ctx.beginPath(); ctx.moveTo(x, y - s * 0.28); ctx.lineTo(x + s * 0.3, y - s * 0.06); ctx.stroke();
+  ctx.strokeStyle = CONFIG.C_GOLD;
+  ctx.beginPath(); ctx.moveTo(x - s * 0.3, y); ctx.lineTo(x, y + s * 0.28); ctx.lineTo(x + s * 0.3, y + s * 0.36); ctx.stroke();
+  ctx.restore();
+}
+
+
+const CHOOSE_LV = [3, 4, 4, 5, 6];
+function chooseGen(lv){
+  const n = CHOOSE_LV[Math.min(lv, CHOOSE_LV.length - 1)];
+  return { g: { n }, answer: n, kind: 'choose',
+    choices: numChoices(n, [n - 1, n + 1, n * 2, n - 2]) };
+}
+function chooseDraw(area, opt){
+  opt = opt || {};
+  const g = opt.g || S.g;
+  dotGrid(area, 1, g.n, { rowHi: opt.markAt != null ? -1 : null });
+  const s = Math.min(20, (area.w - 40) / g.n);
+  const gx = s * 1.9, ox = W / 2 - (g.n - 1) * gx / 2;
+  if (opt.markAt != null) {
+    const x = ox + opt.markAt * gx, y = area.y + area.h / 2;
+    ctx.save();
+    ctx.strokeStyle = '#c15c4e'; ctx.lineWidth = 2.6; ctx.lineCap = 'round';
+    ctx.beginPath(); ctx.moveTo(x - s * 0.5, y - s * 0.5); ctx.lineTo(x + s * 0.5, y + s * 0.5); ctx.stroke();
+    ctx.beginPath(); ctx.moveTo(x + s * 0.5, y - s * 0.5); ctx.lineTo(x - s * 0.5, y + s * 0.5); ctx.stroke();
+    ctx.restore();
+  }
+  if (opt.reveal != null) text('えらび方は ' + opt.reveal + 'とおり', W / 2, area.y + area.h - 16, 16, CONFIG.C_OK);
+}
+function chooseTeachBegin(){
+  const g = S.g;
+  const msgs = [g.n + 'しゅるい ある'];
+  const labels = [''];
+  for (let i = 0; i < g.n; i++) {
+    msgs.push((i + 1) + 'こめを たべない、\nという えらび方');
+    labels.push(String(i + 1));
+  }
+  msgs.push('ぜんぶで ' + g.n + 'とおり');
+  labels.push(String(g.n));
+  return makeTeach(msgs.length - 1, msgs, labels, { g });
+}
+function chooseTeachDraw(area, T){
+  const g = T.g, n = T.shown, last = T.total;
+  chooseDraw(teachFigArea(area), { g, markAt: (n >= 1 && n < last) ? n - 1 : null, reveal: n >= last ? g.n : null });
+}
+function chooseKindIcon(kind, x, y, s){
+  ctx.save();
+  for (let i = 0; i < 3; i++) {
+    ctx.beginPath(); ctx.arc(x - s * 0.28 + i * s * 0.28, y, s * 0.16, 0, Math.PI * 2);
+    ctx.fillStyle = (i === 1) ? '#ffffff' : '#8fb8e8'; ctx.fill(); ctx.strokeStyle = CONFIG.C_EDGE; ctx.lineWidth = 1.2; ctx.stroke();
+  }
+  ctx.strokeStyle = '#c15c4e'; ctx.lineWidth = 1.6; ctx.lineCap = 'round';
+  ctx.beginPath(); ctx.moveTo(x - s * 0.06, y - s * 0.16); ctx.lineTo(x + s * 0.06, y + s * 0.16); ctx.stroke();
+  ctx.beginPath(); ctx.moveTo(x + s * 0.06, y - s * 0.16); ctx.lineTo(x - s * 0.06, y + s * 0.16); ctx.stroke();
+  ctx.restore();
+}
+
+
+const FINGER_VALS = [8, 4, 2, 1];
+function fingerGen(lv){
+  const nFold = [1, 2, 2, 3, 3][Math.min(lv, 4)];
+  const idx = shuffleArr([0, 1, 2, 3]).slice(0, nFold);
+  const answer = idx.reduce((a, i) => a + FINGER_VALS[i], 0);
+  const wrongs = [15 - answer, answer + 1, answer - 1, 15 - answer + 1];
+  return { g: { folded: idx }, answer, kind: 'finger', choices: numChoices(answer, wrongs) };
+}
+function fingerDraw(area, opt){
+  opt = opt || {};
+  const g = opt.g || S.g;
+  const s = Math.min(56, (area.w - 60) / 4);
+  const ox = W / 2 - s * 1.5, oy = area.y + area.h / 2 - 10;
+  ctx.save();
+  for (let i = 0; i < 4; i++) {
+    const x = ox + i * s;
+    const folded = g.folded.includes(i);
+    const showFold = opt.showAt == null || i <= opt.showAt;
+    const isFolded = folded && showFold;
+    rrect(x - s * 0.32, oy - (isFolded ? s * 0.32 : s * 0.62), s * 0.64, (isFolded ? s * 0.64 : s * 1.24), 10);
+    ctx.fillStyle = isFolded ? CONFIG.C_HI_T : '#ffffff'; ctx.fill();
+    ctx.strokeStyle = isFolded ? CONFIG.C_GOLD : CONFIG.C_GRID; ctx.lineWidth = isFolded ? 2.4 : 1.4; ctx.stroke();
+    text(String(FINGER_VALS[i]), x, oy + s * 0.5, 15, CONFIG.C_INK_SOFT, 'center', '700');
+  }
+  if (opt.reveal != null) text(g.folded.map(i => FINGER_VALS[i]).join('＋') + '＝' + opt.reveal, W / 2, area.y + area.h - 16, 16, CONFIG.C_OK);
+  ctx.restore();
+}
+function fingerTeachBegin(){
+  const g = S.g;
+  const msgs = ['4本の 指に 8・4・2・1'];
+  const labels = [''];
+  let sum = 0;
+  g.folded.forEach(i => {
+    sum += FINGER_VALS[i];
+    msgs.push((i + 1) + 'ほんめが おれている\n＋' + FINGER_VALS[i]);
+    labels.push('+' + FINGER_VALS[i]);
+  });
+  msgs.push(g.folded.map(i => FINGER_VALS[i]).join('＋') + '＝' + sum);
+  labels.push(String(sum));
+  return makeTeach(msgs.length - 1, msgs, labels, { g });
+}
+function fingerTeachDraw(area, T){
+  const g = T.g, n = T.shown, last = T.total;
+  fingerDraw(teachFigArea(area), { g, showAt: n >= last ? 3 : (n >= 1 ? g.folded[n - 1] : -1), reveal: n >= last ? g.folded.reduce((a,i)=>a+FINGER_VALS[i],0) : null });
+}
+function fingerKindIcon(kind, x, y, s){
+  ctx.save();
+  for (let i = 0; i < 3; i++) {
+    rrect(x - s * 0.24 + i * s * 0.22, y - s * 0.2, s * 0.16, s * 0.36, 4);
+    ctx.fillStyle = (i === 1) ? CONFIG.C_HI_T : '#ffffff'; ctx.fill(); ctx.strokeStyle = CONFIG.C_EDGE; ctx.lineWidth = 1; ctx.stroke();
+  }
+  ctx.restore();
+}
+
+
+const TRI_LV = [4, 5, 6, 7, 9];
+function triGen(lv){
+  const n = TRI_LV[Math.min(lv, TRI_LV.length - 1)];
+  const answer = n * (n + 1) / 2;
+  return { g: { n }, answer, kind: 'tri', choices: numChoices(answer, [n * n, n * (n - 1) / 2, n + (n - 1), answer + n]) };
+}
+function triDraw(area, opt){
+  opt = opt || {};
+  const g = opt.g || S.g;
+  const nums = Array.from({ length: g.n }, (_, i) => i + 1);
+  numberRow(area, nums, opt.hi, { arc: opt.arc, reveal: opt.reveal });
+}
+function triTeachBegin(){
+  const g = S.g, n = g.n;
+  const pairs = [];
+  let a = 1, b = n;
+  while (a < b) { pairs.push([a, b]); a++; b--; }
+  const mid = (a === b) ? a : null;
+  const msgs = [n + 'まで の 数を ならべる'];
+  const labels = [''];
+  const pairSum = n + 1;
+  pairs.forEach(([x, y]) => { msgs.push(x + 'と' + y + 'を ペアに\n＝' + pairSum); labels.push(x + '+' + y); });
+  let total = pairs.length * pairSum;
+  if (mid) { msgs.push(mid + ' だけ のこる'); labels.push(String(mid)); total += mid; }
+  msgs.push('ぜんぶで ' + total);
+  labels.push(String(total));
+  return makeTeach(msgs.length - 1, msgs, labels, { g, pairs, mid });
+}
+function triTeachDraw(area, T){
+  const g = T.g, n = T.shown, last = T.total, pairs = T.pairs, mid = T.mid;
+  const shownPairs = Math.min(Math.max(0, n - 1), pairs.length);
+  let hi = [], arc = null;
+  for (let k = 0; k < shownPairs; k++) hi.push(pairs[k][0] - 1, pairs[k][1] - 1);
+  if (n >= 1 && n <= pairs.length) arc = [pairs[n - 1][0] - 1, pairs[n - 1][1] - 1];
+  if (mid && n === pairs.length + 1) hi.push(mid - 1);
+  let reveal = null;
+  if (n >= last) reveal = g.n * (g.n + 1) / 2;
+  triDraw(teachFigArea(area), { g, hi, arc, reveal });
+}
+function triKindIcon(kind, x, y, s){
+  ctx.save();
+  [-1, 0, 1].forEach((d, i) => {
+    rrect(x + d * s * 0.24 - s * 0.1, y - s * 0.1, s * 0.2, s * 0.2, 4);
+    ctx.fillStyle = (i !== 1) ? CONFIG.C_HI_T : '#ffffff'; ctx.fill(); ctx.strokeStyle = CONFIG.C_EDGE; ctx.lineWidth = 1; ctx.stroke();
+  });
+  ctx.restore();
+}
+
+
+const SQ_LV = [2, 3, 4, 5, 6];
+function squareGen(lv){
+  const n = SQ_LV[Math.min(lv, SQ_LV.length - 1)];
+  const answer = n * n;
+  return { g: { n }, answer, kind: 'square', choices: numChoices(answer, [n * 2, n + n, (n - 1) * (n - 1), (n + 1) * (n + 1)]) };
+}
+function squareDraw(area, opt){
+  opt = opt || {};
+  const g = opt.g || S.g;
+  dotGrid(area, g.n, g.n, { upTo: opt.upTo, reveal: opt.reveal });
+}
+function squareTeachBegin(){
+  const g = S.g, n = g.n;
+  const msgs = [n + 'ばんめ は、たてに ' + n + 'こ よこに ' + n + 'こ'];
+  const labels = [''];
+  msgs.push('たてが ' + n + 'こ'); labels.push(n + '×');
+  msgs.push('それが ' + n + 'れつ'); labels.push('×' + n);
+  msgs.push(n + '×' + n + '＝' + (n * n)); labels.push(String(n * n));
+  return makeTeach(msgs.length - 1, msgs, labels, { g });
+}
+function squareTeachDraw(area, T){
+  const g = T.g, n = T.shown, last = T.total;
+  const upTo = n <= 1 ? g.n : (n === 2 ? g.n * g.n : null);
+  squareDraw(teachFigArea(area), { g, upTo, reveal: n >= last ? g.n * g.n : null });
+}
+function squareKindIcon(kind, x, y, s){
+  ctx.save();
+  for (let r = 0; r < 2; r++) for (let c = 0; c < 2; c++) {
+    rrect(x - s * 0.22 + c * s * 0.22, y - s * 0.22 + r * s * 0.22, s * 0.18, s * 0.18, 3);
+    ctx.fillStyle = '#8fb8e8'; ctx.fill(); ctx.strokeStyle = CONFIG.C_EDGE; ctx.lineWidth = 1; ctx.stroke();
+  }
+  ctx.restore();
+}
+
+
+const SUMDIFF_LV = [[10, 4], [16, 4], [20, 6], [30, 8], [40, 10]];
+function sumdiffGen(lv, kind){
+  const [maxSum, maxDiff] = SUMDIFF_LV[Math.min(lv, SUMDIFF_LV.length - 1)];
+  let sum, diff, big, small;
+  for (let t = 0; t < 40; t++) {
+    diff = randInt(2, maxDiff);
+    sum = randInt(diff + 2, maxSum);
+    if ((sum + diff) % 2 === 0) { big = (sum + diff) / 2; small = (sum - diff) / 2; if (small >= 1) break; }
+  }
+  const k = (kind === 'small') ? 'small' : 'big';
+  const answer = (k === 'big') ? big : small;
+  return { g: { sum, diff, big, small }, answer, kind: k,
+    choices: numChoices(answer, [sum, diff, sum - diff, sum + diff, (k === 'big') ? small : big]) };
+}
+function sumdiffDraw(area, opt){
+  opt = opt || {};
+  const g = opt.g || S.g;
+  lineSegs(area, [
+    { len: g.big, label: '大きい方', hi: opt.showDiff },
+    { len: g.small, label: '小さい方', hi: false },
+  ], { reveal: opt.reveal });
+  if (opt.showDiff) {
+    ctx.save();
+    text('差 ' + g.diff, W - 40, area.y + area.h / 2 - 24, 13, CONFIG.C_GOLD, 'right', '700');
+    ctx.restore();
+  }
+}
+function sumdiffTeachBegin(){
+  const g = S.g, k = S.kind;
+  const msgs = ['和は ' + g.sum + '、差は ' + g.diff];
+  const labels = [''];
+  msgs.push('大きい方から、差の ' + g.diff + 'を 切る\nすると 2つとも 小さい方に そろう'); labels.push('−' + g.diff);
+  msgs.push('（' + g.sum + '−' + g.diff + '）÷2 ＝ ' + g.small + '（小さい方）'); labels.push(String(g.small));
+  if (k === 'big') { msgs.push(g.small + '＋' + g.diff + '＝' + g.big + '（大きい方）'); labels.push(String(g.big)); }
+  return makeTeach(msgs.length - 1, msgs, labels, { g });
+}
+function sumdiffTeachDraw(area, T){
+  const g = T.g, n = T.shown, last = T.total;
+  sumdiffDraw(teachFigArea(area), { g, showDiff: n >= 1, reveal: n >= last ? (S.kind === 'big' ? g.big : g.small) : null });
+}
+function sumdiffKindIcon(kind, x, y, s){
+  ctx.save();
+  rrect(x - s * 0.32, y - s * 0.24, s * 0.64, s * 0.12, 4); ctx.fillStyle = '#8fb8e8'; ctx.fill(); ctx.strokeStyle = CONFIG.C_EDGE; ctx.lineWidth = 1; ctx.stroke();
+  rrect(x - s * 0.32, y + s * 0.1, s * 0.4, s * 0.12, 4); ctx.fillStyle = (kind === 'small') ? CONFIG.C_HI_T : '#8fb8e8'; ctx.fill(); ctx.strokeStyle = CONFIG.C_EDGE; ctx.lineWidth = 1; ctx.stroke();
+  ctx.restore();
+}
+
+
+const ROUND_LV = [[80, 96], [150, 96], [250, 97], [400, 98], [600, 99]];
+function roundGen(lv){
+  const [maxB, near] = ROUND_LV[Math.min(lv, ROUND_LV.length - 1)];
+  const base = Math.ceil(near / 10) * 10;
+  const a = randInt(near, base - 1);
+  const b = randInt(10, maxB);
+  const answer = a + b;
+  const diff = base - a;
+  return { g: { a, b, base, diff }, answer,
+    choices: numChoices(answer, [base + b, a + b + diff, a + b - diff, base + b - diff]) };
+}
+function roundDraw(area, opt){
+  opt = opt || {};
+  const g = opt.g || S.g;
+  ctx.save();
+  text(g.a + ' ＋ ' + g.b, W / 2, area.y + area.h / 2 - 14, 30, CONFIG.C_INK, 'center', '800');
+  if (opt.step >= 1) text(g.a + '＝' + g.base + '－' + g.diff, W / 2, area.y + area.h / 2 + 30, 18, CONFIG.C_GOLD, 'center', '700');
+  if (opt.reveal != null) text('＝' + opt.reveal, W / 2, area.y + area.h / 2 + 66, 20, CONFIG.C_OK, 'center', '800');
+  ctx.restore();
+}
+function roundTeachBegin(){
+  const g = S.g;
+  const msgs = [g.a + ' は ' + g.base + ' に あと ' + g.diff + ' で とどく数'];
+  const labels = [''];
+  msgs.push(g.a + '＝' + g.base + '－' + g.diff); labels.push(g.base + '−' + g.diff);
+  msgs.push(g.base + '＋' + g.b + '＝' + (g.base + g.b)); labels.push('+' + g.b);
+  const ans = g.a + g.b;
+  msgs.push((g.base + g.b) + '－' + g.diff + '＝' + ans); labels.push('−' + g.diff);
+  return makeTeach(msgs.length - 1, msgs, labels, { g });
+}
+function roundTeachDraw(area, T){
+  const g = T.g, n = T.shown, last = T.total;
+  roundDraw(teachFigArea(area), { g, step: n >= 1 ? 1 : 0, reveal: n >= last ? g.a + g.b : null });
+}
+function roundKindIcon(kind, x, y, s){
+  ctx.save();
+  text('100', x, y, s * 0.34, CONFIG.C_GOLD, 'center', '800');
+  ctx.restore();
+}
+
+
+const MUL_LV = [[3, 4], [3, 5], [4, 5], [4, 6], [5, 6]];
+function mulGen(lv, kind){
+  const [maxA, maxB] = MUL_LV[Math.min(lv, MUL_LV.length - 1)];
+  const per = randInt(2, maxA), bags = randInt(2, maxB);
+  const answer = per * bags;
+  return { g: { per, bags }, answer, kind: kind || 'mul',
+    choices: numChoices(answer, [per + bags, per * bags + per, per * (bags + 1), (per + 1) * bags]) };
+}
+function mulDraw(area, opt){
+  opt = opt || {};
+  const g = opt.g || S.g;
+  dotGrid(area, g.bags, g.per, { upTo: opt.upTo, reveal: opt.reveal, rowHi: opt.rowHi });
+}
+function mulTeachBegin(){
+  const g = S.g;
+  const msgs = ['1ふくろに ' + g.per + 'こ、それが ' + g.bags + 'ふくろ'];
+  const labels = [''];
+  for (let i = 0; i < g.bags; i++) { msgs.push((i + 1) + 'ふくろめ で ' + g.per + 'こ ずつ'); labels.push('+' + g.per); }
+  msgs.push(g.per + '×' + g.bags + '＝' + (g.per * g.bags));
+  labels.push(g.per + '×' + g.bags);
+  return makeTeach(msgs.length - 1, msgs, labels, { g });
+}
+function mulTeachDraw(area, T){
+  const g = T.g, n = T.shown, last = T.total;
+  mulDraw(teachFigArea(area), { g, rowHi: (n >= 1 && n < last) ? n - 1 : null, upTo: n >= last ? g.per * g.bags : (n >= 1 ? n * g.per : 0), reveal: n >= last ? g.per * g.bags : null });
+}
+function mulKindIcon(kind, x, y, s){
+  ctx.save();
+  for (let r = 0; r < 2; r++) for (let c = 0; c < 3; c++) {
+    ctx.beginPath(); ctx.arc(x - s * 0.28 + c * s * 0.14, y - s * 0.1 + r * s * 0.2, s * 0.06, 0, Math.PI * 2);
+    ctx.fillStyle = '#8fb8e8'; ctx.fill(); ctx.strokeStyle = CONFIG.C_EDGE; ctx.lineWidth = 1; ctx.stroke();
+  }
+  ctx.restore();
+}
+
+
+const PER_LV = [[8, 2], [12, 3], [16, 4], [20, 4], [24, 6]];
+function perGen(lv){
+  const [maxTotal, maxGroup] = PER_LV[Math.min(lv, PER_LV.length - 1)];
+  const groups = randInt(2, maxGroup);
+  const per = randInt(2, Math.max(2, Math.floor(maxTotal / groups)));
+  const total = per * groups;
+  return { g: { total, groups, per }, answer: per,
+    choices: numChoices(per, [total, groups, total - groups, per + groups]) };
+}
+function perDraw(area, opt){
+  opt = opt || {};
+  const g = opt.g || S.g;
+  dotGrid(area, g.groups, g.per, { upTo: opt.upTo, reveal: opt.reveal, rowHi: opt.rowHi });
+  ctx.save();
+  text(g.total + 'こを ' + g.groups + '人で 同じ数ずつ', W / 2, area.y + 16, 13, CONFIG.C_INK_SOFT, 'center', '700');
+  ctx.restore();
+}
+function perTeachBegin(){
+  const g = S.g;
+  const msgs = [g.total + 'こを ' + g.groups + '人に 同じ数ずつ 配る'];
+  const labels = [''];
+  for (let i = 0; i < g.groups; i++) { msgs.push((i + 1) + '人めに 配ると のこりが へる'); labels.push((i + 1) + '人め'); }
+  msgs.push(g.total + '÷' + g.groups + '＝' + g.per + '（1人ぶん）');
+  labels.push(g.total + '÷' + g.groups);
+  return makeTeach(msgs.length - 1, msgs, labels, { g });
+}
+function perTeachDraw(area, T){
+  const g = T.g, n = T.shown, last = T.total;
+  perDraw(teachFigArea(area), { g, rowHi: (n >= 1 && n < last) ? n - 1 : null, upTo: n >= 1 ? Math.min(n, g.groups) * g.per : 0, reveal: n >= last ? g.per : null });
+}
+function perKindIcon(kind, x, y, s){
+  ctx.save();
+  for (let i = 0; i < 3; i++) {
+    rrect(x - s * 0.3 + i * s * 0.3, y - s * 0.16, s * 0.22, s * 0.32, 5);
+    ctx.fillStyle = '#8fb8e8'; ctx.fill(); ctx.strokeStyle = CONFIG.C_EDGE; ctx.lineWidth = 1; ctx.stroke();
+  }
+  ctx.restore();
+}
+
+
+const GROUP_LV = [[8, 2], [12, 3], [16, 4], [20, 4], [24, 4]];
+function groupGen(lv){
+  const [maxTotal, maxPer] = GROUP_LV[Math.min(lv, GROUP_LV.length - 1)];
+  const per = randInt(2, maxPer);
+  const groups = randInt(2, Math.max(2, Math.floor(maxTotal / per)));
+  const total = per * groups;
+  return { g: { total, per, groups }, answer: groups,
+    choices: numChoices(groups, [total, per, total - per, groups + per]) };
+}
+function groupDraw(area, opt){
+  opt = opt || {};
+  const g = opt.g || S.g;
+  dotGrid(area, g.groups, g.per, { upTo: opt.upTo, reveal: opt.reveal, rowHi: opt.rowHi });
+  ctx.save();
+  text(g.total + 'こを 1くみ ' + g.per + 'こずつ に 分ける', W / 2, area.y + 16, 13, CONFIG.C_INK_SOFT, 'center', '700');
+  ctx.restore();
+}
+function groupTeachBegin(){
+  const g = S.g;
+  const msgs = [g.total + 'こを 1くみ ' + g.per + 'こずつ に 分ける'];
+  const labels = [''];
+  for (let i = 0; i < g.groups; i++) { msgs.push((i + 1) + 'くみめが できた'); labels.push((i + 1) + 'くみ'); }
+  msgs.push(g.total + '÷' + g.per + '＝' + g.groups + '（くみの数）');
+  labels.push(g.total + '÷' + g.per);
+  return makeTeach(msgs.length - 1, msgs, labels, { g });
+}
+function groupTeachDraw(area, T){
+  const g = T.g, n = T.shown, last = T.total;
+  groupDraw(teachFigArea(area), { g, rowHi: (n >= 1 && n < last) ? n - 1 : null, upTo: n >= 1 ? Math.min(n, g.groups) * g.per : 0, reveal: n >= last ? g.groups : null });
+}
+function groupKindIcon(kind, x, y, s){
+  ctx.save();
+  for (let i = 0; i < 2; i++) {
+    ctx.strokeStyle = CONFIG.C_GOLD; ctx.lineWidth = 1.4;
+    ctx.strokeRect(x - s * 0.32 + i * s * 0.34, y - s * 0.16, s * 0.28, s * 0.32);
+  }
+  ctx.restore();
+}
+
+
+const MIX_LV = [[5, 3], [8, 4], [10, 5], [12, 6], [15, 8]];
+function mixGen(lv){
+  const [maxA, maxBC] = MIX_LV[Math.min(lv, MIX_LV.length - 1)];
+  const a = randInt(1, maxA), b = randInt(2, maxBC), c = randInt(2, maxBC);
+  const plusFirst = Math.random() < 0.5;
+  const bc = b * c;
+  const answer = plusFirst ? a + bc : a - bc + (bc > a ? bc : 0); 
+  let g;
+  if (plusFirst) g = { a, b, c, op: '+', answer: a + bc };
+  else { const a2 = bc + randInt(1, maxA); g = { a: a2, b, c, op: '−', answer: a2 - bc }; }
+  return { g, answer: g.answer,
+    choices: numChoices(g.answer, [(g.op === '+' ? g.a + b : g.a - b) * c, g.a + b + c, g.a - b - c, bc]) };
+}
+function mixDraw(area, opt){
+  opt = opt || {};
+  const g = opt.g || S.g;
+  ctx.save();
+  text(g.a + ' ' + g.op + ' ' + g.b + '×' + g.c, W / 2, area.y + area.h / 2 - 14, 28, CONFIG.C_INK, 'center', '800');
+  if (opt.step >= 1) text(g.b + '×' + g.c + '＝' + (g.b * g.c) + ' を さきに', W / 2, area.y + area.h / 2 + 30, 16, CONFIG.C_GOLD, 'center', '700');
+  if (opt.reveal != null) text('＝' + opt.reveal, W / 2, area.y + area.h / 2 + 66, 20, CONFIG.C_OK, 'center', '800');
+  ctx.restore();
+}
+function mixTeachBegin(){
+  const g = S.g;
+  const msgs = ['＋・－ より ×・÷ を さきに 計算する'];
+  const labels = [''];
+  msgs.push(g.b + '×' + g.c + '＝' + (g.b * g.c)); labels.push(g.b + '×' + g.c);
+  msgs.push(g.a + ' ' + g.op + ' ' + (g.b * g.c) + '＝' + g.answer); labels.push(String(g.answer));
+  return makeTeach(msgs.length - 1, msgs, labels, { g });
+}
+function mixTeachDraw(area, T){
+  const g = T.g, n = T.shown, last = T.total;
+  mixDraw(teachFigArea(area), { g, step: n >= 1 ? 1 : 0, reveal: n >= last ? g.answer : null });
+}
+function mixKindIcon(kind, x, y, s){
+  ctx.save(); text('×÷', x, y, s * 0.3, CONFIG.C_GOLD, 'center', '800'); ctx.restore();
+}
+
+
+const CHANGE_LV = [[10, 6], [16, 8], [22, 10], [30, 14], [40, 18]];
+function changeGen(lv, kind){
+  const [maxStart, maxDelta] = CHANGE_LV[Math.min(lv, CHANGE_LV.length - 1)];
+  const start = randInt(2, maxStart);
+  const up = kind !== 'down';
+  const delta = randInt(1, Math.min(maxDelta, up ? 999 : start - 1));
+  const answer = up ? start + delta : start - delta;
+  return { g: { start, delta, up }, answer, kind: up ? 'up' : 'down',
+    choices: numChoices(answer, [start, delta, start + (up ? -delta : delta), start * 2]) };
+}
+function changeDraw(area, opt){
+  opt = opt || {};
+  const g = opt.g || S.g;
+  lineSegs(area, [
+    { len: g.start, label: 'はじめ' },
+    { len: g.up ? g.start + g.delta : g.start - g.delta, label: 'いま', hi: opt.hiEnd },
+  ], { reveal: opt.reveal });
+}
+function changeTeachBegin(){
+  const g = S.g, up = g.up;
+  const msgs = ['はじめは ' + g.start];
+  const labels = [''];
+  msgs.push(up ? (g.delta + 'こ もらった') : (g.delta + 'こ つかった')); labels.push((up ? '+' : '−') + g.delta);
+  const ans = up ? g.start + g.delta : g.start - g.delta;
+  msgs.push(g.start + (up ? '＋' : '－') + g.delta + '＝' + ans); labels.push(String(ans));
+  return makeTeach(msgs.length - 1, msgs, labels, { g });
+}
+function changeTeachDraw(area, T){
+  const g = T.g, n = T.shown, last = T.total;
+  changeDraw(teachFigArea(area), { g, hiEnd: n >= 1, reveal: n >= last ? (g.up ? g.start + g.delta : g.start - g.delta) : null });
+}
+function changeKindIcon(kind, x, y, s){
+  ctx.save();
+  ctx.strokeStyle = CONFIG.C_GOLD; ctx.lineWidth = 1.8; ctx.lineCap = 'round';
+  ctx.beginPath();
+  if (kind === 'down') { ctx.moveTo(x - s * 0.2, y - s * 0.16); ctx.lineTo(x + s * 0.2, y + s * 0.16); ctx.lineTo(x + s * 0.06, y + s * 0.16); ctx.moveTo(x + s * 0.2, y + s * 0.16); ctx.lineTo(x + s * 0.2, y + s * 0.02); }
+  else { ctx.moveTo(x - s * 0.2, y + s * 0.16); ctx.lineTo(x + s * 0.2, y - s * 0.16); ctx.lineTo(x + s * 0.06, y - s * 0.16); ctx.moveTo(x + s * 0.2, y - s * 0.16); ctx.lineTo(x + s * 0.2, y - s * 0.02); }
+  ctx.stroke();
+  ctx.restore();
+}
+
+
+const COINS = [500, 100, 50, 10, 5, 1];
+function coinCount(yen){
+  let rest = yen, n = 0; const used = [];
+  for (const c of COINS) { const k = Math.floor(rest / c); if (k > 0) { used.push([c, k]); n += k; rest -= c * k; } }
+  return { n, used };
+}
+const COIN_LV = [180, 380, 680, 980, 1980];
+function coinGen(lv){
+  const max = COIN_LV[Math.min(lv, COIN_LV.length - 1)];
+  const yen = randInt(11, max);
+  const { n, used } = coinCount(yen);
+  return { g: { yen, used }, answer: n, choices: numChoices(n, [n + 1, n - 1, n + 2, Math.max(1, n - 2)]) };
+}
+function coinDraw(area, opt){
+  opt = opt || {};
+  const g = opt.g || S.g;
+  ctx.save();
+  text(g.yen + '円', W / 2, area.y + area.h / 2 - 30, 28, CONFIG.C_INK, 'center', '800');
+  if (opt.showUsed) {
+    const s = g.used.map(([c, k]) => c + '円×' + k).join('　');
+    text(s, W / 2, area.y + area.h / 2 + 14, 15, CONFIG.C_GOLD, 'center', '700');
+  }
+  if (opt.reveal != null) text('あわせて ' + opt.reveal + 'まい', W / 2, area.y + area.h / 2 + 50, 18, CONFIG.C_OK, 'center', '800');
+  ctx.restore();
+}
+function coinTeachBegin(){
+  const g = S.g;
+  const msgs = [g.yen + '円を、なるべく 大きい こう貨から 使う'];
+  const labels = [''];
+  let sum = 0;
+  g.used.forEach(([c, k]) => { sum += k; msgs.push(c + '円玉を ' + k + 'まい'); labels.push('+' + k); });
+  msgs.push('あわせて ' + sum + 'まい');
+  labels.push(String(sum));
+  return makeTeach(msgs.length - 1, msgs, labels, { g });
+}
+function coinTeachDraw(area, T){
+  const g = T.g, n = T.shown, last = T.total;
+  coinDraw(teachFigArea(area), { g, showUsed: n >= 1, reveal: n >= last ? g.used.reduce((a, [,k]) => a + k, 0) : null });
+}
+function coinKindIcon(kind, x, y, s){
+  ctx.save();
+  ctx.beginPath(); ctx.arc(x, y, s * 0.24, 0, Math.PI * 2); ctx.fillStyle = '#e8c877'; ctx.fill();
+  ctx.strokeStyle = CONFIG.C_EDGE; ctx.lineWidth = 1.4; ctx.stroke();
+  ctx.restore();
+}
+
+
+const CARD_LV = [3, 3, 3, 4, 4];
+function cardGen(lv){
+  const digits = CARD_LV[Math.min(lv, CARD_LV.length - 1)];
+  const cards = Array.from({ length: digits }, () => randInt(1, 9));
+  const sorted = [...cards].sort((a, b) => b - a);
+  const answer = Number(sorted.join(''));
+  const worst = Number([...cards].sort((a, b) => a - b).join(''));
+  return { g: { cards }, answer, choices: numChoices(answer, [worst, answer - 1, answer + 9]) };
+}
+function cardDraw(area, opt){
+  opt = opt || {};
+  const g = opt.g || S.g;
+  const n = g.cards.length;
+  const s = Math.min(60, (area.w - 40) / n - 8);
+  const ox = W / 2 - (n - 1) * (s + 8) / 2, oy = area.y + area.h / 2;
+  ctx.save();
+  const order = opt.order || g.cards.map((_, i) => i);
+  order.forEach((ci, i) => {
+    const x = ox + i * (s + 8);
+    rrect(x - s / 2, oy - s * 0.7, s, s * 1.4, 8);
+    ctx.fillStyle = '#ffffff'; ctx.fill(); ctx.strokeStyle = CONFIG.C_GRID; ctx.lineWidth = 1.6; ctx.stroke();
+    text(String(g.cards[ci]), x, oy, Math.round(s * 0.55), CONFIG.C_INK);
+  });
+  if (opt.reveal != null) text(String(opt.reveal), W / 2, oy + s * 0.9 + 26, 22, CONFIG.C_OK, 'center', '800');
+  ctx.restore();
+}
+function cardTeachBegin(){
+  const g = S.g;
+  const sorted = g.cards.map((_, i) => i).sort((a, b) => g.cards[b] - g.cards[a]);
+  const msgs = ['一番 大きい 数に するには、\n大きいカードを 左に'];
+  const labels = [''];
+  const val = Number(sorted.map(i => g.cards[i]).join(''));
+  msgs.push('大きい じゅんに ならべる'); labels.push('ならべる');
+  msgs.push(sorted.map(i => g.cards[i]).join('') + ' が 一番大きい'); labels.push(String(val));
+  return makeTeach(msgs.length - 1, msgs, labels, { g, sorted });
+}
+function cardTeachDraw(area, T){
+  const g = T.g, n = T.shown, last = T.total;
+  const val = Number(T.sorted.map(i => g.cards[i]).join(''));
+  cardDraw(teachFigArea(area), { g, order: n >= 1 ? T.sorted : g.cards.map((_, i) => i), reveal: n >= last ? val : null });
+}
+function cardKindIcon(kind, x, y, s){
+  ctx.save();
+  for (let i = 0; i < 3; i++) {
+    rrect(x - s * 0.3 + i * s * 0.22, y - s * 0.2, s * 0.16, s * 0.36, 3);
+    ctx.fillStyle = '#ffffff'; ctx.fill(); ctx.strokeStyle = CONFIG.C_GRID; ctx.lineWidth = 1; ctx.stroke();
+  }
+  ctx.restore();
+}
+
+
+const NAMES3 = ['あ', 'い', 'う'];
+function logicGen(lv){
+  
+  let win;
+  for (;;) {
+    win = [[null, Math.random() < 0.5, Math.random() < 0.5], [null, null, Math.random() < 0.5], [null, null, null]];
+    win[1][0] = !win[0][1]; win[2][0] = !win[0][2]; win[2][1] = !win[1][2];
+    const wins = [0, 1, 2].map(r => [0, 1, 2].filter(c => c !== r && win[r][c] === true).length);
+    if (new Set(wins).size === 3) { win.wins = wins; break; }
+  }
+  const wins = win.wins;
+  const best = wins.indexOf(Math.max(...wins));
+  const answer = wins[best];
+  return { g: { win, wins, best }, answer, choices: numChoices(answer, [0, 1, 2]) };
+}
+function logicDraw(area, opt){
+  opt = opt || {};
+  const g = opt.g || S.g;
+  const marks = [[null, null, null], [null, null, null], [null, null, null]];
+  for (let r = 0; r < 3; r++) for (let c = 0; c < 3; c++) {
+    if (r === c) continue;
+    if (opt.upTo != null && (r * 3 + c) > opt.upTo) continue;
+    marks[r][c] = g.win[r][c] ? 'o' : 'x';
+  }
+  markTable(area, NAMES3, NAMES3, marks, { reveal: opt.reveal });
+}
+function logicTeachBegin(){
+  const g = S.g;
+  const msgs = ['○は 勝ち、×は 負け'];
+  const labels = [''];
+  msgs.push(NAMES3[g.best] +'の 勝ち数を かぞえる'); labels.push('かぞえる');
+  msgs.push(NAMES3[g.best] +'は ' + g.wins[g.best] + '勝で 一番多い'); labels.push(String(g.wins[g.best]));
+  return makeTeach(msgs.length - 1, msgs, labels, { g });
+}
+function logicTeachDraw(area, T){
+  const g = T.g, n = T.shown, last = T.total;
+  logicDraw(teachFigArea(area), { g, upTo: n >= 1 ? 8 : -1, reveal: n >= last ? g.answer : null });
+}
+function logicKindIcon(kind, x, y, s){
+  ctx.save();
+  ctx.strokeStyle = CONFIG.C_OK; ctx.lineWidth = 2; ctx.beginPath(); ctx.arc(x - s * 0.14, y, s * 0.16, 0, Math.PI * 2); ctx.stroke();
+  ctx.strokeStyle = '#c15c4e'; ctx.lineWidth = 2; ctx.lineCap = 'round';
+  ctx.beginPath(); ctx.moveTo(x + s * 0.02, y - s * 0.14); ctx.lineTo(x + s * 0.26, y + s * 0.14); ctx.stroke();
+  ctx.beginPath(); ctx.moveTo(x + s * 0.26, y - s * 0.14); ctx.lineTo(x + s * 0.02, y + s * 0.14); ctx.stroke();
+  ctx.restore();
+}
+
+
+const MISSING_LV = [12, 20, 40, 80, 150];
+function missingGen(lv){
+  const max = MISSING_LV[Math.min(lv, MISSING_LV.length - 1)];
+  const c = randInt(6, max);
+  const a = randInt(1, c - 1);
+  const b = c - a;
+  return { g: { a, b, c }, answer: b, choices: numChoices(b, [c, a, c - a + 1, c - a - 1]) };
+}
+function missingDraw(area, opt){
+  opt = opt || {};
+  const g = opt.g || S.g;
+  ctx.save();
+  const bTxt = opt.reveal != null ? String(opt.reveal) : '□';
+  text(g.a + ' ＋ ' + bTxt + ' ＝ ' + g.c, W / 2, area.y + area.h / 2, 30, CONFIG.C_INK, 'center', '800');
+  if (opt.step >= 1) text('一の位から 考える', W / 2, area.y + area.h / 2 + 46, 14, CONFIG.C_GOLD, 'center', '700');
+  ctx.restore();
+}
+function missingTeachBegin(){
+  const g = S.g;
+  const msgs = [g.c + ' から ' + g.a + ' を 引くと、□が わかる'];
+  const labels = [''];
+  msgs.push(g.c + ' － ' + g.a + ' ＝ ' + g.b); labels.push(g.c + '−' + g.a);
+  return makeTeach(msgs.length - 1, msgs, labels, { g });
+}
+function missingTeachDraw(area, T){
+  const g = T.g, n = T.shown, last = T.total;
+  missingDraw(teachFigArea(area), { g, step: n >= 1 ? 1 : 0, reveal: n >= last ? g.b : null });
+}
+function missingKindIcon(kind, x, y, s){
+  ctx.save();
+  ctx.strokeStyle = CONFIG.C_GOLD; ctx.lineWidth = 1.6; ctx.strokeRect(x - s * 0.18, y - s * 0.18, s * 0.36, s * 0.36);
+  ctx.restore();
+}
+
+
+const SUGO_LV = [[6, 3], [8, 3], [10, 4], [12, 5], [14, 5]];
+function sugoGen(lv){
+  const [len, steps] = SUGO_LV[Math.min(lv, SUGO_LV.length - 1)];
+  const nums = Array.from({ length: len }, () => randInt(1, 6));
+  const start = randInt(0, len - steps - 1);
+  const visited = Array.from({ length: steps + 1 }, (_, i) => start + i);
+  const answer = visited.reduce((a, i) => a + nums[i], 0);
+  return { g: { nums, start, steps, visited }, answer,
+    choices: numChoices(answer, [answer + nums[visited[0]], answer - nums[visited[visited.length - 1]], answer + 1]) };
+}
+function sugoDraw(area, opt){
+  opt = opt || {};
+  const g = opt.g || S.g;
+  const upto = opt.upto != null ? opt.upto : -1;
+  numberRow(area, g.nums, g.visited.slice(0, upto + 1 < 0 ? g.visited.length : upto + 1), { reveal: opt.reveal });
+}
+function sugoTeachBegin(){
+  const g = S.g;
+  const msgs = ['通った マスの 数を 1つずつ たす'];
+  const labels = [''];
+  let sum = 0;
+  g.visited.forEach((i, k) => { sum += g.nums[i]; msgs.push((k + 1) + 'マスめ ＋' + g.nums[i]); labels.push('+' + g.nums[i]); });
+  msgs.push('あわせて ' + sum); labels.push(String(sum));
+  return makeTeach(msgs.length - 1, msgs, labels, { g });
+}
+function sugoTeachDraw(area, T){
+  const g = T.g, n = T.shown, last = T.total;
+  let sum = 0; for (let k = 0; k < Math.min(n, g.visited.length); k++) sum += g.nums[g.visited[k]];
+  sugoDraw(teachFigArea(area), { g, upto: n - 1, reveal: n >= last ? sum : null });
+}
+function sugoKindIcon(kind, x, y, s){
+  ctx.save();
+  for (let i = 0; i < 3; i++) {
+    rrect(x - s * 0.3 + i * s * 0.24, y - s * 0.14, s * 0.18, s * 0.28, 4);
+    ctx.fillStyle = (i === 1) ? CONFIG.C_HI_T : '#ffffff'; ctx.fill(); ctx.strokeStyle = CONFIG.C_GRID; ctx.lineWidth = 1; ctx.stroke();
+  }
+  ctx.restore();
+}
+
+
+
+function cubeEdgePts(B){
+  const V = [];
+  for (let x = 0; x <= 1; x++) for (let y = 0; y <= 1; y++) for (let z = 0; z <= 1; z++) V.push([x, y, z]);
+  const idx = (x, y, z) => x * 4 + y * 2 + z;
+  const E = [];
+  for (let x = 0; x <= 1; x++) for (let y = 0; y <= 1; y++) E.push([idx(x, y, 0), idx(x, y, 1)]);
+  for (let x = 0; x <= 1; x++) for (let z = 0; z <= 1; z++) E.push([idx(x, 0, z), idx(x, 1, z)]);
+  for (let y = 0; y <= 1; y++) for (let z = 0; z <= 1; z++) E.push([idx(0, y, z), idx(1, y, z)]);
+  return { V, E };
+}
+function edgeRel(a, b){
+  
+  const dirOf = (e) => (e < 4) ? 0 : (e < 8) ? 1 : 2;
+  if (a === b) return 'same';
+  return (dirOf(a) === dirOf(b)) ? 'parallel' : (edgeShareVertex(a, b) ? 'cross' : 'skew');
+}
+function edgeShareVertex(a, b){
+  const { V, E } = cubeEdgePts();
+  const [a1, a2] = E[a], [b1, b2] = E[b];
+  return a1 === b1 || a1 === b2 || a2 === b1 || a2 === b2;
+}
+const REL_LABEL = { parallel: '平行な辺', cross: '交わる辺', skew: 'ねじれの辺' };
+function spaceGen(lv, kind){
+  const k = kind || 'parallel';
+  const base = randInt(0, 11);
+  let count = 0;
+  for (let i = 0; i < 12; i++) if (i !== base && edgeRel(base, i) === k) count++;
+  return { g: { base, k }, answer: count, kind: k, choices: numChoices(count, [count + 1, count - 1, 11 - count]) };
+}
+function spaceDraw(area, opt){
+  opt = opt || {};
+  const g = opt.g || S.g;
+  const { V, E } = cubeEdgePts();
+  const B = { az: 35 * Math.PI / 180, el: 30 * Math.PI / 180 };
+  const scale = Math.min(area.w, area.h) * 0.5;
+  const cx = W / 2, cy = area.y + area.h / 2;
+  const proj2 = (v) => {
+    const x = v[0] - 0.5, y = v[1] - 0.5, z = v[2] - 0.5;
+    const px = x * Math.cos(B.az) - y * Math.sin(B.az);
+    const py0 = x * Math.sin(B.az) + y * Math.cos(B.az);
+    const py = py0 * Math.sin(B.el) - z * Math.cos(B.el);
+    return [cx + px * scale, cy + py * scale];
+  };
+  const pts = V.map(proj2);
+  ctx.save();
+  E.forEach((e, i) => {
+    const [p1, p2] = e.map(vi => pts[vi]);
+    let color = '#cfc7b6', lw = 1.6;
+    if (i === g.base) { color = CONFIG.C_GOLD; lw = 3.4; }
+    else if (opt.reveal != null) {
+      const rel = edgeRel(g.base, i);
+      if (rel === g.k) { color = CONFIG.C_OK; lw = 2.6; }
+    }
+    ctx.strokeStyle = color; ctx.lineWidth = lw; ctx.lineCap = 'round';
+    ctx.beginPath(); ctx.moveTo(p1[0], p1[1]); ctx.lineTo(p2[0], p2[1]); ctx.stroke();
+  });
+  if (opt.reveal != null) text(REL_LABEL[g.k] + ' は ' + opt.reveal + '本', W / 2, area.y + area.h - 18, 16, CONFIG.C_OK);
+  ctx.restore();
+}
+function spaceTeachBegin(){
+  const g = S.g, k = g.k;
+  const msgs = ['金いろの辺と、' + REL_LABEL[k] + ' を さがす'];
+  const labels = [''];
+  let count = 0;
+  for (let i = 0; i < 12; i++) if (i !== g.base && edgeRel(g.base, i) === k) count++;
+  msgs.push(REL_LABEL[k] + ' が 緑になった\n数えると ' + count + '本'); labels.push(String(count));
+  return makeTeach(msgs.length - 1, msgs, labels, { g });
+}
+function spaceTeachDraw(area, T){
+  const g = T.g, n = T.shown, last = T.total;
+  let count = 0;
+  for (let i = 0; i < 12; i++) if (i !== g.base && edgeRel(g.base, i) === g.k) count++;
+  spaceDraw(teachFigArea(area), { g, reveal: n >= 1 ? count : null });
+}
+function spaceKindIcon(kind, x, y, s){
+  ctx.save();
+  ctx.strokeStyle = kind === 'parallel' ? CONFIG.C_GOLD : (kind === 'cross' ? CONFIG.C_OK : '#8867c9');
+  ctx.lineWidth = 1.8; ctx.lineCap = 'round';
+  ctx.beginPath(); ctx.moveTo(x - s * 0.22, y - s * 0.12); ctx.lineTo(x + s * 0.22, y - s * 0.12); ctx.stroke();
+  if (kind === 'parallel') { ctx.beginPath(); ctx.moveTo(x - s * 0.22, y + s * 0.12); ctx.lineTo(x + s * 0.22, y + s * 0.12); ctx.stroke(); }
+  else if (kind === 'cross') { ctx.beginPath(); ctx.moveTo(x, y - s * 0.2); ctx.lineTo(x, y + s * 0.2); ctx.stroke(); }
+  else { ctx.beginPath(); ctx.moveTo(x - s * 0.16, y + s * 0.08); ctx.lineTo(x + s * 0.16, y + s * 0.24); ctx.stroke(); }
+  ctx.restore();
+}
+
+
+const SHAPES25 = [
+  { n: 3, name: 'さんかく' }, { n: 4, name: 'しかく' }, { n: 5, name: 'ごかく' }, { n: 6, name: 'ろっかく' },
+];
+function rotGen(lv){
+  const sh = SHAPES25[randInt(0, Math.min(lv, SHAPES25.length - 1))];
+  return { g: { n: sh.n, name: sh.name }, answer: sh.n, choices: numChoices(sh.n, [sh.n - 1, sh.n + 1, sh.n * 2]) };
+}
+function rotDraw(area, opt){
+  opt = opt || {};
+  const g = opt.g || S.g;
+  const cx = W / 2, cy = area.y + area.h / 2 - 10, r = Math.min(area.w, area.h) * 0.32;
+  const ang = opt.rot || 0;
+  ctx.save();
+  const pts = [];
+  for (let i = 0; i < g.n; i++) { const a = -Math.PI / 2 + ang + i * 2 * Math.PI / g.n; pts.push([cx + r * Math.cos(a), cy + r * Math.sin(a)]); }
+  poly(pts, '#8fb8e8', CONFIG.C_EDGE, 2);
+  if (opt.reveal != null) text('正' + g.name + 'は ' + opt.reveal + '回で もとに もどる', W / 2, area.y + area.h - 18, 15, CONFIG.C_OK);
+  ctx.restore();
+}
+function rotTeachBegin(){
+  const g = S.g;
+  const msgs = ['正' + g.name + 'を すこしずつ まわす'];
+  const labels = [''];
+  for (let i = 1; i <= g.n; i++) { msgs.push((360 / g.n * i).toFixed(0) + '度 まわすと …'); labels.push(i + '回'); }
+  msgs.push(g.n + '回で もとの 形に もどる'); labels.push(String(g.n));
+  return makeTeach(msgs.length - 1, msgs, labels, { g });
+}
+function rotTeachDraw(area, T){
+  const g = T.g, n = T.shown, last = T.total;
+  const step = Math.min(n, g.n);
+  rotDraw(teachFigArea(area), { g, rot: step * 2 * Math.PI / g.n, reveal: n >= last ? g.n : null });
+}
+function rotKindIcon(kind, x, y, s){
+  ctx.save();
+  ctx.strokeStyle = CONFIG.C_GOLD; ctx.lineWidth = 1.6; ctx.lineCap = 'round';
+  ctx.beginPath(); ctx.arc(x, y, s * 0.2, 0.2, Math.PI * 1.6); ctx.stroke();
+  ctx.beginPath(); ctx.moveTo(x + s * 0.2 * Math.cos(1.6 * Math.PI), y + s * 0.2 * Math.sin(1.6 * Math.PI));
+  ctx.lineTo(x + s * 0.2 * Math.cos(1.6 * Math.PI) + 5, y + s * 0.2 * Math.sin(1.6 * Math.PI) - 5); ctx.stroke();
+  ctx.restore();
+}
+
+
+const FOLD_SHAPES = [
+  { id: 'rect', axes: 2, name: '長方形' },
+  { id: 'rhomb', axes: 2, name: 'ひし形' },
+  { id: 'iso', axes: 1, name: '二等辺三角形' },
+  { id: 'square', axes: 4, name: '正方形' },
+];
+function foldGen(lv){
+  const sh = FOLD_SHAPES[randInt(0, Math.min(lv + 1, FOLD_SHAPES.length - 1))];
+  return { g: { id: sh.id, name: sh.name, axes: sh.axes }, answer: sh.axes, choices: numChoices(sh.axes, [sh.axes + 1, Math.max(0, sh.axes - 1), sh.axes + 2]) };
+}
+function foldShapePts(id, cx, cy, r){
+  if (id === 'square') return [[cx - r, cy - r], [cx + r, cy - r], [cx + r, cy + r], [cx - r, cy + r]];
+  if (id === 'rect') return [[cx - r * 1.3, cy - r * 0.7], [cx + r * 1.3, cy - r * 0.7], [cx + r * 1.3, cy + r * 0.7], [cx - r * 1.3, cy + r * 0.7]];
+  if (id === 'rhomb') return [[cx, cy - r * 1.2], [cx + r, cy], [cx, cy + r * 1.2], [cx - r, cy]];
+  return [[cx, cy - r * 1.1], [cx + r, cy + r * 0.7], [cx - r, cy + r * 0.7]]; 
+}
+const FOLD_AXES_PTS = {
+  square: [[[0,-1],[0,1]], [[-1,0],[1,0]], [[-1,-1],[1,1]], [[-1,1],[1,-1]]],
+  rect: [[[0,-1],[0,1]], [[-1,0],[1,0]]],
+  rhomb: [[[0,-1],[0,1]], [[-1,0],[1,0]]],
+  iso: [[[0,-1],[0,1]]],
+};
+function foldDraw(area, opt){
+  opt = opt || {};
+  const g = opt.g || S.g;
+  const cx = W / 2, cy = area.y + area.h / 2 - 10, r = Math.min(area.w, area.h) * 0.24;
+  ctx.save();
+  poly(foldShapePts(g.id, cx, cy, r), '#8fb8e8', CONFIG.C_EDGE, 2);
+  if (opt.showAxes) {
+    const n = opt.axesUpTo != null ? opt.axesUpTo : FOLD_AXES_PTS[g.id].length;
+    FOLD_AXES_PTS[g.id].slice(0, n).forEach(([p1, p2]) => {
+      ctx.strokeStyle = CONFIG.C_GOLD; ctx.lineWidth = 2; ctx.setLineDash([6, 5]);
+      ctx.beginPath(); ctx.moveTo(cx + p1[0] * r * 1.5, cy + p1[1] * r * 1.5); ctx.lineTo(cx + p2[0] * r * 1.5, cy + p2[1] * r * 1.5); ctx.stroke();
+      ctx.setLineDash([]);
+    });
+  }
+  if (opt.reveal != null) text(g.name + 'の 対称の軸は ' + opt.reveal + '本', W / 2, area.y + area.h - 18, 15, CONFIG.C_OK);
+  ctx.restore();
+}
+function foldTeachBegin(){
+  const g = S.g;
+  const msgs = [g.name + 'を 折って ぴったり 重なる 線を さがす'];
+  const labels = [''];
+  for (let i = 1; i <= g.axes; i++) { msgs.push(i + '本目の 折り線'); labels.push(i + '本'); }
+  msgs.push('ぜんぶで ' + g.axes + '本'); labels.push(String(g.axes));
+  return makeTeach(msgs.length - 1, msgs, labels, { g });
+}
+function foldTeachDraw(area, T){
+  const g = T.g, n = T.shown, last = T.total;
+  foldDraw(teachFigArea(area), { g, showAxes: n >= 1, axesUpTo: Math.min(n, g.axes), reveal: n >= last ? g.axes : null });
+}
+function foldKindIcon(kind, x, y, s){
+  ctx.save();
+  ctx.strokeStyle = CONFIG.C_EDGE; ctx.lineWidth = 1.4; ctx.strokeRect(x - s * 0.2, y - s * 0.2, s * 0.4, s * 0.4);
+  ctx.strokeStyle = CONFIG.C_GOLD; ctx.lineWidth = 1.4; ctx.setLineDash([3, 3]);
+  ctx.beginPath(); ctx.moveTo(x, y - s * 0.2); ctx.lineTo(x, y + s * 0.2); ctx.stroke(); ctx.setLineDash([]);
+  ctx.restore();
+}
+
+
+const SCALE_LV = [[3, 6, 2], [3, 8, 2], [2, 9, 3], [2, 12, 3], [2, 12, 4]];
+function scaleGen(lv){
+  const [minA, maxA, times] = SCALE_LV[Math.min(lv, SCALE_LV.length - 1)];
+  const a = randInt(minA, maxA);
+  const answer = a * times;
+  return { g: { a, times }, answer, choices: numChoices(answer, [a + times, a * times + times, a * (times - 1), a * times - 1]) };
+}
+function scaleDraw(area, opt){
+  opt = opt || {};
+  const g = opt.g || S.g;
+  const cx = W / 2, cy = area.y + area.h / 2, r0 = Math.min(24, area.w * 0.12);
+  ctx.save();
+  const r1 = r0 * g.times;
+  rrect(cx - r1 - r0 - 30, cy - r1, r1 * 2, r1 * 2, 6);
+  ctx.strokeStyle = opt.showBig ? CONFIG.C_GOLD : CONFIG.C_GRID; ctx.lineWidth = 1.6; ctx.setLineDash(opt.showBig ? [] : [5, 5]); ctx.stroke(); ctx.setLineDash([]);
+  rrect(cx + 30, cy - r0, r0 * 2, r0 * 2, 4);
+  ctx.fillStyle = '#8fb8e8'; ctx.fill(); ctx.strokeStyle = CONFIG.C_EDGE; ctx.lineWidth = 1.6; ctx.stroke();
+  text(g.a + 'cm', cx + 30 + r0, cy + r0 + 16, 13, CONFIG.C_INK_SOFT);
+  text(g.times + '倍', W / 2, cy - r1 - 20, 14, CONFIG.C_GOLD, 'center', '700');
+  if (opt.reveal != null) text('？＝' + opt.reveal + 'cm', cx - r1 - r0 - 30 + r1, cy + r1 + 18, 15, CONFIG.C_OK, 'center', '800');
+  ctx.restore();
+}
+function scaleTeachBegin(){
+  const g = S.g;
+  const msgs = [g.a + 'cm を ' + g.times + '倍に する'];
+  const labels = [''];
+  msgs.push(g.a + '×' + g.times + '＝' + (g.a * g.times) + 'cm'); labels.push(g.a + '×' + g.times);
+  return makeTeach(msgs.length - 1, msgs, labels, { g });
+}
+function scaleTeachDraw(area, T){
+  const g = T.g, n = T.shown, last = T.total;
+  scaleDraw(teachFigArea(area), { g, showBig: n >= 1, reveal: n >= last ? g.a * g.times : null });
+}
+function scaleKindIcon(kind, x, y, s){
+  ctx.save();
+  ctx.strokeStyle = CONFIG.C_EDGE; ctx.lineWidth = 1.4; ctx.strokeRect(x - s * 0.1, y - s * 0.1, s * 0.2, s * 0.2);
+  ctx.strokeStyle = CONFIG.C_GOLD; ctx.setLineDash([3, 3]); ctx.strokeRect(x - s * 0.24, y - s * 0.24, s * 0.48, s * 0.48); ctx.setLineDash([]);
+  ctx.restore();
+}
+
+
+const UNIT_PAIRS = [
+  { big: 'm', small: 'cm', mul: 100, maxBig: 9 },
+  { big: 'cm', small: 'mm', mul: 10, maxBig: 30 },
+  { big: 'kg', small: 'g', mul: 1000, maxBig: 9 },
+  { big: 'L', small: 'mL', mul: 1000, maxBig: 9 },
+];
+function unitGen(lv){
+  const u = UNIT_PAIRS[randInt(0, Math.min(lv, UNIT_PAIRS.length - 1))];
+  const big = randInt(1, u.maxBig);
+  const answer = big * u.mul;
+  return { g: { u, big }, answer, choices: numChoices(answer, [big * u.mul + u.mul, big + u.mul, big * (u.mul / 10 || 1)]) };
+}
+function unitDraw(area, opt){
+  opt = opt || {};
+  const g = opt.g || S.g;
+  ctx.save();
+  text(g.big + g.u.big + ' は ' + g.u.small + 'で ？', W / 2, area.y + area.h / 2 - 20, 24, CONFIG.C_INK, 'center', '800');
+  if (opt.step >= 1) text('1' + g.u.big + '＝' + g.u.mul + g.u.small, W / 2, area.y + area.h / 2 + 24, 15, CONFIG.C_GOLD, 'center', '700');
+  if (opt.reveal != null) text('＝' + opt.reveal + g.u.small, W / 2, area.y + area.h / 2 + 58, 20, CONFIG.C_OK, 'center', '800');
+  ctx.restore();
+}
+function unitTeachBegin(){
+  const g = S.g;
+  const msgs = ['1' + g.u.big + ' は ' + g.u.mul + g.u.small];
+  const labels = [''];
+  msgs.push(g.big + '×' + g.u.mul + '＝' + (g.big * g.u.mul)); labels.push(g.big + '×' + g.u.mul);
+  return makeTeach(msgs.length - 1, msgs, labels, { g });
+}
+function unitTeachDraw(area, T){
+  const g = T.g, n = T.shown, last = T.total;
+  unitDraw(teachFigArea(area), { g, step: n >= 1 ? 1 : 0, reveal: n >= last ? g.big * g.u.mul : null });
+}
+function unitKindIcon(kind, x, y, s){
+  ctx.save();
+  ctx.strokeStyle = CONFIG.C_EDGE; ctx.lineWidth = 1.4;
+  ctx.beginPath(); ctx.moveTo(x - s * 0.28, y); ctx.lineTo(x + s * 0.28, y); ctx.stroke();
+  for (let i = -2; i <= 2; i++) { ctx.beginPath(); ctx.moveTo(x + i * s * 0.11, y - 4); ctx.lineTo(x + i * s * 0.11, y + 4); ctx.stroke(); }
+  ctx.restore();
+}
+
+
+const ROAD_LV = [[3, 4], [4, 4], [4, 5], [5, 5], [5, 6]];
+function roadGen(lv){
+  const [len, maxN] = ROAD_LV[Math.min(lv, ROAD_LV.length - 1)];
+  const roadA = Array.from({ length: len }, () => randInt(1, maxN));
+  const roadB = Array.from({ length: len }, () => randInt(1, maxN));
+  const sumA = roadA.reduce((a, b) => a + b, 0), sumB = roadB.reduce((a, b) => a + b, 0);
+  const pick = Math.random() < 0.5 ? 'A' : 'B';
+  const answer = pick === 'A' ? sumA : sumB;
+  return { g: { roadA, roadB, pick }, answer, choices: numChoices(answer, [sumA + sumB, pick === 'A' ? sumB : sumA, answer + 1]) };
+}
+function roadDraw(area, opt){
+  opt = opt || {};
+  const g = opt.g || S.g;
+  const rowH = 44, top = area.y + area.h / 2 - rowH;
+  ['A', 'B'].forEach((lab, ri) => {
+    const nums = lab === 'A' ? g.roadA : g.roadB;
+    const on = g.pick === lab;
+    const s = Math.min(36, (area.w - 60) / nums.length);
+    const ox = W / 2 - (nums.length - 1) * s / 2;
+    const y = top + ri * rowH * 1.3;
+    ctx.save();
+    text(lab, 34, y, 14, on ? CONFIG.C_GOLD : CONFIG.C_INK_SOFT, 'center', '800');
+    nums.forEach((n, i) => {
+      const x = ox + i * s;
+      rrect(x - s * 0.4, y - s * 0.4, s * 0.8, s * 0.8, 6);
+      ctx.fillStyle = on ? CONFIG.C_HI_T : '#ffffff'; ctx.fill();
+      ctx.strokeStyle = on ? CONFIG.C_GOLD : CONFIG.C_GRID; ctx.lineWidth = on ? 2 : 1.2; ctx.stroke();
+      text(String(n), x, y + 1, Math.round(s * 0.4), CONFIG.C_INK);
+    });
+    ctx.restore();
+  });
+  if (opt.reveal != null) text(g.pick + 'の道は ' + opt.reveal, W / 2, top + rowH * 2.8, 17, CONFIG.C_OK, 'center', '800');
+}
+function roadTeachBegin(){
+  const g = S.g, nums = g.pick === 'A' ? g.roadA : g.roadB;
+  const msgs = [g.pick + 'の道を たどる'];
+  const labels = [''];
+  let sum = 0;
+  nums.forEach((n, i) => { sum += n; msgs.push((i + 1) + 'つめ ＋' + n); labels.push('+' + n); });
+  msgs.push('あわせて ' + sum); labels.push(String(sum));
+  return makeTeach(msgs.length - 1, msgs, labels, { g });
+}
+function roadTeachDraw(area, T){
+  const g = T.g, n = T.shown, last = T.total;
+  const nums = g.pick === 'A' ? g.roadA : g.roadB;
+  let sum = 0; for (let k = 0; k < Math.min(n, nums.length); k++) sum += nums[k];
+  roadDraw(teachFigArea(area), { g, reveal: n >= last ? sum : null });
+}
+function roadKindIcon(kind, x, y, s){
+  ctx.save();
+  ctx.strokeStyle = CONFIG.C_GOLD; ctx.lineWidth = 1.8; ctx.lineCap = 'round';
+  ctx.beginPath(); ctx.moveTo(x - s * 0.26, y - s * 0.12); ctx.lineTo(x + s * 0.26, y - s * 0.12); ctx.stroke();
+  ctx.strokeStyle = CONFIG.C_GRID;
+  ctx.beginPath(); ctx.moveTo(x - s * 0.26, y + s * 0.12); ctx.lineTo(x + s * 0.26, y + s * 0.12); ctx.stroke();
+  ctx.restore();
+}
+
 const STAGES = [
   {
     id: 'shape', no: 'No.4', name: '積み木はいくつ？', learn: '真上から見て、柱ごとに足す',
@@ -2163,6 +3350,237 @@ const STAGES = [
     kindIcon: weekKindIcon, teachBegin: weekTeachBegin, teachDraw: weekTeachDraw,
     icon(x, y, s){ weekKindIcon('date', x, y, s * 1.3); },
   },
+  
+  {
+    id: 'tree', unlocked: true,
+    kinds: ['tree', 'tree', 'tree', 'tree', 'tree', 'tree'],
+    intros: [{ kind: 'tree', label: 'じゅけい図', g: { n1: 3, n2: 2 }, answer: 6 }],
+    txt: { tree: ['くみあわせは ', ['何','なん'], 'とおり？'] },
+    gen: treeGen,
+    drawQ(area){ qWrap(area, () => treeDraw(area, {})); },
+    kindIcon: treeKindIcon, teachBegin: treeTeachBegin, teachDraw: treeTeachDraw,
+    icon(x, y, s){ treeKindIcon('tree', x, y, s * 1.3); },
+  },
+  {
+    id: 'choose', unlocked: true,
+    kinds: ['choose', 'choose', 'choose', 'choose', 'choose', 'choose'],
+    intros: [{ kind: 'choose', label: 'えらばない', g: { n: 4 }, answer: 4 }],
+    txt: { choose: ['えらび方は ', ['何','なん'], 'とおり？'] },
+    gen: chooseGen,
+    drawQ(area){ qWrap(area, () => chooseDraw(area, {})); },
+    kindIcon: chooseKindIcon, teachBegin: chooseTeachBegin, teachDraw: chooseTeachDraw,
+    icon(x, y, s){ chooseKindIcon('choose', x, y, s * 1.3); },
+  },
+  {
+    id: 'finger', unlocked: true,
+    kinds: ['finger', 'finger', 'finger', 'finger', 'finger', 'finger'],
+    intros: [{ kind: 'finger', label: '8・4・2・1', g: { folded: [0, 3] }, answer: 9 }],
+    txt: { finger: ['おれている ゆびの 数は？'] },
+    gen: fingerGen,
+    drawQ(area){ qWrap(area, () => fingerDraw(area, {})); },
+    kindIcon: fingerKindIcon, teachBegin: fingerTeachBegin, teachDraw: fingerTeachDraw,
+    icon(x, y, s){ fingerKindIcon('finger', x, y, s * 1.3); },
+  },
+  {
+    id: 'tri', unlocked: true,
+    kinds: ['tri', 'tri', 'tri', 'tri', 'tri', 'tri'],
+    intros: [{ kind: 'tri', label: 'ペアにする', g: { n: 5 }, answer: 15 }],
+    txt: { tri: [['何','なん'], 'までの 数を ぜんぶ たすと？'] },
+    gen: triGen,
+    drawQ(area){ qWrap(area, () => triDraw(area, {})); },
+    kindIcon: triKindIcon, teachBegin: triTeachBegin, teachDraw: triTeachDraw,
+    icon(x, y, s){ triKindIcon('tri', x, y, s * 1.3); },
+  },
+  {
+    id: 'square', unlocked: true,
+    kinds: ['square', 'square', 'square', 'square', 'square', 'square'],
+    intros: [{ kind: 'square', label: '番目とこ', g: { n: 4 }, answer: 16 }],
+    txt: { square: [['何','なん'], 'ばんめの しかくすう？'] },
+    gen: squareGen,
+    drawQ(area){ qWrap(area, () => squareDraw(area, {})); },
+    kindIcon: squareKindIcon, teachBegin: squareTeachBegin, teachDraw: squareTeachDraw,
+    icon(x, y, s){ squareKindIcon('square', x, y, s * 1.3); },
+  },
+  {
+    id: 'sumdiff', unlocked: true,
+    kinds: ['big', 'big', 'small', 'big', 'small', 'big'],
+    intros: [{ kind: 'big', label: '線分図', g: { sum: 10, diff: 4, big: 7, small: 3 }, answer: 7 }],
+    txt: { big: ['大きい方は ', ['何','なん'], '？'], small: ['小さい方は ', ['何','なん'], '？'] },
+    gen: sumdiffGen,
+    drawQ(area){ qWrap(area, () => sumdiffDraw(area, {})); },
+    kindIcon: sumdiffKindIcon, teachBegin: sumdiffTeachBegin, teachDraw: sumdiffTeachDraw,
+    icon(x, y, s){ sumdiffKindIcon('big', x, y, s * 1.3); },
+  },
+  {
+    id: 'round', unlocked: true,
+    kinds: ['round', 'round', 'round', 'round', 'round', 'round'],
+    intros: [{ kind: 'round', label: 'きりのいい数', g: { a: 98, b: 37, base: 100, diff: 2 }, answer: 135 }],
+    txt: { round: ['こたえは ', ['何','なん'], '？'] },
+    gen: roundGen,
+    drawQ(area){ qWrap(area, () => roundDraw(area, {})); },
+    kindIcon: roundKindIcon, teachBegin: roundTeachBegin, teachDraw: roundTeachDraw,
+    icon(x, y, s){ roundKindIcon('round', x, y, s * 1.3); },
+  },
+  {
+    id: 'mul', unlocked: true,
+    kinds: ['mul', 'mul', 'mul', 'mul', 'mul', 'mul'],
+    intros: [{ kind: 'mul', label: 'いくつ分', g: { per: 3, bags: 5 }, answer: 15 }],
+    txt: { mul: ['ぜんぶで ', ['何','なん'], 'こ？'] },
+    gen: mulGen,
+    drawQ(area){ qWrap(area, () => mulDraw(area, {})); },
+    kindIcon: mulKindIcon, teachBegin: mulTeachBegin, teachDraw: mulTeachDraw,
+    icon(x, y, s){ mulKindIcon('mul', x, y, s * 1.3); },
+  },
+  {
+    id: 'per', unlocked: true,
+    kinds: ['per', 'per', 'per', 'per', 'per', 'per'],
+    intros: [{ kind: 'per', label: '1あたり', g: { total: 12, groups: 3, per: 4 }, answer: 4 }],
+    txt: { per: ['1人ぶんは ', ['何','なん'], 'こ？'] },
+    gen: perGen,
+    drawQ(area){ qWrap(area, () => perDraw(area, {})); },
+    kindIcon: perKindIcon, teachBegin: perTeachBegin, teachDraw: perTeachDraw,
+    icon(x, y, s){ perKindIcon('per', x, y, s * 1.3); },
+  },
+  {
+    id: 'group', unlocked: true,
+    kinds: ['group', 'group', 'group', 'group', 'group', 'group'],
+    intros: [{ kind: 'group', label: 'くみの数', g: { total: 12, per: 3, groups: 4 }, answer: 4 }],
+    txt: { group: ['なんくみ できる？'] },
+    gen: groupGen,
+    drawQ(area){ qWrap(area, () => groupDraw(area, {})); },
+    kindIcon: groupKindIcon, teachBegin: groupTeachBegin, teachDraw: groupTeachDraw,
+    icon(x, y, s){ groupKindIcon('group', x, y, s * 1.3); },
+  },
+  {
+    id: 'mix', unlocked: true,
+    kinds: ['mix', 'mix', 'mix', 'mix', 'mix', 'mix'],
+    intros: [{ kind: 'mix', label: 'どれから', g: { a: 2, b: 3, c: 4, op: '+', answer: 14 }, answer: 14 }],
+    txt: { mix: ['こたえは ', ['何','なん'], '？'] },
+    gen: mixGen,
+    drawQ(area){ qWrap(area, () => mixDraw(area, {})); },
+    kindIcon: mixKindIcon, teachBegin: mixTeachBegin, teachDraw: mixTeachDraw,
+    icon(x, y, s){ mixKindIcon('mix', x, y, s * 1.3); },
+  },
+  {
+    id: 'change', unlocked: true,
+    kinds: ['up', 'down', 'up', 'down', 'up', 'down'],
+    intros: [{ kind: 'up', label: 'ふえた', g: { start: 5, delta: 3, up: true }, answer: 8 }],
+    txt: { up: ['いま ', ['何','なん'], 'こ？'], down: ['いま ', ['何','なん'], 'こ？'] },
+    gen: changeGen,
+    drawQ(area){ qWrap(area, () => changeDraw(area, {})); },
+    kindIcon: changeKindIcon, teachBegin: changeTeachBegin, teachDraw: changeTeachDraw,
+    icon(x, y, s){ changeKindIcon('up', x, y, s * 1.3); },
+  },
+  {
+    id: 'coin', unlocked: true,
+    kinds: ['coin', 'coin', 'coin', 'coin', 'coin', 'coin'],
+    intros: [{ kind: 'coin', label: 'さいふ', g: { yen: 270, used: [[100, 2], [50, 1], [10, 2]] }, answer: 5 }],
+    txt: { coin: ['なんまいで はらえる？'] },
+    gen: coinGen,
+    drawQ(area){ qWrap(area, () => coinDraw(area, {})); },
+    kindIcon: coinKindIcon, teachBegin: coinTeachBegin, teachDraw: coinTeachDraw,
+    icon(x, y, s){ coinKindIcon('coin', x, y, s * 1.3); },
+  },
+  {
+    id: 'card', unlocked: true,
+    kinds: ['card', 'card', 'card', 'card', 'card', 'card'],
+    intros: [{ kind: 'card', label: 'ならべる', g: { cards: [3, 7, 1] }, answer: 731 }],
+    txt: { card: ['一番大きい 数は？'] },
+    gen: cardGen,
+    drawQ(area){ qWrap(area, () => cardDraw(area, {})); },
+    kindIcon: cardKindIcon, teachBegin: cardTeachBegin, teachDraw: cardTeachDraw,
+    icon(x, y, s){ cardKindIcon('card', x, y, s * 1.3); },
+  },
+  {
+    id: 'logic', unlocked: true,
+    kinds: ['logic', 'logic', 'logic', 'logic', 'logic', 'logic'],
+    intros: [{ kind: 'logic', label: '○×ひょう', g: { win: [[null,true,true],[false,null,true],[false,false,null]], wins:[2,1,0], best:0 }, answer: 2 }],
+    txt: { logic: ['一番 かった数は？'] },
+    gen: logicGen,
+    drawQ(area){ qWrap(area, () => logicDraw(area, {})); },
+    kindIcon: logicKindIcon, teachBegin: logicTeachBegin, teachDraw: logicTeachDraw,
+    icon(x, y, s){ logicKindIcon('logic', x, y, s * 1.3); },
+  },
+  {
+    id: 'missing', unlocked: true,
+    kinds: ['missing', 'missing', 'missing', 'missing', 'missing', 'missing'],
+    intros: [{ kind: 'missing', label: '虫食い算', g: { a: 7, b: 6, c: 13 }, answer: 6 }],
+    txt: { missing: ['□に 入る 数は？'] },
+    gen: missingGen,
+    drawQ(area){ qWrap(area, () => missingDraw(area, {})); },
+    kindIcon: missingKindIcon, teachBegin: missingTeachBegin, teachDraw: missingTeachDraw,
+    icon(x, y, s){ missingKindIcon('missing', x, y, s * 1.3); },
+  },
+  {
+    id: 'sugo', unlocked: true,
+    kinds: ['sugo', 'sugo', 'sugo', 'sugo', 'sugo', 'sugo'],
+    intros: [{ kind: 'sugo', label: 'すごろく', g: { nums: [2,3,1,4,2,5], start: 0, steps: 2, visited: [0,1,2] }, answer: 6 }],
+    txt: { sugo: ['進んだ 数の 合計は？'] },
+    gen: sugoGen,
+    drawQ(area){ qWrap(area, () => sugoDraw(area, {})); },
+    kindIcon: sugoKindIcon, teachBegin: sugoTeachBegin, teachDraw: sugoTeachDraw,
+    icon(x, y, s){ sugoKindIcon('sugo', x, y, s * 1.3); },
+  },
+  {
+    id: 'space', unlocked: true,
+    kinds: ['parallel', 'cross', 'skew', 'parallel', 'cross', 'skew'],
+    intros: [{ kind: 'parallel', label: '平行・交わる・ねじれ', g: { base: 0, k: 'parallel' }, answer: 3 }],
+    txt: { parallel: ['平行な辺は ', ['何','なん'], '本？'], cross: ['交わる辺は ', ['何','なん'], '本？'], skew: ['ねじれの辺は ', ['何','なん'], '本？'] },
+    gen: spaceGen,
+    drawQ(area){ qWrap(area, () => spaceDraw(area, {})); },
+    kindIcon: spaceKindIcon, teachBegin: spaceTeachBegin, teachDraw: spaceTeachDraw,
+    icon(x, y, s){ spaceKindIcon('parallel', x, y, s * 1.3); },
+  },
+  {
+    id: 'rot', unlocked: true,
+    kinds: ['rot', 'rot', 'rot', 'rot', 'rot', 'rot'],
+    intros: [{ kind: 'rot', label: 'まわして重ねる', g: { n: 4, name: 'しかく' }, answer: 4 }],
+    txt: { rot: [['何','なん'], '回で もとに もどる？'] },
+    gen: rotGen,
+    drawQ(area){ qWrap(area, () => rotDraw(area, {})); },
+    kindIcon: rotKindIcon, teachBegin: rotTeachBegin, teachDraw: rotTeachDraw,
+    icon(x, y, s){ rotKindIcon('rot', x, y, s * 1.3); },
+  },
+  {
+    id: 'fold', unlocked: true,
+    kinds: ['fold', 'fold', 'fold', 'fold', 'fold', 'fold'],
+    intros: [{ kind: 'fold', label: '折って重ねる', g: { id: 'square', name: '正方形', axes: 4 }, answer: 4 }],
+    txt: { fold: ['対称の軸は ', ['何','なん'], '本？'] },
+    gen: foldGen,
+    drawQ(area){ qWrap(area, () => foldDraw(area, {})); },
+    kindIcon: foldKindIcon, teachBegin: foldTeachBegin, teachDraw: foldTeachDraw,
+    icon(x, y, s){ foldKindIcon('fold', x, y, s * 1.3); },
+  },
+  {
+    id: 'scaleu', unlocked: true,
+    kinds: ['scaleu', 'scaleu', 'scaleu', 'scaleu', 'scaleu', 'scaleu'],
+    intros: [{ kind: 'scaleu', label: '拡大', g: { a: 3, times: 2 }, answer: 6 }],
+    txt: { scaleu: [['何','なん'], 'cmに なる？'] },
+    gen: scaleGen,
+    drawQ(area){ qWrap(area, () => scaleDraw(area, {})); },
+    kindIcon: scaleKindIcon, teachBegin: scaleTeachBegin, teachDraw: scaleTeachDraw,
+    icon(x, y, s){ scaleKindIcon('scaleu', x, y, s * 1.3); },
+  },
+  {
+    id: 'unit', unlocked: true,
+    kinds: ['unit', 'unit', 'unit', 'unit', 'unit', 'unit'],
+    intros: [{ kind: 'unit', label: 'ものさし', g: { u: { big: 'm', small: 'cm', mul: 100 }, big: 3 }, answer: 300 }],
+    txt: { unit: [['何','なん'], '？'] },
+    gen: unitGen,
+    drawQ(area){ qWrap(area, () => unitDraw(area, {})); },
+    kindIcon: unitKindIcon, teachBegin: unitTeachBegin, teachDraw: unitTeachDraw,
+    icon(x, y, s){ unitKindIcon('unit', x, y, s * 1.3); },
+  },
+  {
+    id: 'road', unlocked: true,
+    kinds: ['road', 'road', 'road', 'road', 'road', 'road'],
+    intros: [{ kind: 'road', label: 'どっちの道', g: { roadA: [2,3,1], roadB: [1,1,1], pick: 'A' }, answer: 6 }],
+    txt: { road: ['合計は？'] },
+    gen: roadGen,
+    drawQ(area){ qWrap(area, () => roadDraw(area, {})); },
+    kindIcon: roadKindIcon, teachBegin: roadTeachBegin, teachDraw: roadTeachDraw,
+    icon(x, y, s){ roadKindIcon('road', x, y, s * 1.3); },
+  },
 ];
 
 const UNITS = [
@@ -2206,7 +3624,14 @@ function bookOf(no){ return BOOKS.find(b => no >= b.from && no <= b.to) || BOOKS
 
 function unitNo(no){ return 'STAGE ' + (Math.floor((no - 1) / CONFIG.PIECES_PER_DRAGON) + 1) + ' ／ No.' + no; }
 
-const BUILT = { 4: STAGES[0], 21: STAGES[1], 1: STAGES[2], 2: STAGES[3], 3: STAGES[4], 5: STAGES[5] };
+const BUILT = {
+  4: STAGES[0], 21: STAGES[1], 1: STAGES[2], 2: STAGES[3], 3: STAGES[4], 5: STAGES[5],
+  6: STAGES[6], 7: STAGES[7], 8: STAGES[8], 9: STAGES[9], 10: STAGES[10],
+  11: STAGES[11], 12: STAGES[12], 13: STAGES[13], 14: STAGES[14], 15: STAGES[15],
+  16: STAGES[16], 17: STAGES[17], 18: STAGES[18], 19: STAGES[19], 20: STAGES[20],
+  22: STAGES[21], 23: STAGES[22], 24: STAGES[23], 25: STAGES[24],
+  26: STAGES[25], 27: STAGES[26], 28: STAGES[27], 29: STAGES[28],
+};
 const BOSS_TINTS = [null, '#2f6fd6', '#b3452f', '#2f8f6a', '#8a5a2f', '#5a3f8f', '#2f7f8f', '#8f2f5a'];
 STAGES.length = 0;
 UNITS.forEach(([no, name, learn], i) => {
