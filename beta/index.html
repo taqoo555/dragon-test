@@ -92,7 +92,7 @@
 
 
 const CONFIG = {
-  VERSION: 'v45',
+  VERSION: 'v46',
 
   
   
@@ -3972,28 +3972,31 @@ function u10KindIcon(kind, x, y, s){
 
 
 const U11_LV = [30, 60, 120, 300, 999];
+
 function u11Gen(lv){
   const max = U11_LV[Math.min(lv, U11_LV.length - 1)];
   const b = randInt(5, Math.floor(max / 3));
   const ans = randInt(b + 2, max);
   const form = randInt(0, 2);
-  let stmt, correct, wrong;
+  let stmt, W, A, B, unknown;
   if (form === 0) {        
     const c = ans - b;
     stmt = '□ － ' + b + ' ＝ ' + c;
-    correct = c + '＋' + b; wrong = [c + '－' + b, b + '－' + c, c + '×' + b];
+    W = ans; A = c; B = b; unknown = 'W';
   } else if (form === 1) { 
     const c = ans + b;
     stmt = '□ ＋ ' + b + ' ＝ ' + c;
-    correct = c + '－' + b; wrong = [c + '＋' + b, b + '－' + c, c + '×' + b];
+    W = c; A = ans; B = b; unknown = 'A';
   } else {                 
     const big = ans + b;
     const c = big - ans;
     stmt = big + ' － □ ＝ ' + c;
-    correct = big + '－' + c; wrong = [big + '＋' + c, c + '－' + big, c + '＋' + big];
+    W = big; A = ans; B = c; unknown = 'A';
   }
-  const choices = txtChoices(correct, wrong);
-  return { g: { stmt, correct, form }, answer: correct, kind: 'u11', choices };
+  
+  const wrongs = (unknown === 'W') ? [Math.max(1, Math.abs(A - B)), A, B] : [W + B, W, B];
+  const choices = numChoices(ans, wrongs);
+  return { g: { stmt, W, A, B, unknown, ans, form }, answer: ans, kind: 'u11', choices };
 }
 function u11Draw(area, opt){
   opt = opt || {};
@@ -4020,23 +4023,38 @@ function u11Draw(area, opt){
   }
   text('ぜんぶ', x0 - 8, y + 8, 12, opt.whole ? CONFIG.C_GOLD : CONFIG.C_INK_SOFT, 'right', '800');
   text('ぶぶん', x0 - 8, y + 31, 12, CONFIG.C_INK_SOFT, 'right', '800');
-  if (opt.reveal) text(opt.reveal, W / 2, area.y + area.h - 12, 18, CONFIG.C_OK);
+  
+  if (opt.nums) {
+    const wLab = (g.unknown === 'W') ? '□' : String(g.W);
+    text(wLab, x0 + w / 2, y + 8, 13, (g.unknown === 'W') ? CONFIG.C_GOLD : CONFIG.C_INK, 'center', '800');
+    if (opt.parts) {
+      const aLab = (g.unknown === 'A') ? '□' : String(g.A);
+      const bLab = (g.unknown === 'B') ? '□' : String(g.B);
+      text(aLab, x0 + cut / 2, y + 31, 12, (g.unknown === 'A') ? CONFIG.C_GOLD : CONFIG.C_INK, 'center', '800');
+      text(bLab, x0 + cut + 4 + (w - cut - 4) / 2, y + 31, 12, (g.unknown === 'B') ? CONFIG.C_GOLD : CONFIG.C_INK, 'center', '800');
+    }
+  }
+  if (opt.reveal != null) text('□ ＝ ' + opt.reveal, W / 2, area.y + area.h - 12, 19, CONFIG.C_OK, 'center', '800');
   ctx.restore();
 }
 function u11TeachBegin(){
-  const g = S.g;
+  const g = S.g, isWhole = g.unknown === 'W';
+  const known = (g.unknown === 'A') ? g.B : g.A;      
+  const calc = isWhole
+    ? (g.A + ' ＋ ' + g.B + ' ＝ ' + g.ans)
+    : (g.W + ' － ' + known + ' ＝ ' + g.ans);
   const msgs = [
     g.stmt,
     'ぜんぶ は どれ？',
     'ぶぶん は どれ？',
-    (g.form === 2) ? 'ぜんぶ から ぶぶん を ひく' : (g.form === 0 ? 'ぶぶん と ぶぶん を たす' : 'ぜんぶ から ぶぶん を ひく'),
-    'しき は ' + g.correct,
+    isWhole ? 'ぶぶん と ぶぶん を たす' : 'ぜんぶ から ぶぶん を ひく',
+    calc,
   ];
-  return makeTeach(4, msgs, ['', 'ぜんぶ', 'ぶぶん', (g.form === 0) ? 'たす' : 'ひく', g.correct], { g });
+  return makeTeach(4, msgs, ['', 'ぜんぶ', 'ぶぶん', isWhole ? 'たす' : 'ひく', String(g.ans)], { g });
 }
 function u11TeachDraw(area, T){
   const g = T.g, n = T.shown;
-  u11Draw(teachFigArea(area), { g, whole: n >= 1, parts: n >= 2, reveal: n >= 4 ? g.correct : null });
+  u11Draw(teachFigArea(area), { g, whole: n >= 1, parts: n >= 2, nums: n >= 2, reveal: n >= 4 ? g.ans : null });
 }
 function u11KindIcon(kind, x, y, s){
   ctx.save();
@@ -5070,10 +5088,13 @@ const STAGES = [
   {
     id: 'u11', unlocked: true,
     kinds: ['u11', 'u11', 'u11', 'u11', 'u11', 'u11'],
-    intros: [{ kind: 'u11', label: 'ぜんぶ と ぶぶん', g: { stmt: '□ － 25 ＝ 185', correct: '185＋25', form: 0 }, answer: '185＋25' }],
-    txt: { u11: ['□を ', ['出','だ'], 'す しきは？'] },
+    intros: [{ kind: 'u11', label: 'ぜんぶ と ぶぶん',
+      g: { stmt: '□ － 25 ＝ 185', W: 210, A: 185, B: 25, unknown: 'W', ans: 210, form: 0 }, answer: 210 }],
+    
+    txt: { u11: ['□は ', ['何','なん'], '？'] },
     gen: u11Gen,
-    drawQ(area){ qWrap(area, () => u11Draw(area, {})); },
+    
+    drawQ(area){ qWrap(area, () => u11Draw(area, { whole: S.lv <= 1, parts: S.lv <= 1, nums: S.lv <= 1 })); },
     kindIcon: u11KindIcon, teachBegin: u11TeachBegin, teachDraw: u11TeachDraw,
     icon(x, y, s){ u11KindIcon('u11', x, y, s * 1.3); },
   },
