@@ -92,7 +92,7 @@
 
 
 const CONFIG = {
-  VERSION: 'v43',
+  VERSION: 'v44',
 
   
   
@@ -2288,9 +2288,10 @@ function ordItem(id, x, y, s){
   } else if (id === 3) {                            
     ctx.beginPath();
     
-    ctx.moveTo(x - s * 0.9, y - s * 0.66);
-    ctx.quadraticCurveTo(x + s * 0.34, y + s * 1.12, x + s * 0.92, y - s * 0.3);
-    ctx.quadraticCurveTo(x + s * 0.1, y + s * 0.34, x - s * 0.62, y - s * 0.86);
+    
+    ctx.moveTo(x - s * 0.95, y - s * 0.72);
+    ctx.quadraticCurveTo(x + s * 0.42, y + s * 1.2, x + s * 0.98, y - s * 0.24);
+    ctx.quadraticCurveTo(x - s * 0.1, y + s * 0.16, x - s * 0.5, y - s * 0.98);
     ctx.closePath();
     ctx.fillStyle = '#f2cd41'; ctx.fill(); ctx.stroke();
   } else if (id === 4) {                            
@@ -2417,18 +2418,24 @@ function ordDraw(area, opt){
       ordItem(g.fixed, W / 2 - 56, area.y + 116, 11);
       text('に きめる', W / 2 - 40, area.y + 116, 12, CONFIG.C_INK_SOFT, 'left', '700');
     }
-    text('ぜんぶで 何とおり？', W / 2, area.y + (g.fixed != null ? 150 : 122), 14, CONFIG.C_INK, 'center', '800');
-    if (opt.reveal != null) text(opt.reveal + 'とおり', W / 2, area.y + 190, 20, CONFIG.C_OK, 'center', '800');
+    
+    if (opt.reveal != null) text(opt.reveal + 'とおり', W / 2, area.y + 170, 20, CONFIG.C_OK, 'center', '800');
     ctx.restore();
     return;
   }
-  text('まだ 出ていない じゅんばんは？', W / 2, area.y + 18, 13, CONFIG.C_INK_SOFT, 'center', '800');
-  if (g.fixed != null) text('1ばんめは ずっと おなじ', W / 2, area.y + 38, 11, CONFIG.C_INK_SOFT, 'center', '700');
+  
+  const all = (g.fixed == null ? g.arr : [g.fixed].concat(g.arr));
+  text('この ' + all.length + 'つを ならべる', W / 2, area.y + 16, 12, CONFIG.C_INK_SOFT, 'center', '700');
+  const ts = 13, tgap = ts * 2.9, tw0 = (all.length - 1) * tgap;
+  all.forEach((id, i) => ordItem(id, W / 2 - tw0 / 2 + i * tgap, area.y + 42, ts));
+  if (g.fixed != null) {
+    text('1ばんめは ずっと おなじ', W / 2, area.y + 66, 11, CONFIG.C_INK_SOFT, 'center', '700');
+  }
   const rows = g.shown.length;
   
   const s = Math.min(16, (area.w - 40) / (g.shown[0].length * 3.4));
   const rowH = Math.min(52, Math.max(34, s * 3.3));
-  const top = area.y + (g.fixed != null ? 58 : 42);
+  const top = area.y + (g.fixed != null ? 80 : 62);
   const listH = rows * rowH + 12;
   
   rrect(W / 2 - (area.w - 30) / 2, top, area.w - 30, listH, 10);
@@ -2561,8 +2568,8 @@ function chooseDraw(area, opt){
   ctx.fillStyle = CONFIG.C_HI_T; ctx.fill();
   ctx.strokeStyle = CONFIG.C_GOLD; ctx.lineWidth = 2; ctx.stroke();
   text('この うち ' + g.k + 'こ', W / 2, area.y + 88, 15, CONFIG.C_INK, 'center', '800');
-  text('えらび方は 何とおり？', W / 2, area.y + 116, 12, CONFIG.C_INK_SOFT, 'center', '700');
-  text('じゅんばんは 関係ない', W / 2, area.y + 134, 11, CONFIG.C_INK_SOFT, 'center', '700');
+  
+  text('じゅんばんは 関係ない（AとB＝BとA）', W / 2, area.y + 118, 11, CONFIG.C_INK_SOFT, 'center', '700');
   ctx.restore();
 }
 
@@ -2691,15 +2698,17 @@ function codeDraw(area, opt){
     text(String(k), x - cw / 2 - 14, y, 13, CONFIG.C_INK_SOFT, 'right', '800');
     codeWrite(k, g.digits, x + 6, y, bs);
   }
-  const s = Math.min(22, (area.w - 60) / g.digits / 2.2);
-  const cy = area.y + 128;
+  
+  const s = Math.min(28, (area.w - 40) / g.digits / 2.1);
+  const cy = area.y + (opt.vals || S.lv <= 1 ? 140 : 128);
+  const showVals = !!opt.vals || (S.mode === 'play' && S.lv <= 1);
   if (g.add) {
-    codeWrite(g.a, g.digits, W / 2, cy, s, { vals: !!opt.vals });
+    codeWrite(g.a, g.digits, W / 2, cy, s, { vals: showVals });
     text('＋', W / 2 - s * 3.6, cy + s * 1.9, 20, CONFIG.C_INK, 'center', '800');
-    codeWrite(g.b, g.digits, W / 2, cy + s * 3.8, s, { vals: !!opt.vals });
+    codeWrite(g.b, g.digits, W / 2, cy + s * 3.8, s, { vals: showVals });
     if (opt.vals) text(g.a + ' ＋ ' + g.b, W / 2, cy + s * 5.6, 18, CONFIG.C_GOLD, 'center', '800');
   } else {
-    codeWrite(g.v, g.digits, W / 2, cy, s, { vals: !!opt.vals });
+    codeWrite(g.v, g.digits, W / 2, cy, s, { vals: showVals });
   }
   if (opt.reveal != null) text('＝ ' + opt.reveal, W / 2, cy + (g.add ? s * 7.4 : s * 3.0), 22, CONFIG.C_OK, 'center', '800');
   ctx.restore();
@@ -4785,7 +4794,7 @@ const STAGES = [
     id: 'tree', unlocked: true,
     kinds: ['miss', 'miss', 'count', 'miss', 'count', 'miss'],
     intros: [{ kind: 'miss', label: 'じゅけい図', g: ORD_INTRO, answer: ORD_INTRO.miss.join(',') }],
-    txt: { miss: ['どの じゅんばん？'], count: ['ならべ方は 何とおり？'] },
+    txt: { miss: ['まだ 出ていないのは？'], count: ['ならべ方は 何とおり？'] },
     gen: ordGen,
     drawQ(area){ qWrap(area, () => ordDraw(area, {})); },
     kindIcon: ordKindIcon, teachBegin: ordTeachBegin, teachDraw: ordTeachDraw,
@@ -6485,6 +6494,8 @@ function drawHud(){
     ctx.fill();
   }
   
+  text('もんだい', x0 + (n - 1) * gap + r + 9, y, 9, CONFIG.C_INK_SOFT, 'left', '700');
+  
   if (S.boss) {
     
     const st2 = bossState(S.boss.gi);
@@ -6498,6 +6509,7 @@ function drawHud(){
       ctx.fillStyle = i <= S.lv ? CONFIG.C_INK : 'rgba(0,0,0,0.13)';
       ctx.fill();
     }
+    text('むずかしさ', lx + (CONFIG.LEVELS.length - 1) * 12 + 13, ly, 9, CONFIG.C_INK_SOFT, 'left', '700');
   }
   
 
@@ -7391,12 +7403,14 @@ function drawPlay(){
   
   if (S.mode === 'play' || S.mode === 'correct') {
     const f = figArea();
+    
+    const cardTop = AREA.fig.y - 5, cardBot = f.y + f.h + 6;
     ctx.save();
     ctx.shadowColor = 'rgba(60,48,30,0.16)'; ctx.shadowBlur = 14; ctx.shadowOffsetY = 4;
-    rrect(14, f.y - 8, W - 28, f.h + 14, 16);
+    rrect(14, cardTop, W - 28, cardBot - cardTop, 16);
     ctx.fillStyle = '#fbf8f1'; ctx.fill();
     ctx.restore();
-    rrect(14, f.y - 8, W - 28, f.h + 14, 16);
+    rrect(14, cardTop, W - 28, cardBot - cardTop, 16);
     ctx.strokeStyle = 'rgba(60,48,30,0.14)'; ctx.lineWidth = 1.4; ctx.stroke();
   }
 
