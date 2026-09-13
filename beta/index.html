@@ -92,7 +92,7 @@
 
 
 const CONFIG = {
-  VERSION: 'v62',
+  VERSION: 'v63',
 
   
   
@@ -1453,18 +1453,53 @@ function magicAddTeachBegin(){
   }
   msgs.push('のこりの マスも 同じように ' + opWord);
   labels.push('のこりも');
-  const sumB = g.base[r][0] + g.base[r][1] + g.base[r][2];
-  msgs.push('もとの この列は ' + g.base[r].join('＋') + ' ＝ ' + sumB);
-  labels.push('もと ' + sumB);
-  msgs.push('できた この列は ' + g.m[r].join('＋') + ' ＝ ' + g.sum + '。\nどの列も ' + g.sum + '。だから 3方陣の まま');
-  labels.push('できた ' + g.sum);
-  return makeTeach(msgs.length - 1, msgs, labels, { g, mk: 'add', row: r, sumB });
+  const sumB = g.base[0][0] + g.base[0][1] + g.base[0][2];
+  
+  msgs.push('よこ 3本は ぜんぶ ' + g.sum + '。\nもとは ' + sumB
+            + (g.op === 'add' ? ('。' + g.k + ' が 3つぶん ふえた') : ('。ぜんぶ ' + g.k + ' ばい')));
+  labels.push('よこ 3本');
+  msgs.push('たて 3本も ぜんぶ ' + g.sum);
+  labels.push('たて 3本');
+  msgs.push('ななめ 2本も ' + g.sum + '。\n8本 ぜんぶ ' + g.sum + '。だから 3方陣の まま');
+  labels.push('8本 ぜんぶ ' + g.sum);
+  return makeTeach(msgs.length - 1, msgs, labels, { g, mk: 'add', row: r });
+}
+
+function magicAddProof(area, g, opt){
+  const inner = { x: W / 2 - 104, y: area.y, w: 208, h: area.h - 24 };
+  const res = magicDrawGrid(inner, { n: 3, m: g.m, hidden: [], ask: g.ask }, {});
+  const { ox, oy, cs } = res;
+  const m = g.m;
+  text('できた', ox + cs * 1.5, oy - 15, 12, CONFIG.C_INK_SOFT, 'center', '700');
+  if (opt.rows) for (let i = 0; i < 3; i++)
+    text(String(m[i][0] + m[i][1] + m[i][2]), ox + cs * 3 + 20, oy + i * cs + cs / 2,
+         15, CONFIG.C_OK, 'center', '800');
+  if (opt.cols) for (let i = 0; i < 3; i++)
+    text(String(m[0][i] + m[1][i] + m[2][i]), ox + i * cs + cs / 2, oy + cs * 3 + 14,
+         15, CONFIG.C_OK, 'center', '800');
+  if (opt.diags) {
+    ctx.save();
+    ctx.strokeStyle = CONFIG.C_GOLD; ctx.lineWidth = 2.4; ctx.globalAlpha = 0.55; ctx.lineCap = 'round';
+    ctx.beginPath();
+    ctx.moveTo(ox + 8, oy + 8); ctx.lineTo(ox + cs * 3 - 8, oy + cs * 3 - 8);
+    ctx.moveTo(ox + cs * 3 - 8, oy + 8); ctx.lineTo(ox + 8, oy + cs * 3 - 8);
+    ctx.stroke();
+    ctx.restore();
+    text(String(m[0][0] + m[1][1] + m[2][2]), ox + cs * 3 + 20, oy + cs * 3 + 14,
+         15, CONFIG.C_GOLD, 'center', '800');
+    text(String(m[0][2] + m[1][1] + m[2][0]), ox - 20, oy + cs * 3 + 14,
+         15, CONFIG.C_GOLD, 'center', '800');
+  }
 }
 function magicAddTeachDraw(area, T){
   const g = T.g, n = T.shown, r = T.row;
   const a = { x: 0, y: area.y + TEACH_BAR_H + 6, w: W, h: area.h - TEACH_BAR_H - TEACH_FOOT_H - TEACH_MSG_H - 12 };
   magicRuleText(a, g);
   const gridArea = { x: a.x, y: a.y + 46, w: a.w, h: a.h - 50 };
+  if (n >= 5) {                                 
+    magicAddProof(gridArea, g, { rows: true, cols: n >= 6, diags: n >= 7 });
+    return;
+  }
   
   let hiddenR = [];
   if (n < 4) {
@@ -1473,16 +1508,11 @@ function magicAddTeachDraw(area, T){
       if (!filled) hiddenR.push({ r: rr, c: cc });
     }
   }
-  const rowLit = {}; for (let cc = 0; cc < 3; cc++) rowLit[r + ',' + cc] = CONFIG.C_HI_T;
   const opt = { hiddenR };                     
   if (n >= 1 && n <= 3) {                       
     const c = n - 1;
     opt.litL = { [r + ',' + c]: CONFIG.C_HI_T };
     opt.litR = { [r + ',' + c]: CONFIG.C_HI_T };
-  } else if (n >= 5) {                          
-    opt.litL = rowLit;
-    opt.sumL = 'たすと ' + T.sumB;
-    if (n >= 6) { opt.litR = rowLit; opt.sumR = 'たすと ' + g.sum; }
   }
   magicAddDrawQ(gridArea, g, opt);
 }
