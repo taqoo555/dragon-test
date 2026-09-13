@@ -92,7 +92,7 @@
 
 
 const CONFIG = {
-  VERSION: 'v42',
+  VERSION: 'v43',
 
   
   
@@ -2257,9 +2257,10 @@ function markTable(area, rowsLbl, colsLbl, marks, opt){
 
 const ORD_FRUIT = [0, 1, 2, 3];      
 const ORD_MARK  = [10, 11, 12, 13];  
+
 const U06_LV = [
-  { mark: 0.0, ns: [2, 2, 3] },
-  { mark: 0.0, ns: [2, 3, 3] },
+  { mark: 0.0, ns: [3, 3, 3] },
+  { mark: 0.0, ns: [3, 3, 3] },
   { mark: 0.4, ns: [3, 3, 3] },
   { mark: 0.5, ns: [3, 3, 4] },
   { mark: 0.6, ns: [3, 4, 4] },
@@ -2286,9 +2287,10 @@ function ordItem(id, x, y, s){
     }
   } else if (id === 3) {                            
     ctx.beginPath();
-    ctx.moveTo(x - s * 0.82, y - s * 0.52);
-    ctx.quadraticCurveTo(x + s * 0.3, y + s * 1.05, x + s * 0.86, y - s * 0.2);
-    ctx.quadraticCurveTo(x + s * 0.2, y + s * 0.5, x - s * 0.82, y - s * 0.52);
+    
+    ctx.moveTo(x - s * 0.9, y - s * 0.66);
+    ctx.quadraticCurveTo(x + s * 0.34, y + s * 1.12, x + s * 0.92, y - s * 0.3);
+    ctx.quadraticCurveTo(x + s * 0.1, y + s * 0.34, x - s * 0.62, y - s * 0.86);
     ctx.closePath();
     ctx.fillStyle = '#f2cd41'; ctx.fill(); ctx.stroke();
   } else if (id === 4) {                            
@@ -2335,8 +2337,8 @@ function ordItem(id, x, y, s){
   ctx.restore();
 }
 
-function ordRow(list, cx, cy, s, alpha){
-  const gap = s * 3.4;
+function ordRow(list, cx, cy, s, alpha, gapK){
+  const gap = s * (gapK || 3.4);
   const wTotal = (list.length - 1) * gap;
   ctx.save(); if (alpha != null) ctx.globalAlpha = alpha;
   list.forEach((id, i) => {
@@ -2344,7 +2346,7 @@ function ordRow(list, cx, cy, s, alpha){
     ordItem(id, x, cy, s);
     if (i < list.length - 1) {
       ctx.strokeStyle = CONFIG.C_INK_SOFT; ctx.lineWidth = 1.4; ctx.lineCap = 'round';
-      const ax = x + s * 1.3, bx = x + gap - s * 1.3;
+      const ax = x + s * 1.15, bx = x + gap - s * 1.15;
       ctx.beginPath(); ctx.moveTo(ax, cy); ctx.lineTo(bx, cy);
       ctx.moveTo(bx - s * 0.42, cy - s * 0.32); ctx.lineTo(bx, cy);
       ctx.lineTo(bx - s * 0.42, cy + s * 0.32); ctx.stroke();
@@ -2378,27 +2380,54 @@ const ORD_INTRO = (function(){
   const arr = [0, 1, 2], perms = ordPerms(arr);
   return { fixed: null, arr, n: 3, shown: perms.filter((_, i) => i !== 2), miss: perms[2], all: perms };
 })();
-function ordGen(lv){
+function ordGen(lv, kind){
   const cfg = U06_LV[Math.min(lv, U06_LV.length - 1)];
   const ids = (Math.random() < cfg.mark) ? ORD_MARK : ORD_FRUIT;
   const n = cfg.ns[randInt(0, cfg.ns.length - 1)];
   const g = ordMake(ids, n);
+  
+  if (kind === 'count') {
+    g.count = true;
+    const ans = g.all.length;
+    return { g, answer: ans, kind: 'count',
+      choices: numChoices(ans, [n, n * (n - 1), ans + 2, Math.max(2, ans - 2), ans + 6, n + 1]) };
+  }
   const choices = shuffleArr(g.all.map(o => ({ v: o.join(','), draw: (q, ink) => ordChoiceDraw(q, o) })));
-  return { g, answer: g.miss.join(','), kind: 'ord', choices };
+  return { g, answer: g.miss.join(','), kind: 'miss', choices };
 }
 function ordChoiceDraw(q, list){
-  const s = Math.min(9, (q.w - 14) / (list.length * 3.4));
-  ordRow(list, q.x + q.w / 2, q.y + q.h / 2, s, null);
+  
+  const gapK = 3.0;
+  const s = Math.min((q.w - 10) / ((list.length - 1) * gapK + 2), q.h * 0.34);
+  ordRow(list, q.x + q.w / 2, q.y + q.h / 2, s, null, gapK);
 }
 function ordDraw(area, opt){
   opt = opt || {};
   const g = opt.g || S.g;
   ctx.save();
+  if (g.count) {
+    
+    const all = (g.fixed == null ? g.arr : [g.fixed].concat(g.arr));
+    text('この ' + all.length + 'つを ならべる', W / 2, area.y + 20, 14, CONFIG.C_INK_SOFT, 'center', '800');
+    const s = Math.min(22, (area.w - 60) / all.length / 2.6);
+    const gap = s * 2.9, w0 = (all.length - 1) * gap;
+    all.forEach((id, i) => ordItem(id, W / 2 - w0 / 2 + i * gap, area.y + 74, s));
+    if (g.fixed != null) {
+      text('1ばんめは', W / 2 - 70, area.y + 116, 12, CONFIG.C_INK_SOFT, 'right', '700');
+      ordItem(g.fixed, W / 2 - 56, area.y + 116, 11);
+      text('に きめる', W / 2 - 40, area.y + 116, 12, CONFIG.C_INK_SOFT, 'left', '700');
+    }
+    text('ぜんぶで 何とおり？', W / 2, area.y + (g.fixed != null ? 150 : 122), 14, CONFIG.C_INK, 'center', '800');
+    if (opt.reveal != null) text(opt.reveal + 'とおり', W / 2, area.y + 190, 20, CONFIG.C_OK, 'center', '800');
+    ctx.restore();
+    return;
+  }
   text('まだ 出ていない じゅんばんは？', W / 2, area.y + 18, 13, CONFIG.C_INK_SOFT, 'center', '800');
   if (g.fixed != null) text('1ばんめは ずっと おなじ', W / 2, area.y + 38, 11, CONFIG.C_INK_SOFT, 'center', '700');
   const rows = g.shown.length;
-  const s = Math.min(13, (area.w - 40) / (g.shown[0].length * 3.4));
-  const rowH = Math.min(44, Math.max(28, s * 3.2));
+  
+  const s = Math.min(16, (area.w - 40) / (g.shown[0].length * 3.4));
+  const rowH = Math.min(52, Math.max(34, s * 3.3));
   const top = area.y + (g.fixed != null ? 58 : 42);
   const listH = rows * rowH + 12;
   
@@ -2647,20 +2676,23 @@ function codeDraw(area, opt){
   ctx.save();
   
   
-  const boxW = area.w - 34, by = area.y + 27;
-  const pitch = boxW / 4;
-  const bs = Math.min(8, (pitch - 24) / (g.digits * 1.9));
-  rrect(W / 2 - boxW / 2, area.y + 8, boxW, 38, 9);
+  
+  const boxW = area.w - 34, boxH = 62;
+  const pitch = boxW / 2;
+  const bs = Math.min(10, (pitch - 46) / (g.digits * 1.9));
+  rrect(W / 2 - boxW / 2, area.y + 6, boxW, boxH, 9);
   ctx.fillStyle = 'rgba(255,255,255,0.6)'; ctx.fill();
   ctx.strokeStyle = CONFIG.C_GRID; ctx.lineWidth = 1.3; ctx.stroke();
   for (let k = 1; k <= 4; k++) {
-    const x = W / 2 - boxW / 2 + (k - 0.5) * pitch;
+    const col = (k - 1) % 2, row = Math.floor((k - 1) / 2);
+    const x = W / 2 - boxW / 2 + (col + 0.5) * pitch;
+    const y = area.y + 22 + row * 28;
     const cw = (g.digits - 1) * bs * 1.9;
-    text(String(k), x - cw / 2 - 9, by, 12, CONFIG.C_INK_SOFT, 'right', '800');
-    codeWrite(k, g.digits, x + 4, by, bs);
+    text(String(k), x - cw / 2 - 14, y, 13, CONFIG.C_INK_SOFT, 'right', '800');
+    codeWrite(k, g.digits, x + 6, y, bs);
   }
   const s = Math.min(22, (area.w - 60) / g.digits / 2.2);
-  const cy = area.y + 112;
+  const cy = area.y + 128;
   if (g.add) {
     codeWrite(g.a, g.digits, W / 2, cy, s, { vals: !!opt.vals });
     text('＋', W / 2 - s * 3.6, cy + s * 1.9, 20, CONFIG.C_INK, 'center', '800');
@@ -4230,7 +4262,8 @@ function u15KindIcon(kind, x, y, s){
 const U17_LV = [[10, 4], [16, 4], [20, 6], [30, 8], [40, 10]];
 function u17MiniBars(q, big, small, kind){
   const pad = 13, w = q.w - pad * 2, m = Math.max(big, small, 1);
-  const bh = 8, gap = 7, bx = q.x + pad;
+  
+  const bh = Math.max(8, Math.min(18, q.h * 0.17)), gap = Math.max(6, bh * 0.8), bx = q.x + pad;
   const y0 = q.y + q.h / 2 - (bh * 2 + gap) / 2;
   const bar = (y, len, col) => {
     rrect(bx, y, Math.max(6, w * len / m), bh, 3);
@@ -4750,9 +4783,9 @@ const STAGES = [
   
   {
     id: 'tree', unlocked: true,
-    kinds: ['ord', 'ord', 'ord', 'ord', 'ord', 'ord'],
-    intros: [{ kind: 'ord', label: 'じゅけい図', g: ORD_INTRO, answer: ORD_INTRO.miss.join(',') }],
-    txt: { ord: ['どの じゅんばん？'] },
+    kinds: ['miss', 'miss', 'count', 'miss', 'count', 'miss'],
+    intros: [{ kind: 'miss', label: 'じゅけい図', g: ORD_INTRO, answer: ORD_INTRO.miss.join(',') }],
+    txt: { miss: ['どの じゅんばん？'], count: ['ならべ方は 何とおり？'] },
     gen: ordGen,
     drawQ(area){ qWrap(area, () => ordDraw(area, {})); },
     kindIcon: ordKindIcon, teachBegin: ordTeachBegin, teachDraw: ordTeachDraw,
@@ -6583,9 +6616,21 @@ function drawMute(x, y){
 }
 
 
-function choiceRect(i){
-  const c = i % 3, r = Math.floor(i / 3);
-  return { x: CH_X0 + c * (CH_W + CH_GX), y: CH_Y0 + r * (CH_H + CH_GY), w: CH_W, h: CH_H };
+
+function choiceCols(n){
+  if (n <= 2) return 2;
+  if (n === 3) return 3;
+  if (n === 4) return 2;
+  return 3;
+}
+function choiceRect(i, n){
+  n = n || (S.choices ? S.choices.length : 6);
+  const cols = choiceCols(n), rows = Math.ceil(n / cols);
+  const span = CH_W * 3 + CH_GX * 2;                 
+  const w = (span - CH_GX * (cols - 1)) / cols;
+  const h = (rows === 1) ? CH_BLOCK : CH_H;
+  const c = i % cols, r = Math.floor(i / cols);
+  return { x: CH_X0 + c * (w + CH_GX), y: CH_Y0 + r * (CH_H + CH_GY), w, h };
 }
 
 function choiceVal(c){ return (c !== null && typeof c === 'object') ? c.v : c; }
@@ -6596,6 +6641,22 @@ function txtChoices(correct, wrongs){
   return shuffleArr(out);
 }
 
+
+function fitText(str, q, ink){
+  const padW = q.w - 14, maxSize = (q.h >= CH_BLOCK) ? 30 : 24;
+  let size = maxSize;
+  while (size > 11 && textWidth(str, size, '700') > padW) size -= 1;
+  if (textWidth(str, size, '700') <= padW) { text(str, q.x + q.w/2, q.y + q.h/2 + 1, size, ink); return; }
+  
+  const sp = str.lastIndexOf(' ', Math.ceil(str.length / 2) + 2);
+  const cut = (sp > 0) ? sp : Math.ceil(str.length / 2);
+  const a = str.slice(0, cut).trim(), b = str.slice(sp > 0 ? sp + 1 : cut).trim();
+  size = maxSize;
+  while (size > 10 && Math.max(textWidth(a, size, '700'), textWidth(b, size, '700')) > padW) size -= 1;
+  const lh = size * 1.15;
+  text(a, q.x + q.w/2, q.y + q.h/2 - lh/2 + 1, size, ink);
+  text(b, q.x + q.w/2, q.y + q.h/2 + lh/2 + 1, size, ink);
+}
 function drawChoices(){
   const active = (S.mode === 'play');
   
@@ -6641,8 +6702,7 @@ function drawChoices(){
     } else {
       const s = (c !== null && typeof c === 'object' && c.txt != null) ? String(c.txt) : String(v);
       
-      const size = s.length >= 9 ? 13 : s.length >= 7 ? 15 : s.length >= 5 ? 17 : s.length >= 3 ? 20 : 24;
-      text(s, q.x + q.w/2, q.y + q.h/2 + 1, size, ink);
+      fitText(s, q, ink);
     }
     ctx.restore();
     ctx.restore();
@@ -7386,27 +7446,61 @@ function hitStepBtn(lx, ly){
   return lx >= b.x - 8 && lx <= b.x + b.w + 8 && ly >= b.y - 8 && ly <= b.y + b.h + 8;
 }
 
-function drawRichLine(s, cx, y, fs, col){
-  const parts = String(s).split('**');
-  if (parts.length === 1) { text(s, cx, y, fs, col, 'center', '700'); return; }
-  const ws = parts.map((p, i) => textWidth(p, fs, (i % 2) ? '900' : '700'));
-  let x = cx - ws.reduce((a, b) => a + b, 0) / 2;
-  parts.forEach((p, i) => {
-    if (p) text(p, x, y, fs, (i % 2) ? CONFIG.C_GOLD : col, 'left', (i % 2) ? '900' : '700');
-    x += ws[i];
+function drawRichLine(segs, cx, y, fs, col){
+  const total = segs.reduce((a, g) => a + textWidth(g.t, fs, g.b ? '900' : '700'), 0);
+  let x = cx - total / 2;
+  segs.forEach(g => {
+    if (g.t) text(g.t, x, y, fs, g.b ? CONFIG.C_GOLD : col, 'left', g.b ? '900' : '700');
+    x += textWidth(g.t, fs, g.b ? '900' : '700');
   });
+}
+
+
+const NO_HEAD = /^[、。，．！？）」』】〉・ー…]/;
+function richAtoms(line){
+  const out = [];
+  String(line).split('**').forEach((part, i) => {
+    const b = (i % 2) === 1;
+    part.split(/(\s+)/).forEach(t => { if (t) out.push({ t, b, nb: NO_HEAD.test(t) }); });
+  });
+  return out;
+}
+
+function wrapRich(atoms, maxW, fs){
+  const lines = []; let cur = [], w = 0;
+  for (const a of atoms) {
+    const aw = textWidth(a.t, fs, a.b ? '900' : '700');
+    if (w + aw > maxW && cur.length && !a.nb) {
+      while (cur.length && /^\s+$/.test(cur[cur.length - 1].t)) cur.pop();
+      lines.push(cur); cur = []; w = 0;
+      if (/^\s+$/.test(a.t)) continue;
+    }
+    cur.push(a); w += aw;
+  }
+  if (cur.length) lines.push(cur);
+  return lines;
 }
 function drawTeachMsg(){
   const T = S.teach, m = teachAreas().msg;
   const msg = T.msgFn ? T.msgFn() : '';
   if (!msg) return;
-  const lines = msg.split('\n');
+  const maxW = m.w - 34;
+  
+  let fs = 17, rows = [];
+  for (const size of [17, 15, 13, 12]) {
+    fs = size; rows = [];
+    msg.split('\n').forEach(ln => { rows = rows.concat(wrapRich(richAtoms(ln), maxW, size)); });
+    if (rows.length <= 3) break;
+  }
+  const lh = Math.round(fs * 1.45);
+  const boxH = Math.max(m.h - 8, rows.length * lh + 16);
+  const boxY = m.y + m.h - 4 - boxH;
   ctx.save();
-  rrect(m.x + 6, m.y + 4, m.w - 12, m.h - 8, 10);
+  rrect(m.x + 6, boxY, m.w - 12, boxH, 10);
   ctx.fillStyle = 'rgba(255,255,255,0.75)'; ctx.fill();
   ctx.restore();
-  const fs = 17, lh = 25, y0 = m.y + m.h/2 - (lines.length - 1) * lh / 2;
-  lines.forEach((ln, i) => drawRichLine(ln, W/2, y0 + i * lh, fs, CONFIG.C_INK));
+  const y0 = boxY + boxH/2 - (rows.length - 1) * lh / 2;
+  rows.forEach((segs, i) => drawRichLine(segs, W/2, y0 + i * lh, fs, CONFIG.C_INK));
 }
 function drawTeachOverlay(){
   const T = S.teach;
