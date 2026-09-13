@@ -92,7 +92,7 @@
 
 
 const CONFIG = {
-  VERSION: 'v37',
+  VERSION: 'v38',
 
   
   
@@ -3969,13 +3969,12 @@ function drawEnemyArt(box, e, t, white){
 
 
 const DRAGONS = [
-  
-  { id: 0, img: 'dragon0', tint: null,      name: 'STAGE 1', dname: 'フレイムドラゴン',  sname: 'フレイム',   breath: 'flame',   c1: '#8a4b52', c2: '#c46c74' },
-  { id: 1, img: 'dragon1', tint: null,      name: 'STAGE 2', dname: 'サンダードラゴン',  sname: 'サンダー',   breath: 'thunder', c1: '#3a4a7a', c2: '#6c8cc4' },
-  { id: 2, img: 'dragon0', silhouette: true, name: 'STAGE 3', dname: 'アイスドラゴン',   sname: 'アイス',     breath: 'ice',     c1: '#3f6b58', c2: '#5fa384' },
-  { id: 3, img: 'dragon0', silhouette: true, name: 'STAGE 4', dname: 'フォレストドラゴン', sname: 'フォレスト', breath: 'beam',    c1: '#8a6b3f', c2: '#c4a06c' },
-  { id: 4, img: 'dragon0', silhouette: true, name: 'STAGE 5', dname: 'シャインドラゴン',  sname: 'シャイン',   breath: 'beam',    c1: '#3a3a3a', c2: '#6c6c6c' },
-  { id: 5, img: 'dragon0', silhouette: true, name: 'STAGE 6', dname: 'ダークドラゴン',   sname: 'ダーク',     breath: 'beam',    c1: '#6b3f8a', c2: '#a06cc4' },
+  { id: 0, img: 'dragon0', tint: null, name: 'STAGE 1', dname: 'フレイムドラゴン',  sname: 'フレイム',   breath: 'flame',   c1: '#8a4b52', c2: '#c46c74' },
+  { id: 1, img: 'dragon1', tint: null, name: 'STAGE 2', dname: 'サンダードラゴン',  sname: 'サンダー',   breath: 'thunder', c1: '#3a4a7a', c2: '#6c8cc4' },
+  { id: 2, img: 'dragon-ice', tint: null, name: 'STAGE 3', dname: 'アイスドラゴン',   sname: 'アイス',     breath: 'ice',     c1: '#3f6b58', c2: '#5fa384' },
+  { id: 3, img: 'dragon-forest', tint: null, name: 'STAGE 4', dname: 'フォレストドラゴン', sname: 'フォレスト', breath: 'beam',    c1: '#8a6b3f', c2: '#c4a06c' },
+  { id: 4, img: 'dragon-shine', tint: null, name: 'STAGE 5', dname: 'シャインドラゴン',  sname: 'シャイン',   breath: 'beam',    c1: '#3a3a3a', c2: '#6c6c6c' },
+  { id: 5, img: 'dragon-dark', tint: null, name: 'STAGE 6', dname: 'ダークドラゴン',   sname: 'ダーク',     breath: 'beam',    c1: '#6b3f8a', c2: '#a06cc4' },
 ];
 function dragonImage(d){
   const im = d.img && IMG[d.img];
@@ -7251,6 +7250,11 @@ loadImg('enemy0', 'img/enemy0.webp');
 loadImg('dragon1', 'img/dragon1.webp');
 
 loadImg('enemy1', 'img/enemy1.webp');
+
+loadImg('dragon-ice', 'img/dragon-ice.webp');
+loadImg('dragon-forest', 'img/dragon-forest.webp');
+loadImg('dragon-shine', 'img/dragon-shine.webp');
+loadImg('dragon-dark', 'img/dragon-dark.webp');
 
 loadImg('logo0', 'img/logo0.webp');
 
