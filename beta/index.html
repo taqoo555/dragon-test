@@ -92,7 +92,7 @@
 
 
 const CONFIG = {
-  VERSION: 'v47',
+  VERSION: 'v48',
 
   
   
@@ -4407,6 +4407,7 @@ function u17MiniBars(q, big, small, kind){
   text('△', q.x + 7, y0 + bh + gap + bh / 2, 10, '#cfc7b6', 'center', '700');
 }
 function u17Gen(lv, kind){
+  if (kind === 'ratio2' || kind === 'ratio3') return u17RatioGen(lv, kind);
   const [maxSum, maxDiff] = U17_LV[Math.min(lv, U17_LV.length - 1)];
   let sum, diff, big, small;
   for (let t = 0; t < 40; t++) {
@@ -4467,6 +4468,7 @@ function u17Draw(area, opt){
   ctx.restore();
 }
 function u17TeachBegin(){
+  if (S.kind === 'ratio2' || S.kind === 'ratio3') return u17RatioTeachBegin();
   const g = S.g;
   const msgs = [
     g.said,
@@ -4479,9 +4481,96 @@ function u17TeachBegin(){
   return makeTeach(4, msgs, ['', '○が長い', 'おなじ図', 'きると', String(g.big)], { g });
 }
 function u17TeachDraw(area, T){
+  if (T.kk === 'ratio') return u17RatioTeachDraw(area, T);
   const g = T.g, n = T.shown;
   u17Draw(teachFigArea(area), { g, bars: n >= 1, diff: n >= 3, reveal: n >= 4 ? ('○は ' + g.big) : null });
 }
+
+
+const U17_RATIO2_LV = [[2, 3], [2, 3], [2, 3], [3, 4], [3, 4]];
+const U17_RATIO3_LV = [[[2, 3]], [[2, 3]], [[2, 3], [3, 4]], [[3, 4], [2, 4]], [[3, 4], [2, 4]]];
+function u17RatioGen(lv, kind){
+  const base = randInt(2, 6);
+  if (kind === 'ratio3') {
+    const pairs = U17_RATIO3_LV[Math.min(lv, U17_RATIO3_LV.length - 1)];
+    const [k2, k3] = pairs[randInt(0, pairs.length - 1)];
+    const mults = [1, k2, k3];
+    const sum = base * mults.reduce((a, b) => a + b, 0);
+    const ask = randInt(0, 2);
+    const vals = mults.map(m => m * base);
+    return { g: { people: 3, mults, base, sum, ask, vals }, answer: vals[ask], kind: 'ratio3',
+      choices: numChoices(vals[ask], [base, sum, vals[ask] + base, Math.max(1, vals[ask] - base), sum - vals[ask], vals[(ask + 1) % 3]]) };
+  }
+  const mults2 = U17_RATIO2_LV[Math.min(lv, U17_RATIO2_LV.length - 1)];
+  const k = mults2[randInt(0, mults2.length - 1)];
+  const mults = [1, k];
+  const sum = base * (1 + k);
+  const ask = randInt(0, 1);
+  const vals = mults.map(m => m * base);
+  return { g: { people: 2, mults, base, sum, ask, vals }, answer: vals[ask], kind: 'ratio2',
+    choices: numChoices(vals[ask], [base, sum, vals[ask] + base, Math.max(1, vals[ask] - base), sum - vals[ask], k]) };
+}
+
+function u17RatioDraw(area, opt){
+  opt = opt || {};
+  const g = opt.g || S.g;
+  const n = g.people;
+  ctx.save();
+  text('あわせて ' + g.sum + 'こ', W / 2, area.y + 20, 14, CONFIG.C_INK_SOFT, 'center', '700');
+  const m = Math.max(...g.mults);
+  const w = 200, x0 = W / 2 - w / 2, bh = 20, gap = 8;
+  const top = area.y + 42;
+  const NAMES = ['①', '②', '③'];
+  const COLS = ['#8fb8e8', '#f0b070', '#a8d5a2'];
+  for (let i = 0; i < n; i++) {
+    const y = top + i * (bh + gap);
+    const len = Math.max(20, w * g.mults[i] / m);
+    rrect(x0, y, len, bh, 4);
+    ctx.fillStyle = (opt.reveal || i !== g.ask) ? COLS[i] : '#fff1bd';
+    ctx.fill();
+    ctx.strokeStyle = (i === g.ask) ? CONFIG.C_GOLD : CONFIG.C_EDGE;
+    ctx.lineWidth = (i === g.ask) ? 2.4 : 1.4; ctx.stroke();
+    text(NAMES[i], x0 - 12, y + bh / 2, 13, CONFIG.C_INK, 'right', '800');
+    const lab = (i === 0) ? '×1（もとに する）' : ('×' + g.mults[i]);
+    text(lab, x0 + len + 8, y + bh / 2, 11, CONFIG.C_INK_SOFT, 'left', '700');
+    if (i === g.ask && !opt.reveal) text('？', x0 + len / 2, y + bh / 2 + 1, 14, CONFIG.C_GOLD, 'center', '800');
+    if (i === g.ask && opt.reveal) text(String(g.vals[i]), x0 + len / 2, y + bh / 2 + 1, 14, CONFIG.C_INK, 'center', '800');
+  }
+  text(NAMES[g.ask] + 'は 何こ？', W / 2, top + n * (bh + gap) + 8, 13, CONFIG.C_INK, 'center', '800');
+  ctx.restore();
+}
+function u17RatioTeachBegin(){
+  const g = S.g, n = g.people;
+  const NAMES = ['①', '②', '③'];
+  const unit = g.mults.reduce((a, b) => a + b, 0);
+  const msgs = [g.sum + 'こを、' + NAMES.slice(0, n).join('・') + ' に 分ける'];
+  const labels = [''];
+  msgs.push('①を **1つぶん** と 考える');
+  labels.push('1つぶん');
+  for (let i = 1; i < n; i++) {
+    msgs.push(NAMES[i] + ' は ①の ' + g.mults[i] + '倍 → ' + g.mults[i] + 'つぶん');
+    labels.push(g.mults[i] + 'つぶん');
+  }
+  msgs.push('ぜんぶで ' + unit + 'つぶん。' + g.sum + ' ÷ ' + unit + ' ＝ ' + g.base + '（①）');
+  labels.push(String(g.base));
+  msgs.push(NAMES[g.ask] + 'は ' + g.base + (g.ask === 0 ? '' : ('×' + g.mults[g.ask])) + ' ＝ ' + g.vals[g.ask]);
+  labels.push(String(g.vals[g.ask]));
+  return makeTeach(msgs.length - 1, msgs, labels, { g, kk: 'ratio' });
+}
+function u17RatioTeachDraw(area, T){
+  const g = T.g, n = T.shown, last = T.total;
+  u17RatioDraw(teachFigArea(area), { g, reveal: n >= last });
+}
+function u17RatioKindIcon(kind, x, y, s){
+  ctx.save();
+  const cols = ['#8fb8e8', '#f0b070', '#a8d5a2'], nn = (kind === 'ratio3') ? 3 : 2;
+  for (let i = 0; i < nn; i++) {
+    rrect(x - s * 0.32, y - s * 0.22 + i * s * 0.2, s * (0.32 + i * 0.14), s * 0.14, 3);
+    ctx.fillStyle = cols[i]; ctx.fill(); ctx.strokeStyle = CONFIG.C_EDGE; ctx.lineWidth = 1; ctx.stroke();
+  }
+  ctx.restore();
+}
+
 function u17KindIcon(kind, x, y, s){
   ctx.save();
   rrect(x - s * 0.28, y - s * 0.16, s * 0.56, s * 0.12, 3); ctx.fillStyle = '#8fb8e8'; ctx.fill();
@@ -5224,12 +5313,17 @@ const STAGES = [
   {
     id: 'u17', unlocked: true,
     
-    kinds: ['fig', 'rev', 'fig', 'num', 'rev', 'fig'],
+    kinds: ['fig', 'rev', 'fig', 'num', 'ratio2', 'ratio3'],
     intros: [{ kind: 'fig', label: 'より を 図に', g: { sum: 10, diff: 4, big: 7, small: 3, said: '○は △より 4こ 多い', k: 'fig' }, answer: 'ok' }],
-    txt: { fig: ['どの ', ['図','ず'], '？'], rev: ['どの ', ['図','ず'], '？'], num: ['○は いくつ？'] },
+    txt: { fig: ['どの ', ['図','ず'], '？'], rev: ['どの ', ['図','ず'], '？'], num: ['○は いくつ？'],
+           ratio2: ['？は 何こ？'], ratio3: ['？は 何こ？'] },
     gen: u17Gen,
-    drawQ(area){ qWrap(area, () => u17Draw(area, { bars: S.kind === 'num' })); },
-    kindIcon: u17KindIcon, teachBegin: u17TeachBegin, teachDraw: u17TeachDraw,
+    drawQ(area){ qWrap(area, () => {
+      if (S.kind === 'ratio2' || S.kind === 'ratio3') return u17RatioDraw(area, {});
+      u17Draw(area, { bars: S.kind === 'num' });
+    }); },
+    kindIcon(kind, x, y, s){ (kind === 'ratio2' || kind === 'ratio3') ? u17RatioKindIcon(kind, x, y, s) : u17KindIcon(kind, x, y, s); },
+    teachBegin: u17TeachBegin, teachDraw: u17TeachDraw,
     icon(x, y, s){ u17KindIcon('fig', x, y, s * 1.3); },
   },
   {
