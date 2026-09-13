@@ -92,7 +92,7 @@
 
 
 const CONFIG = {
-  VERSION: 'v53',
+  VERSION: 'v55',
 
   
   
@@ -2838,23 +2838,27 @@ function codeDraw(area, opt){
   
   const showVals = !!opt.vals;
   const topPad = showVals ? 1.5 : 0.7;                 
-  const bottomUnits = g.add
-    ? (opt.reveal != null ? 8.0 : 4.4)
-    : (opt.reveal != null ? 3.6 : 0.6);
+  
+  const bottomUnits = (opt.reveal != null) ? 3.6 : 0.6;
   const totalUnits = topPad + bottomUnits;
   const availH = Math.max(40, (area.y + area.h) - legendBottom - 14);
-  const wCap = Math.min(28, (area.w - 40) / g.digits / 2.1);
+  
+  const PLUS_UNITS = 1.7;   
+  const gapsNeeded = g.add ? ((g.digits - 1) * 2 + PLUS_UNITS) : (g.digits - 1);
+  const wCap = Math.min(28, (area.w - 40) / Math.max(1, gapsNeeded) / 1.9);
   const s = Math.max(10, Math.min(wCap, availH / totalUnits));
   const cy = legendBottom + topPad * s;
   if (g.add) {
-    codeWrite(g.a, g.digits, W / 2, cy, s, { vals: showVals });
-    text('＋', W / 2 - s * 3.6, cy + s * 1.9, 20, CONFIG.C_INK, 'center', '800');
-    codeWrite(g.b, g.digits, W / 2, cy + s * 3.8, s, { vals: showVals });
-    if (opt.vals) text(g.a + ' ＋ ' + g.b, W / 2, cy + s * 5.6, 18, CONFIG.C_GOLD, 'center', '800');
+    
+    const half = (g.digits - 1) * s * 1.9 / 2, plusGap = s * 1.9 * PLUS_UNITS;
+    const xA = W / 2 - (half + plusGap / 2), xB = W / 2 + (half + plusGap / 2);
+    codeWrite(g.a, g.digits, xA, cy, s, { vals: showVals });
+    text('＋', W / 2, cy, 22, CONFIG.C_INK, 'center', '800');
+    codeWrite(g.b, g.digits, xB, cy, s, { vals: showVals });
   } else {
     codeWrite(g.v, g.digits, W / 2, cy, s, { vals: showVals });
   }
-  if (opt.reveal != null) text('＝ ' + opt.reveal, W / 2, cy + (g.add ? s * 7.4 : s * 3.0), 22, CONFIG.C_OK, 'center', '800');
+  if (opt.reveal != null) text('＝ ' + opt.reveal, W / 2, cy + s * 3.0, 22, CONFIG.C_OK, 'center', '800');
   ctx.restore();
 }
 
@@ -2907,12 +2911,18 @@ function codeKindIcon(kind, x, y, s){
 }
 
 
-const TRI_LV = [4, 5, 6, 7, 9];
+
+
+const TRI_LV = [[3, 7], [4, 8], [5, 9], [6, 10], [7, 12]];
+let TRI_LAST = [];
 
 const TRI_BASE_COL = '#cfc7b6';
 const TRI_PAIR_COLS = ['#f0b070', '#8fb8e8', '#a8d5a2', '#d9a8e0', '#e8c877'];
 function triGen(lv){
-  const n = TRI_LV[Math.min(lv, TRI_LV.length - 1)];
+  const [tLo, tHi] = TRI_LV[Math.min(lv, TRI_LV.length - 1)];
+  let n;
+  for (let t = 0; t < 10; t++) { n = randInt(tLo, tHi); if (!TRI_LAST.includes(n)) break; }
+  TRI_LAST.push(n); if (TRI_LAST.length > 3) TRI_LAST.shift();   
   const answer = n * (n + 1) / 2;
   return { g: { n }, answer, kind: 'tri',
     choices: numChoices(answer, [n * n, n * (n - 1) / 2, n + (n - 1), answer + n, Math.max(1, answer - n)]) };
@@ -2984,9 +2994,13 @@ function triKindIcon(kind, x, y, s){
 }
 
 
-const MIXROW_LV = [4, 5, 6, 7, 8];
+const MIXROW_LV = [[3, 6], [4, 7], [5, 8], [6, 9], [7, 10]];   
+let MIXROW_LAST = [];
 function mixrowGen(lv){
-  const n = MIXROW_LV[Math.min(lv, MIXROW_LV.length - 1)];
+  const [mLo, mHi] = MIXROW_LV[Math.min(lv, MIXROW_LV.length - 1)];
+  let n;
+  for (let t = 0; t < 10; t++) { n = randInt(mLo, mHi); if (!MIXROW_LAST.includes(n)) break; }
+  MIXROW_LAST.push(n); if (MIXROW_LAST.length > 1) MIXROW_LAST.shift();   
   const rowW = n + 1;                    
   const answer = n * rowW;
   return { g: { n, rowW }, answer, kind: 'mixrow',
@@ -4147,9 +4161,14 @@ function u02KindIcon(kind, x, y, s){
 
 
 
-const SQ2_LV = [3, 4, 5, 6, 7];
+
+const SQ2_LV = [[2, 8], [3, 9], [4, 10], [5, 11], [6, 12]];
+let SQ2_LAST = [];   
 function basicSqGen(lv){
-  const n = SQ2_LV[Math.min(lv, SQ2_LV.length - 1)];
+  const [sLo, sHi] = SQ2_LV[Math.min(lv, SQ2_LV.length - 1)];
+  let n;
+  for (let t = 0; t < 10; t++) { n = randInt(sLo, sHi); if (!SQ2_LAST.includes(n)) break; }
+  SQ2_LAST.push(n); if (SQ2_LAST.length > 5) SQ2_LAST.shift();   
   const answer = n * n;
   return { g: { n }, answer, kind: 'basic',
     choices: numChoices(answer, [n, n * (n + 1), Math.max(1, (n - 1) * (n - 1)), n * 2, answer + n]) };
@@ -4196,7 +4215,11 @@ function basicSqKindIcon(kind, x, y, s){
   ctx.restore();
 }
 function sqGen(lv){
-  const n = SQ2_LV[Math.min(lv, SQ2_LV.length - 1)];
+  const [sLo2, sHi2] = SQ2_LV[Math.min(lv, SQ2_LV.length - 1)];
+  const lo2 = Math.max(2, sLo2);
+  let n;
+  for (let t = 0; t < 10; t++) { n = randInt(lo2, sHi2); if (!SQ2_LAST.includes(n)) break; }
+  SQ2_LAST.push(n); if (SQ2_LAST.length > 5) SQ2_LAST.shift();   
   const answer = n * n;
   const black = n * (n + 1) / 2, white = (n - 1) * n / 2;
   return { g: { n, black, white }, answer, kind: 'sq',
@@ -5526,10 +5549,11 @@ const STAGES = [
     
     kinds: ['basic', 'basic', 'sq', 'basic', 'basic', 'sq'],
     intros: [{ kind: 'basic', label: 'たてよこ', g: { n: 4 }, answer: 16 }],
-    txt: { basic: [['何','なん'], 'こ？'], sq: [['何','なん'], 'こ？（三角数で）'] },
+    
+    txt: { basic: [['何','なん'], 'こ？'], sq: ['黒 ＋ 白は ', ['何','なん'], 'こ？'] },
     gen(lv, kind){ return kind === 'sq' ? sqGen(lv) : basicSqGen(lv); },
     drawQ(area){ qWrap(area, () => {
-      if (S.kind === 'sq') return sqDraw(area, {});
+      if (S.kind === 'sq') return sqDraw(area, { split: true });
       basicSqDraw(area, {});
     }); },
     kindIcon(kind, x, y, s){ (kind === 'sq') ? sqKindIcon(kind, x, y, s) : basicSqKindIcon(kind, x, y, s); },
