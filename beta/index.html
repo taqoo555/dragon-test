@@ -92,7 +92,7 @@
 
 
 const CONFIG = {
-  VERSION: 'v49',
+  VERSION: 'v50',
 
   
   
@@ -2543,27 +2543,35 @@ function ordDraw(area, opt){
 
 const ORD_TEACH = [0, 1, 2];          
 const ORD_NAME  = ['りんご', 'みかん', 'ぶどう', 'バナナ'];
+
 function ordTeachBegin(){
-  const a = ORD_TEACH;
+  const g = S.g, a = g.arr;
   const msgs = [
-    'りんご・みかん・ぶどう の じゅんばんを\n**ぜんぶ** しらべる',
-    'まず 1ばんめを **' + ORD_NAME[a[0]] + '** に する',
+    (g.fixed != null ? '1ばんめは いつも おなじに する。のこり3つの' : 'この3つの') +
+      ' じゅんばんを\n**ぜんぶ** しらべる',
+    'まず 1ばんめを これに する',
     '2ばんめは のこりの 2つ。3ばんめは のこりの 1つ\n→ **2とおり**',
-    '1ばんめを **' + ORD_NAME[a[1]] + '** に しても **2とおり**',
-    '1ばんめを **' + ORD_NAME[a[2]] + '** に しても **2とおり**',
-    '2 ＋ 2 ＋ 2 ＝ **6とおり**\nこの 6つ ぜんぶ 出ていれば もれなし',
+    '1ばんめを かえても **2とおり**',
+    '1ばんめを かえても **2とおり**',
+    '2 ＋ 2 ＋ 2 ＝ **6とおり**',
   ];
-  const labels = ['', ORD_NAME[a[0]], '2とおり', '4とおり', '6とおり', '6とおり'];
-  return makeTeach(5, msgs, labels, { a, k: 'ord' });
+  const labels = ['', 'まず', '2とおり', '4とおり', '6とおり', '6とおり'];
+  if (!g.count) {
+    msgs.push('この もんだいで まだ 出ていなかったのは\nこれ');
+    labels.push('これ！');
+  }
+  return makeTeach(msgs.length - 1, msgs, labels, { g, a, k: 'ord' });
 }
 function ordTeachDraw(area, T){
-  const a = T.a || ORD_TEACH, n = T.shown;
+  const a = T.a || ORD_TEACH, n = T.shown, g = T.g;
   const ar = teachFigArea(area);
   const full = (n <= 1) ? 0 : (n === 2 ? 1 : n === 3 ? 2 : 3);
   const hi1 = (n === 1) ? 0 : -1;
-  const s = Math.min(12, (ar.h - 30) / 6 / 2.6);
-  const rowH = Math.min(38, (ar.h - 30) / 6);
-  const top = ar.y + (ar.h - rowH * 6) / 2 + rowH / 2;
+  const showMiss = n >= 6 && g && !g.count;
+  const rows = showMiss ? 7 : 6;
+  const s = Math.min(12, (ar.h - 30) / rows / 2.6);
+  const rowH = Math.min(38, (ar.h - 30) / rows);
+  const top = ar.y + (ar.h - rowH * rows) / 2 + rowH / 2;
   const x0 = W / 2 - 128, x1 = W / 2 - 62, x2 = W / 2 + 10, x3 = W / 2 + 82;
   ctx.save();
   text('1ばんめ', x1, ar.y + 12, 10, CONFIG.C_INK_SOFT, 'center', '700');
@@ -2590,7 +2598,13 @@ function ordTeachDraw(area, T){
       ordItem(rest[1 - j], x3, y2, s);
     }
   }
-  if (n >= 5) text('ぜんぶで 6とおり', W / 2, top + rowH * 5.9, 15, CONFIG.C_OK, 'center', '800');
+  if (n >= 5) text(g.count ? 'ぜんぶで 6とおり' : 'まず ぜんぶで 6とおり', W / 2, top + rowH * 5.9, 14, CONFIG.C_OK, 'center', '800');
+  
+  if (showMiss) {
+    const yy = top + rowH * 7.0;
+    ordRow(g.miss, W / 2, yy, Math.min(s * 1.15, 14));
+    text('これが ぬけていた', W / 2, yy + rowH * 0.62, 12, CONFIG.C_GOLD, 'center', '800');
+  }
   ctx.restore();
 }
 function ordKindIcon(kind, x, y, s){
@@ -2674,7 +2688,7 @@ function chooseDraw(area, opt){
   ctx.restore();
 }
 
-const CHOOSE_TEACH = [0, 1, 2, 3];
+const CHOOSE_TEACH = [0, 1, 2, 3];    
 function chooseList(ids, k, cx, top, s, rowH, label){
   const list = combos(ids.length, k);
   text(label, cx, top - 12, 12, CONFIG.C_GOLD, 'center', '800');
@@ -2682,31 +2696,30 @@ function chooseList(ids, k, cx, top, s, rowH, label){
   text(list.length + 'とおり', cx, top + list.length * rowH + 12, 14, CONFIG.C_OK, 'center', '800');
   return list.length;
 }
+
 function chooseTeachBegin(){
+  const g = S.g, n = g.n, k = g.k, k2 = n - k, ans = S.answer;
   const msgs = [
-    '4つ の うち から えらぶ',
-    '**1こ** えらぶ → どれか1つ → **4とおり**',
-    '**3こ** えらぶ → **えらばない 1こ** を 決めるだけ → **4とおり**',
-    '1こ えらぶ と 3こ えらぶ は **おなじ 4とおり**',
-    '**2こ** えらぶ → 書き出すと **6とおり**\n（AとB と BとA は おなじ 1とおり）',
+    'この ' + n + 'つ の うち から ' + k + 'こ えらぶ',
+    k + 'こ えらぶ ＝ **' + k2 + 'こ えらばない** を きめる こと',
+    'えらび方を 書き出すと ' + '**' + ans + 'とおり**',
     'えらぶ ＝ **えらばない を 決める**',
   ];
-  const labels = ['', '4とおり', '4とおり', 'おなじ', '6とおり', 'えらばない'];
-  return makeTeach(5, msgs, labels, { ids: CHOOSE_TEACH, k: 'choose' });
+  const labels = ['', '言いかえ', String(ans), String(ans)];
+  return makeTeach(3, msgs, labels, { g, listK: Math.min(k, k2), mk: 'choose' });
 }
 function chooseTeachDraw(area, T){
-  const ids = T.ids || CHOOSE_TEACH, n = T.shown;
+  const g = T.g, n = T.shown;
   const ar = teachFigArea(area);
   ctx.save();
-  const s = 10, rowH = 26;
-  chooseRow(ids, [0, 1, 2, 3], W / 2, ar.y + 18, 12);
-  const top = ar.y + 58;
-  if (n === 1) chooseList(ids, 1, W / 2, top, s, rowH, '1こ えらぶ');
-  else if (n === 2) chooseList(ids, 3, W / 2, top, s, rowH, '3こ えらぶ（1こ えらばない）');
-  else if (n === 3) {
-    chooseList(ids, 1, W / 2 - 88, top, s * 0.8, rowH * 0.86, '1こ');
-    chooseList(ids, 3, W / 2 + 88, top, s * 0.8, rowH * 0.86, '3こ');
-  } else if (n >= 4) chooseList(ids, 2, W / 2, top, s, rowH, '2こ えらぶ');
+  chooseRow(g.ids, g.ids.map((_, i) => i), W / 2, ar.y + 18, 12);
+  if (n >= 2) {
+    const rowsCount = combos(g.n, T.listK).length;
+    const top = ar.y + 58;
+    const rowH = Math.max(14, Math.min(26, (ar.h - top + ar.y - 34) / rowsCount));
+    const sSize = Math.max(6, Math.min(10, rowH * 0.35));
+    chooseList(g.ids, T.listK, W / 2, top, sSize, rowH, T.listK + 'こ の えらび方');
+  }
   ctx.restore();
 }
 function chooseKindIcon(kind, x, y, s){
@@ -2827,23 +2840,41 @@ function codeDraw(area, opt){
   ctx.restore();
 }
 
-const CODE_TEACH = { v: 13, digits: 4, add: false };
+const CODE_TEACH = { v: 13, digits: 4, add: false };  
+
 function codeTeachBegin(){
-  const g = CODE_TEACH, bits = codeBits(g.v, g.digits);
-  const on = [];
-  bits.forEach((b, i) => { if (b) on.push(CODE_VALS[CODE_VALS.length - g.digits + i]); });
+  const g = S.g;
+  const namesFor = (n, digits) => {
+    const bits = codeBits(n, digits), on = [];
+    bits.forEach((b, i) => { if (b) on.push(CODE_VALS[CODE_VALS.length - digits + i]); });
+    return on;
+  };
+  if (g.add) {
+    const onA = namesFor(g.a, g.digits), onB = namesFor(g.b, g.digits);
+    const msgs = [
+      '○ は 0、｜ は 1',
+      '1つ目：｜の ところを ひろう\n' + (onA.length ? onA.join(' ＋ ') : '0') + ' ＝ ' + g.a,
+      '2つ目：｜の ところを ひろう\n' + (onB.length ? onB.join(' ＋ ') : '0') + ' ＝ ' + g.b,
+      g.a + ' ＋ ' + g.b + ' ＝ **' + (g.a + g.b) + '**',
+    ];
+    const labels = ['', String(g.a), String(g.b), String(g.a + g.b)];
+    return makeTeach(3, msgs, labels, { g, k: 'code' });
+  }
+  const on = namesFor(g.v, g.digits);
+  const vals = CODE_VALS.slice(CODE_VALS.length - g.digits).join('・');
   const msgs = [
     '○ は 0、｜ は 1',
-    '右から **1・2・4・8** の **ねうち** を 書く',
-    '｜ の ところ だけ ひろう → **' + on.join('・') + '**',
-    on.join(' ＋ ') + ' ＝ **' + g.v + '**',
+    '右から **' + vals + '** の **ねうち** を 書く',
+    '｜ の ところ だけ ひろう → **' + (on.length ? on.join('・') : '0') + '**',
+    (on.length ? on.join(' ＋ ') : '0') + ' ＝ **' + g.v + '**',
   ];
-  const labels = ['', '1･2･4･8', on.join('+'), String(g.v)];
+  const labels = ['', 'ねうち', on.join('+') || '0', String(g.v)];
   return makeTeach(3, msgs, labels, { g, k: 'code' });
 }
 function codeTeachDraw(area, T){
-  const n = T.shown, g = T.g || CODE_TEACH;
-  codeDraw(teachFigArea(area), { g, vals: n >= 1, reveal: n >= 3 ? g.v : null });
+  const n = T.shown, g = T.g;
+  const reveal = n >= 3 ? (g.add ? g.a + g.b : g.v) : null;
+  codeDraw(teachFigArea(area), { g, vals: n >= 1, reveal });
 }
 function codeKindIcon(kind, x, y, s){
   ctx.save();
