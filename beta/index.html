@@ -92,7 +92,7 @@
 
 
 const CONFIG = {
-  VERSION: 'v57',
+  VERSION: 'v58',
 
   
   
@@ -4292,12 +4292,21 @@ function sqKindIcon(kind, x, y, s){
 
 
 const U11_LV = [10, 20, 50, 120, 400];
+
+const U11_LAST = [];
 function u11Gen(lv){
   const max = U11_LV[Math.min(lv, U11_LV.length - 1)];
   const bLo = (lv === 0) ? 2 : 5;
-  const b = randInt(bLo, Math.max(bLo, Math.floor(max / 3)));
-  const ans = randInt(b + 2, max);
-  const form = randInt(0, 2);
+  let b, ans, form, key;
+  for (let tries = 0; tries < 10; tries++){
+    b = randInt(bLo, Math.max(bLo, Math.floor(max / 3)));
+    ans = randInt(b + 2, max);
+    form = randInt(0, 2);
+    key = form + ':' + b + ':' + ans;
+    if (!U11_LAST.includes(key)) break;
+  }
+  U11_LAST.push(key);
+  if (U11_LAST.length > 5) U11_LAST.shift();
   let stmt, W, A, B, unknown;
   if (form === 0) {        
     const c = ans - b;
@@ -4319,38 +4328,37 @@ function u11Gen(lv){
   return { g: { stmt, W, A, B, unknown, ans, form }, answer: ans, kind: 'u11', choices };
 }
 
+
+function u11Seg(x1, x2, y, known, label){
+  ctx.save();
+  ctx.strokeStyle = known ? CONFIG.C_INK : CONFIG.C_GOLD;
+  ctx.lineWidth = 3; ctx.lineCap = 'round';
+  if (!known) ctx.setLineDash([7, 5]);
+  ctx.beginPath(); ctx.moveTo(x1, y); ctx.lineTo(x2, y); ctx.stroke();
+  ctx.setLineDash([]);
+  [x1, x2].forEach(x => { ctx.beginPath(); ctx.moveTo(x, y - 8); ctx.lineTo(x, y + 8); ctx.stroke(); });
+  ctx.restore();
+  text(label, (x1 + x2) / 2, y - 17, 17, known ? CONFIG.C_INK : CONFIG.C_GOLD, 'center', '800');
+}
 function u11Draw(area, opt){
   opt = opt || {};
   const g = opt.g || S.g;
   ctx.save();
   text(g.stmt, W / 2, area.y + area.h * 0.3, 26, CONFIG.C_INK, 'center', '800');
-  const y = area.y + area.h * 0.58, x0 = W / 2 - 100, w = 210;
+  const y = area.y + area.h * 0.62, x0 = W / 2 - 100, w = 210;
   const ratioA = Math.min(0.85, Math.max(0.15, g.A / (g.A + g.B)));
   const cut = w * ratioA;
-  const showBox = (known, x, ww) => {
-    rrect(x, y, ww, 30, 6);
-    if (known) { ctx.fillStyle = '#8fb8e8'; ctx.fill(); ctx.strokeStyle = CONFIG.C_EDGE; ctx.lineWidth = 1.4; ctx.stroke(); return; }
-    ctx.save(); ctx.setLineDash([5, 4]); ctx.strokeStyle = CONFIG.C_GOLD; ctx.lineWidth = 2; ctx.stroke(); ctx.restore();
-  };
   if (opt.parts) {
-    showBox(g.unknown !== 'A', x0, cut - 3);
-    showBox(g.unknown !== 'B', x0 + cut + 3, w - cut - 3);
-    
-    if (g.unknown !== 'W') {
-      ctx.strokeStyle = CONFIG.C_GOLD; ctx.lineWidth = 2;
-      ctx.beginPath(); ctx.moveTo(x0, y - 10); ctx.lineTo(x0 + w, y - 10); ctx.stroke();
-      text(String(g.W), x0 + w / 2, y - 22, 15, CONFIG.C_GOLD, 'center', '800');
-    }
-  } else {
-    ctx.save(); ctx.setLineDash([5, 4]); ctx.strokeStyle = CONFIG.C_GRID; ctx.lineWidth = 1.4;
-    rrect(x0, y, w, 30, 6); ctx.stroke();
-    ctx.restore();
-  }
-  if (opt.nums && opt.parts) {
     const aLab = (g.unknown === 'A') ? '□' : String(g.A);
     const bLab = (g.unknown === 'B') ? '□' : String(g.B);
-    text(aLab, x0 + (cut - 3) / 2, y + 15, 15, (g.unknown === 'A') ? CONFIG.C_GOLD : CONFIG.C_INK, 'center', '800');
-    text(bLab, x0 + cut + 3 + (w - cut - 3) / 2, y + 15, 15, (g.unknown === 'B') ? CONFIG.C_GOLD : CONFIG.C_INK, 'center', '800');
+    u11Seg(x0, x0 + cut - 6, y, g.unknown !== 'A', aLab);
+    u11Seg(x0 + cut + 6, x0 + w, y, g.unknown !== 'B', bLab);
+    
+    if (g.unknown !== 'W') u11Seg(x0, x0 + w, y - 30, true, String(g.W));
+  } else {
+    ctx.save(); ctx.setLineDash([5, 4]); ctx.strokeStyle = CONFIG.C_GRID; ctx.lineWidth = 2;
+    ctx.beginPath(); ctx.moveTo(x0, y); ctx.lineTo(x0 + w, y); ctx.stroke();
+    ctx.restore();
   }
   if (opt.reveal != null) text('□ ＝ ' + opt.reveal, W / 2, area.y + area.h - 14, 19, CONFIG.C_OK, 'center', '800');
   ctx.restore();
