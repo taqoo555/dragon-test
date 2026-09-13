@@ -92,7 +92,7 @@
 
 
 const CONFIG = {
-  VERSION: 'v44',
+  VERSION: 'v45',
 
   
   
@@ -2432,10 +2432,13 @@ function ordDraw(area, opt){
     text('1ばんめは ずっと おなじ', W / 2, area.y + 66, 11, CONFIG.C_INK_SOFT, 'center', '700');
   }
   const rows = g.shown.length;
-  
-  const s = Math.min(16, (area.w - 40) / (g.shown[0].length * 3.4));
-  const rowH = Math.min(52, Math.max(34, s * 3.3));
   const top = area.y + (g.fixed != null ? 80 : 62);
+  
+  const reserve = 34;                                    
+  const availH = Math.max(80, (area.y + area.h) - top - reserve);
+  const rowHmax = Math.max(22, Math.min(52, Math.floor((availH - 12) / rows)));
+  const s = Math.min(16, (area.w - 40) / (g.shown[0].length * 3.4), rowHmax / 3.3);
+  const rowH = Math.min(rowHmax, Math.max(22, s * 3.3));
   const listH = rows * rowH + 12;
   
   rrect(W / 2 - (area.w - 30) / 2, top, area.w - 30, listH, 10);
@@ -2569,7 +2572,15 @@ function chooseDraw(area, opt){
   ctx.strokeStyle = CONFIG.C_GOLD; ctx.lineWidth = 2; ctx.stroke();
   text('この うち ' + g.k + 'こ', W / 2, area.y + 88, 15, CONFIG.C_INK, 'center', '800');
   
-  text('じゅんばんは 関係ない（AとB＝BとA）', W / 2, area.y + 118, 11, CONFIG.C_INK_SOFT, 'center', '700');
+  text('じゅんばんは 関係ない', W / 2, area.y + 118, 12, CONFIG.C_INK_SOFT, 'center', '800');
+  const es = 11, ey = area.y + 148, egap = es * 2.5;
+  const rowX = (cx, rev) => {
+    ordItem(g.ids[rev ? 1 : 0], cx - egap / 2, ey, es);
+    ordItem(g.ids[rev ? 0 : 1], cx + egap / 2, ey, es);
+  };
+  rowX(W / 2 - 58, false);
+  text('＝', W / 2, ey, 15, CONFIG.C_INK_SOFT, 'center', '800');
+  rowX(W / 2 + 58, true);
   ctx.restore();
 }
 
@@ -2648,7 +2659,10 @@ function codeGen(lv, kind){
     return { g: { a, b, digits, add: true }, answer: ans, kind: 'add',
       choices: numChoices(ans, [a, b, ans + 1, Math.max(1, ans - 1), a * b, ans + 2]) };
   }
-  const v = randInt(1, top);
+  
+  const fullMask = (1 << digits) - 1;
+  let v = randInt(1, top);
+  if (v === fullMask) v = randInt(1, Math.max(1, top - 1));
   const bits = codeBits(v, digits);
   
   const rev = parseInt(bits.slice().reverse().join(''), 2) || v + 1;
