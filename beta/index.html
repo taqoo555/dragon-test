@@ -92,7 +92,7 @@
 
 
 const CONFIG = {
-  VERSION: 'v58',
+  VERSION: 'v59',
 
   
   
@@ -2249,11 +2249,13 @@ function weekKindIcon(kind, x, y, s){
 
 
 
+
 function dotGrid(area, rows, cols, opt){
   opt = opt || {};
-  const s = Math.min(20, (area.w - 40) / Math.max(cols, 1), (area.h - 40) / Math.max(rows, 1) / 1.15);
+  const labelPad = (opt.rowLabel != null) ? 26 : 0;
+  const s = Math.min(20, (area.w - 40 - labelPad) / Math.max(cols, 1), (area.h - 40) / Math.max(rows, 1) / 1.15);
   const gx = s * 1.9, gy = s * 2.1;
-  const ox = W / 2 - (cols - 1) * gx / 2, oy = area.y + area.h / 2 - (rows - 1) * gy / 2;
+  const ox = W / 2 - (cols - 1) * gx / 2 + labelPad / 2, oy = area.y + area.h / 2 - (rows - 1) * gy / 2;
   ctx.save();
   for (let r = 0; r < rows; r++) for (let c = 0; c < cols; c++) {
     const x = ox + c * gx, y = oy + r * gy;
@@ -2264,7 +2266,9 @@ function dotGrid(area, rows, cols, opt){
     ctx.strokeStyle = CONFIG.C_EDGE; ctx.lineWidth = dim ? 1 : 1.4; ctx.globalAlpha = dim ? 0.35 : 1; ctx.stroke();
     ctx.globalAlpha = 1;
   }
-  if (opt.reveal != null) text(opt.reveal, W / 2, oy + rows * gy - gy / 2 + 30, 18, CONFIG.C_OK);
+  if (opt.rowLabel != null) text(String(opt.rowLabel), ox - gx / 2 - 8, oy + (rows - 1) * gy / 2, 15, CONFIG.C_GOLD, 'right', '800');
+  if (opt.colLabel != null) text(String(opt.colLabel), ox + (cols - 1) * gx / 2, oy + (rows - 1) * gy + gy / 2 + 12, 15, CONFIG.C_GOLD, 'center', '800');
+  if (opt.reveal != null) text(opt.reveal, W / 2, oy + rows * gy - gy / 2 + (opt.colLabel != null ? 52 : 30), 18, CONFIG.C_OK);
   ctx.restore();
 }
 
@@ -4354,7 +4358,7 @@ function u11Draw(area, opt){
     u11Seg(x0, x0 + cut - 6, y, g.unknown !== 'A', aLab);
     u11Seg(x0 + cut + 6, x0 + w, y, g.unknown !== 'B', bLab);
     
-    if (g.unknown !== 'W') u11Seg(x0, x0 + w, y - 30, true, String(g.W));
+    u11Seg(x0, x0 + w, y - 30, g.unknown !== 'W', (g.unknown === 'W') ? '□' : String(g.W));
   } else {
     ctx.save(); ctx.setLineDash([5, 4]); ctx.strokeStyle = CONFIG.C_GRID; ctx.lineWidth = 2;
     ctx.beginPath(); ctx.moveTo(x0, y); ctx.lineTo(x0 + w, y); ctx.stroke();
@@ -4461,21 +4465,40 @@ function u12KindIcon(kind, x, y, s){
 
 
 const U13_LV = [[2, 4, 2, 4], [2, 5, 2, 5], [3, 5, 3, 5], [3, 6, 3, 6], [4, 7, 3, 6]];
+
+const U13_PIC_LAST = [];
+const U13_PAIR_LAST = [];
 function u13Gen(lv, kind){
   const [pLo, pHi, bLo, bHi] = U13_LV[Math.min(lv, U13_LV.length - 1)];
   const k = (kind === 'pair' && lv >= 2) ? 'pair' : 'pic';
   if (k === 'pic') {
-    const per = randInt(pLo, pHi), bags = randInt(bLo, bHi);
-    if (per === bags) return u13Gen(lv, 'pair');     
+    
+    let per, bags, key;
+    for (let tries = 0; tries < 30; tries++){
+      per = randInt(pLo, pHi); bags = randInt(bLo, bHi);
+      if (per === bags) continue;                     
+      key = per + ':' + bags;
+      if (!U13_PIC_LAST.includes(key)) break;
+    }
+    if (per === bags) return u13Gen(lv, 'pair');       
+    
+    U13_PIC_LAST.push(key); if (U13_PIC_LAST.length > 5) U13_PIC_LAST.shift();
     const correct = per + '×' + bags;
     const choices = txtChoices(correct, [bags + '×' + per, per + '＋' + bags, (per * bags) + '×' + bags]);
     return { g: { per, bags, k }, answer: correct, kind: 'pic', choices };
   }
   
-  const mid = randInt(4, 6);
-  
-  let cnt = randInt(4, 6); if (cnt === mid) cnt = (cnt === 6) ? 4 : cnt + 1;
-  const d = randInt(1, Math.min(2, mid - 2));
+  let mid, cnt, d, key;
+  for (let tries = 0; tries < 30; tries++){
+    mid = randInt(4, 6);
+    cnt = randInt(4, 6);
+    
+    if (cnt === mid) cnt = (cnt === 6) ? 4 : cnt + 1;
+    d = randInt(1, Math.min(2, mid - 2));
+    key = mid + ':' + cnt + ':' + d;
+    if (!U13_PAIR_LAST.includes(key)) break;
+  }
+  U13_PAIR_LAST.push(key); if (U13_PAIR_LAST.length > 3) U13_PAIR_LAST.shift();
   const nums = [mid - d, ...Array.from({ length: cnt - 2 }, () => mid), mid + d];
   const correct = mid + '×' + cnt;
   const choices = txtChoices(correct, [cnt + '×' + mid, (mid * cnt) + '＋' + d, mid + '×' + (cnt - 1)]);
@@ -4487,23 +4510,7 @@ function u13Draw(area, opt){
   ctx.save();
   if (g.k === 'pic') {
     
-    const cols = Math.min(g.bags, 4), rows = Math.ceil(g.bags / cols);
-    const pw = Math.min(70, (area.w - 40) / cols);
-    const ox = W / 2 - (cols - 1) * pw / 2, oy = area.y + area.h / 2 - (rows - 1) * 54 / 2;
-    for (let b = 0; b < g.bags; b++) {
-      const r = Math.floor(b / cols), c = b % cols;
-      const cx = ox + c * pw, cy = oy + r * 54;
-      ctx.beginPath(); ctx.ellipse(cx, cy + 10, pw * 0.4, 11, 0, 0, Math.PI * 2);
-      ctx.fillStyle = '#ffffff'; ctx.fill();
-      ctx.strokeStyle = CONFIG.C_GRID; ctx.lineWidth = 1.4; ctx.stroke();
-      for (let i = 0; i < g.per; i++) {
-        const x = cx - (g.per - 1) * 11 / 2 + i * 11;
-        ctx.beginPath(); ctx.arc(x, cy + 4, 5, 0, Math.PI * 2);
-        ctx.fillStyle = '#7ab84f'; ctx.fill();
-        ctx.strokeStyle = CONFIG.C_EDGE; ctx.lineWidth = 1; ctx.stroke();
-      }
-    }
-    text('1さらに ' + g.per + 'こ', W / 2, area.y + 14, 13, CONFIG.C_INK_SOFT, 'center', '700');
+    dotGrid(area, g.bags, g.per, { rowLabel: g.bags, colLabel: g.per, rowHi: opt.rowHi });
   } else {
     
     const s = Math.min(38, (area.w - 40) / g.nums.length);
@@ -4531,12 +4538,12 @@ function u13TeachBegin(){
   const g = S.g;
   if (g.k === 'pic') {
     const msgs = [
-      '1さらに ' + g.per + 'こ',
-      'それが ' + g.bags + 'さら',
+      'よこに ' + g.per + 'こ ならぶ',
+      'それが たてに ' + g.bags + 'だん',
       '「1つ分の数」×「いくつ分」\n' + g.per + '×' + g.bags,
       g.bags + '×' + g.per + ' と 答えは 同じ。\nでも **意味が ちがう**（' + g.bags + 'こ入りが ' + g.per + 'さら になってしまう）',
     ];
-    return makeTeach(3, msgs, ['', g.bags + 'さら', g.per + '×' + g.bags, 'いみが ちがう'], { g });
+    return makeTeach(3, msgs, ['', 'たて' + g.bags, g.per + '×' + g.bags, 'いみが ちがう'], { g });
   }
   const msgs = [
     (g.mid - g.d) + ' と ' + (g.mid + g.d) + ' を あわせると ' + (g.mid * 2),
@@ -4550,6 +4557,7 @@ function u13TeachDraw(area, T){
   const g = T.g, n = T.shown;
   const ans = (g.k === 'pic') ? (g.per + '×' + g.bags) : (g.mid + '×' + g.cnt);
   u13Draw(teachFigArea(area), { g, pair: g.k === 'pair' && n >= 1 && n < 2, even: g.k === 'pair' && n >= 2,
+    rowHi: (g.k === 'pic' && n === 1) ? 0 : null,
     reveal: n >= 3 ? ans : null });
 }
 function u13KindIcon(kind, x, y, s){
