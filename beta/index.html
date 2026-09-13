@@ -92,7 +92,7 @@
 
 
 const CONFIG = {
-  VERSION: 'v55',
+  VERSION: 'v56',
 
   
   
@@ -4176,8 +4176,12 @@ function basicSqGen(lv){
 function basicSqDraw(area, opt){
   opt = opt || {};
   const g = opt.g || S.g, n = g.n;
-  const s = Math.min(15, (area.w - 20) / n / 1.4, (area.h - 16) / n / 1.55);
-  const gx = s * 2.1, gy = s * 2.1;
+  
+  const gap = 2.1;
+  const s = Math.min(15,
+    (area.w - 20) / Math.max(1, n - 1) / gap,
+    (area.h - 20) / Math.max(1, n - 1) / gap);
+  const gx = s * gap, gy = s * gap;
   const ox = W / 2 - (n - 1) * gx / 2, oy = area.y + (area.h - (n - 1) * gy) / 2;
   ctx.save();
   for (let r = 0; r < n; r++) for (let c = 0; c < n; c++) {
@@ -4228,8 +4232,12 @@ function sqGen(lv){
 
 function sqSplitGrid(area, n, opt){
   opt = opt || {};
-  const s = Math.min(15, (area.w - 20) / n / 1.4, (area.h - 16) / n / 1.55);
-  const gx = s * 2.1, gy = s * 2.1;
+  
+  const gap = 2.1;
+  const s = Math.min(15,
+    (area.w - 20) / Math.max(1, n - 1) / gap,
+    (area.h - 20) / Math.max(1, n - 1) / gap);
+  const gx = s * gap, gy = s * gap;
   const ox = W / 2 - (n - 1) * gx / 2, oy = area.y + (area.h - (n - 1) * gy) / 2;
   ctx.save();
   for (let r = 0; r < n; r++) for (let c = 0; c < n; c++) {
@@ -4246,7 +4254,10 @@ function sqSplitGrid(area, n, opt){
 function sqDraw(area, opt){
   opt = opt || {};
   const g = opt.g || S.g;
-  sqSplitGrid(area, g.n, { split: opt.split });
+  
+  const topGut = opt.split ? 40 : 0, botGut = (opt.reveal != null) ? 26 : 0;
+  const gridArea = { x: area.x, y: area.y + topGut, w: area.w, h: area.h - topGut - botGut };
+  sqSplitGrid(gridArea, g.n, { split: opt.split });
   if (opt.split) {
     text('黒＝' + g.n + '番目の三角数', W / 2, area.y + 16, 12, '#4a4458', 'center', '800');
     text('白＝' + (g.n - 1) + '番目の三角数', W / 2, area.y + 34, 12, CONFIG.C_INK_SOFT, 'center', '800');
