@@ -92,7 +92,7 @@
 
 
 const CONFIG = {
-  VERSION: 'v68',
+  VERSION: 'v69',
 
   
   
@@ -5331,13 +5331,26 @@ function u20Gen(lv){
 }
 
 
+const U20_MARU = ['①', '②', '③', '④', '⑤', '⑥', '⑦'];
 function u20RowsDraw(area, g, rows){
   const n = g.n;
   
   const availH = Math.max(60, area.h - 34);
   const ch = Math.max(16, Math.min(28, availH / Math.max(1, rows.length) - 5));
-  const cw = Math.min(30, ch / 0.92, (area.w - 60) / n / 1.18);
-  const s = cw + cw * 0.18, ox = W / 2 - (n - 1) * s / 2;
+  
+  const LFS = 11;
+  const full = '組み合わせ' + U20_MARU[0];
+  let lw = textWidth(full, LFS, '800'), label = (r) => '組み合わせ' + U20_MARU[r];
+  const cw0 = Math.min(30, ch / 0.92, (area.w - 40 - lw - 8) / n / 1.18);
+  let cw = cw0;
+  if (cw < 20) {                       
+    lw = textWidth(U20_MARU[0], LFS, '800'); label = (r) => U20_MARU[r];
+    cw = Math.min(30, ch / 0.92, (area.w - 40 - lw - 8) / n / 1.18);
+  }
+  const s = cw + cw * 0.18;
+  
+  const ox = W / 2 - (n - 1) * s / 2 + (lw + 8) / 2;
+  const labelR = ox - cw / 2 - 8;                 
   ctx.save();
   text('考えられる 組み合わせ', W / 2, area.y, 12, CONFIG.C_INK_SOFT, 'center', '800');
   for (let i = 0; i < n; i++)
@@ -5345,6 +5358,7 @@ function u20RowsDraw(area, g, rows){
   rows.forEach((row, r) => {
     const v = row.v, dead = row.dead;
     const y = area.y + 31 + r * (ch + 5) + ch / 2;
+    text(label(r), labelR, y, LFS, dead ? CONFIG.C_INK_SOFT : CONFIG.C_INK, 'right', '800');
     for (let i = 0; i < n; i++) {
       const x = ox + i * s;
       rrect(x - cw / 2, y - ch / 2, cw, ch, 4);
@@ -5357,7 +5371,7 @@ function u20RowsDraw(area, g, rows){
       ctx.save();
       ctx.strokeStyle = '#c15c4e'; ctx.lineWidth = 2.4; ctx.lineCap = 'round';
       ctx.beginPath();
-      ctx.moveTo(ox - cw / 2 - 5, y); ctx.lineTo(ox + (n - 1) * s + cw / 2 + 5, y);
+      ctx.moveTo(labelR - lw - 3, y); ctx.lineTo(ox + (n - 1) * s + cw / 2 + 5, y);
       ctx.stroke();
       ctx.restore();
     }
