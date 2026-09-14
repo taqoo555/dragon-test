@@ -92,7 +92,7 @@
 
 
 const CONFIG = {
-  VERSION: 'v64',
+  VERSION: 'v65',
 
   
   
@@ -3363,22 +3363,25 @@ function u14RemGen(lv){
   return { g: { total, groups, q, rem, k: 'rem' }, answer: q, kind: 'rem',
     choices: numChoices(q, [q + 1, Math.max(1, q - 1), q + rem, Math.max(1, q - rem), total]) };
 }
+
 function u14RemDraw(area, opt){
   opt = opt || {};
   const g = opt.g || S.g;
   ctx.save();
-  const gridArea = { x: area.x, y: area.y, w: area.w, h: area.h * 0.66 };
+  text(g.total + 'こを ' + g.groups + '人で 同じ数ずつ 分けると？',
+       W / 2, area.y + 14, 13, CONFIG.C_INK_SOFT, 'center', '700');
+  const gridArea = { x: area.x, y: area.y + 20, w: area.w, h: area.h * 0.58 };
   
-  dotGrid(gridArea, g.q, g.groups, { rowLabel: g.q, colLabel: g.groups });
+  dotGrid(gridArea, g.q, g.groups, { rowLabel: g.q + 'こ', colLabel: g.groups + '人', rowHi: opt.rowHi });
   
-  const ry = area.y + area.h * 0.86;
-  const rs = 22;
-  text('あまり', W / 2 - (g.rem - 1) * rs / 2 - 30, ry, 13, CONFIG.C_INK_SOFT, 'right', '700');
+  const ry = area.y + area.h * 0.82, rr = 12, rs = rr * 2.4;
+  const x0 = W / 2 - (g.rem - 1) * rs / 2;
+  text('あまり', x0 - rr - 16, ry, 14, CONFIG.C_GOLD, 'right', '800');
   for (let i = 0; i < g.rem; i++) {
-    const x = W / 2 - (g.rem - 1) * rs / 2 + i * rs;
-    ctx.beginPath(); ctx.arc(x, ry, 9, 0, Math.PI * 2);
+    const x = x0 + i * rs;
+    ctx.beginPath(); ctx.arc(x, ry, rr, 0, Math.PI * 2);
     ctx.fillStyle = opt.remHi ? CONFIG.C_GOLD : '#ffffff'; ctx.fill();
-    ctx.strokeStyle = opt.remHi ? CONFIG.C_GOLD : CONFIG.C_GRID; ctx.lineWidth = 1.6; ctx.stroke();
+    ctx.strokeStyle = opt.remHi ? CONFIG.C_GOLD : CONFIG.C_GRID; ctx.lineWidth = 1.8; ctx.stroke();
   }
   if (opt.reveal != null) text(opt.reveal, W / 2, area.y + area.h - 4, 18, CONFIG.C_OK, 'center', '800');
   ctx.restore();
@@ -3503,6 +3506,12 @@ function u16Draw(area, opt){
     text(String(v), x, oy + 1, Math.round(box * 0.42), CONFIG.C_INK);
     if (i < n - 1) text('×', x + s / 2, oy + 1, Math.max(16, box * 0.36), CONFIG.C_INK, 'center', '800');
   });
+  
+  if (opt.pairVal != null && opt.hiPair) {
+    const [pi, pj] = opt.hiPair;
+    const midX = (ox + pi * s + ox + pj * s) / 2;
+    text('＝' + opt.pairVal, midX, oy + box / 2 + 26, 19, CONFIG.C_GOLD, 'center', '800');
+  }
   if (opt.reveal != null) text(opt.reveal, W / 2, area.y + area.h - 14, 18, CONFIG.C_OK, 'center', '800');
   ctx.restore();
 }
@@ -3519,7 +3528,9 @@ function u16TeachBegin(){
 }
 function u16TeachDraw(area, T){
   const g = T.g, n = T.shown;
-  u16Draw(teachFigArea(area), { g, hiPair: n >= 1 ? g.niceIdx : null, reveal: n >= 2 ? String(g.total) : null });
+  const [i, j] = g.niceIdx, nice = g.arr[i] * g.arr[j];
+  u16Draw(teachFigArea(area), { g, hiPair: n >= 1 ? g.niceIdx : null,
+    pairVal: n >= 1 ? nice : null, reveal: n >= 2 ? String(g.total) : null });
 }
 function u16KindIcon(kind, x, y, s){
   ctx.save();
@@ -5734,7 +5745,8 @@ const STAGES = [
     kinds: ['u16', 'u16', 'u16', 'u16', 'u16', 'u16'],
     intros: [{ kind: 'u16', label: 'さきに2つ',
       g: { arr: [9, 5, 2], p: 5, q: 2, c: 9, total: 90, niceIdx: [1, 2] }, answer: '5と2' }],
-    txt: { u16: ['さきに 計算する 2つは？'] },
+    
+    txt: { u16: ['さきに ', ['計','けい'], ['算','さん'], 'すると ', ['楽','らく'], 'なのは？'] },
     gen: u16Gen,
     drawQ(area){ qWrap(area, () => u16Draw(area, {})); },
     kindIcon: u16KindIcon, teachBegin: u16TeachBegin, teachDraw: u16TeachDraw,
