@@ -92,7 +92,7 @@
 
 
 const CONFIG = {
-  VERSION: 'v67',
+  VERSION: 'v68',
 
   
   
@@ -5264,26 +5264,59 @@ function u20Rows(g, upto){
   rec(0, Array(g.n).fill(null), {});
   return out;
 }
+
+function u20Pos(g, upto){
+  const pos = [];
+  g.clues.slice(0, upto).forEach(c => c.p.forEach(i => { if (pos.indexOf(i) < 0) pos.push(i); }));
+  return pos.sort((a, b) => a - b);
+}
+
+function u20Step(g, k){
+  const cur = u20Rows(g, k);
+  if (k <= 1) return cur.map(v => ({ v, dead: false }));
+  const prev = u20Rows(g, k - 1), pp = u20Pos(g, k - 1);
+  const out = [];
+  prev.forEach(pv => {
+    const kids = cur.filter(cv => pp.every(i => cv[i] === pv[i]));
+    if (kids.length) kids.forEach(cv => out.push({ v: cv, dead: false }));
+    else out.push({ v: pv, dead: true });
+  });
+  return out;
+}
 function u20Gen(lv){
   const n = U20_LV[Math.min(lv, U20_LV.length - 1)];
   const perms = u20Perms(n);
-  const MAXROW = 6;                                  
+  const MAXROW = 7;                                  
   for (let attempt = 0; attempt < 60; attempt++) {
     const sol = perms[randInt(0, perms.length - 1)];
     const cands = shuffleArr(u20Candidates(sol).slice());
     const clues = [];
     let rest = perms;
-    for (const c of cands) {
-      const nx = rest.filter(pp => u20Ok(c, pp));
-      if (nx.length === rest.length) continue;       
-      const tryClues = clues.concat(c);
-      
-      if (u20Rows({ n, clues: tryClues }, tryClues.length).length > MAXROW) continue;
-      clues.push(c); rest = nx;
-      if (rest.length === 1) break;
-      if (clues.length >= 4) break;
+    for (let step = 0; step < 4 && rest.length > 1; step++) {
+      const okList = [], killList = [];
+      for (const c of cands) {
+        if (clues.indexOf(c) >= 0) continue;
+        const nx = rest.filter(pp => u20Ok(c, pp));
+        if (nx.length === rest.length) continue;     
+        const tryClues = clues.concat(c);
+        
+        const disp = u20Step({ n, clues: tryClues }, tryClues.length);
+        if (disp.length > MAXROW) continue;
+        okList.push({ c, nx });
+        
+        if (step > 0 && disp.some(r => r.dead)) killList.push({ c, nx });
+      }
+      const pool = killList.length ? killList : okList;
+      if (!pool.length) break;
+      const pick = pool[randInt(0, pool.length - 1)];
+      clues.push(pick.c); rest = pick.nx;
     }
     if (rest.length !== 1) continue;                 
+    
+    const gTry = { n, clues };
+    let killed = false;
+    for (let k = 2; k <= clues.length; k++) if (u20Step(gTry, k).some(r => r.dead)) { killed = true; break; }
+    if (!killed) continue;
     const ask = randInt(0, n - 1);
     return { g: { n, sol, clues, ask }, answer: sol[ask], kind: 'u20',
       choices: shuffleArr(Array.from({ length: n }, (_, i) => i + 1)) };
@@ -5297,21 +5330,36 @@ function u20Gen(lv){
     choices: shuffleArr([1, 2, 3, 4]) };
 }
 
+
 function u20RowsDraw(area, g, rows){
   const n = g.n;
-  const cw = Math.min(30, (area.w - 60) / n / 1.18), ch = cw * 0.92, gap = cw * 0.18;
-  const s = cw + gap, ox = W / 2 - (n - 1) * s / 2;
+  
+  const availH = Math.max(60, area.h - 34);
+  const ch = Math.max(16, Math.min(28, availH / Math.max(1, rows.length) - 5));
+  const cw = Math.min(30, ch / 0.92, (area.w - 60) / n / 1.18);
+  const s = cw + cw * 0.18, ox = W / 2 - (n - 1) * s / 2;
   ctx.save();
+  text('考えられる 組み合わせ', W / 2, area.y, 12, CONFIG.C_INK_SOFT, 'center', '800');
   for (let i = 0; i < n; i++)
-    text(U20_NAME[i], ox + i * s, area.y, 11, CONFIG.C_INK_SOFT, 'center', '700');
-  rows.forEach((v, r) => {
-    const y = area.y + 14 + r * (ch + 5) + ch / 2;
+    text(U20_NAME[i], ox + i * s, area.y + 17, 11, CONFIG.C_INK_SOFT, 'center', '700');
+  rows.forEach((row, r) => {
+    const v = row.v, dead = row.dead;
+    const y = area.y + 31 + r * (ch + 5) + ch / 2;
     for (let i = 0; i < n; i++) {
       const x = ox + i * s;
       rrect(x - cw / 2, y - ch / 2, cw, ch, 4);
-      ctx.fillStyle = (v[i] == null) ? '#e6e1d6' : '#ffffff'; ctx.fill();
+      ctx.fillStyle = (v[i] == null) ? '#e6e1d6' : (dead ? '#f0ece2' : '#ffffff'); ctx.fill();
       ctx.strokeStyle = CONFIG.C_GRID; ctx.lineWidth = 1.2; ctx.stroke();
-      if (v[i] != null) text(String(v[i]), x, y + 1, Math.round(ch * 0.6), CONFIG.C_INK);
+      if (v[i] != null) text(String(v[i]), x, y + 1, Math.round(ch * 0.6),
+                             dead ? CONFIG.C_INK_SOFT : CONFIG.C_INK);
+    }
+    if (dead) {                                   
+      ctx.save();
+      ctx.strokeStyle = '#c15c4e'; ctx.lineWidth = 2.4; ctx.lineCap = 'round';
+      ctx.beginPath();
+      ctx.moveTo(ox - cw / 2 - 5, y); ctx.lineTo(ox + (n - 1) * s + cw / 2 + 5, y);
+      ctx.stroke();
+      ctx.restore();
     }
   });
   ctx.restore();
@@ -5347,7 +5395,7 @@ function u20Draw(area, opt){
     text('・' + g.clues[i].t, W / 2, cy, 12.5, on ? CONFIG.C_GOLD : CONFIG.C_INK, 'center', on ? '800' : '700');
     cy += 19;
   }
-  if (opt.rows) u20RowsDraw({ x: area.x, y: cy + 10, w: area.w }, g, opt.rows);
+  if (opt.rows) u20RowsDraw({ x: area.x, y: cy + 10, w: area.w, h: area.h - (cy + 10 - area.y) - 8 }, g, opt.rows);
   if (opt.reveal != null)
     text(U20_NAME[g.ask] + ' は ' + opt.reveal, W / 2, area.y + area.h - 10, 18, CONFIG.C_OK, 'center', '800');
   ctx.restore();
@@ -5371,7 +5419,7 @@ function u20TeachDraw(area, T){
   if (n >= last) { u20Draw(a, { g, clues: 0, open: 'all', reveal: g.sol[g.ask] }); return; }
   if (n === 0) { u20Draw(a, { g, clues: 0 }); return; }
   
-  u20Draw(a, { g, noCards: true, clues: n, hiClue: n - 1, rows: u20Rows(g, n) });
+  u20Draw(a, { g, noCards: true, clues: n, hiClue: n - 1, rows: u20Step(g, n) });
 }
 function u20KindIcon(kind, x, y, s){
   ctx.save();
