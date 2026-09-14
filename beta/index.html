@@ -92,7 +92,7 @@
 
 
 const CONFIG = {
-  VERSION: 'v70',
+  VERSION: 'v71',
 
   
   
@@ -3632,6 +3632,10 @@ function cardKindIcon(kind, x, y, s){
 
 
 
+function teachProg(T, dur){
+  return Math.max(0, Math.min(1, (T.tStep || 0) / (dur || 0.55)));
+}
+
 const U_RECENT = {};
 function uPick(tag, keep, make){
   let q = null;
@@ -3733,7 +3737,49 @@ function u22MushiDraw(area, opt){
   const g = opt.g || S.g;
   fudeDraw(area, u22MushiRows(g, opt.reveal), g.sub ? '−' : '＋',
     { hot: { ri: g.ri, ci: g.ci }, col: opt.col });
-  if (opt.note) text(opt.note, W / 2, area.y + area.h - 14, 14, CONFIG.C_GOLD, 'center', '800');
+  
+  if (opt.eq) text(opt.eq, W / 2, area.y + area.h - 34, 15, CONFIG.C_GOLD, 'center', '800');
+  if (opt.note) text(opt.note, W / 2, area.y + area.h - 12, 15, CONFIG.C_OK, 'center', '800');
+}
+
+const U22_PLACE = ['一', '十', '百', '千'];
+function u22MushiPlan(g){
+  const dg = g.dg;
+  const rows = [String(g.a), String(g.b), String(g.c)];
+  const pi = g.sub ? 1 : 0, qi = g.sub ? 2 : 1, ti = g.sub ? 0 : 2;   
+  const P = rows[pi].split('').map(Number);
+  const Q = rows[qi].split('').map(Number);
+  const Tt = rows[ti].split('').map(Number);
+  const which = (g.ri === pi) ? 'p' : (g.ri === qi) ? 'q' : 't';
+  const steps = [];
+  let carry = 0;
+  for (let j = dg - 1; j >= 0; j--) {
+    const place = U22_PLACE[dg - 1 - j] || '上';
+    const hidden = (j === g.ci);
+    if (hidden) {
+      let eq, msg;
+      if (which === 't') {
+        const sm = P[j] + Q[j] + carry;
+        eq = P[j] + '＋' + Q[j] + (carry ? '＋1' : '') + '＝' + sm;
+        msg = place + 'の位は ' + eq + '。だから □ は ' + (sm % 10);
+      } else {
+        const known = (which === 'p') ? Q[j] : P[j];
+        const need = Tt[j];
+        const ans = ((need - known - carry) % 10 + 10) % 10;
+        eq = '□＋' + known + (carry ? '＋1' : '') + ' の 一の位が ' + need;
+        msg = place + 'の位：' + eq + '。あてはまるのは ' + ans + ' だけ';
+      }
+      steps.push({ j, place, eq, msg, hidden: true });
+      break;
+    }
+    const sm = P[j] + Q[j] + carry;
+    const eq = P[j] + '＋' + Q[j] + (carry ? '＋1' : '') + '＝' + sm;
+    const msg = place + 'の位：' + eq + '。' +
+      (sm >= 10 ? ('だから ' + Tt[j] + ' で、1 くり上がる') : ('だから ' + Tt[j]));
+    steps.push({ j, place, eq, msg, hidden: false });
+    carry = (sm >= 10) ? 1 : 0;
+  }
+  return { steps, pi, qi, ti };
 }
 
 const U22_OPS = ['＋', '−', '×'];
@@ -3791,8 +3837,42 @@ function u22KomachiDraw(area, opt){
     text(String(n), x, y + 1, Math.round(cs * 0.56), CONFIG.C_INK, 'center', '800');
   });
   text('＋ − × を つかって 10 を つくる', W / 2, y + cs * 0.86, 14, CONFIG.C_GOLD, 'center', '800');
-  if (opt.show) text(opt.show + ' ＝ 10', W / 2, y + cs * 0.86 + 30, 19, CONFIG.C_OK, 'center', '800');
+  
+  (opt.lines || []).forEach((ln, i) => {
+    const lastLine = (i === opt.lines.length - 1) && opt.done;
+    text(ln, W / 2, y + cs * 0.86 + 30 + i * 26, lastLine ? 19 : 17,
+      lastLine ? CONFIG.C_OK : CONFIG.C_INK, 'center', '800');
+  });
   ctx.restore();
+}
+
+function u22KomachiSteps(expr){
+  const nums = expr.split(/[＋−×]/).map(Number);
+  const ops = expr.replace(/[0-9]/g, '').split('');
+  const out = [];
+  
+  let terms = [nums[0]], sg = [1], parts = [String(nums[0])];
+  for (let i = 0; i < ops.length; i++) {
+    if (ops[i] === '×') { terms[terms.length - 1] *= nums[i + 1]; parts[parts.length - 1] += '×' + nums[i + 1]; }
+    else { terms.push(nums[i + 1]); sg.push(ops[i] === '＋' ? 1 : -1); parts.push(String(nums[i + 1])); }
+  }
+  const hasMul = parts.some(x => x.indexOf('×') >= 0);
+  if (hasMul) {
+    const shown = parts.map((x, i) => (sg[i] < 0 ? '−' : (i ? '＋' : '')) + x).join('');
+    const done = terms.map((v, i) => (sg[i] < 0 ? '−' : (i ? '＋' : '')) + v).join('');
+    out.push({ msg: '×が あるので そこを さきに 計算する：' + shown + ' → ' + done,
+      lab: 'かける', line: done });
+  }
+  
+  let acc = terms[0] * sg[0], line = String(acc);
+  for (let i = 1; i < terms.length; i++) {
+    const before = acc;
+    acc += sg[i] * terms[i];
+    line = before + (sg[i] < 0 ? '−' : '＋') + terms[i] + '＝' + acc;
+    out.push({ msg: '左から 計算する：' + line, lab: (sg[i] < 0 ? '−' : '＋') + terms[i], line });
+  }
+  out.push({ msg: 'ちょうど 10 に なった。だから この 式', lab: '10', line: expr + '＝10', done: true });
+  return out;
 }
 
 const U22_LET = ['A', 'B', 'C'];
@@ -3822,7 +3902,7 @@ function u22FukuGen(lv){
     if (sols.length !== 1) continue;
     const qi = randInt(0, nLet - 1);
     const ans = sols[0][qi];
-    return { g: { rows, nLet, qi, dg: 3 }, answer: String(ans), kind: 'fuku', choices: digitChoices(ans) };
+    return { g: { rows, nLet, qi, sol: sols[0], dg: 3 }, answer: String(ans), kind: 'fuku', choices: digitChoices(ans) };
   }
   return u22FukuGen(0);
 }
@@ -3830,14 +3910,52 @@ function u22FukuDraw(area, opt){
   opt = opt || {};
   const g = opt.g || S.g;
   const cols = Math.max(...g.rows.map(r => r.length));
-  const rows = g.rows.map(r => padRow(r.join(''), cols));
+  
+  const subst = (r) => r.map(ch => {
+    const i = U22_LET.indexOf(ch);
+    return (i >= 0 && opt.try && opt.try[i] != null) ? String(opt.try[i]) : ch;
+  });
+  const rows = (opt.try ? g.rows.map(r => subst(r)) : g.rows).map(r => padRow(r.join(''), cols));
   const L = U22_LET[g.qi];
   const hots = [];
-  rows.forEach((r, ri) => r.forEach((ch, ci) => { if (ch === L) hots.push({ ri, ci }); }));
+  
+  const base = g.rows.map(r => padRow(r.join(''), cols));
+  base.forEach((r, ri) => r.forEach((ch, ci) => { if (ch === L) hots.push({ ri, ci }); }));
   fudeDraw(area, rows, '＋', { hots });
   
   text('おなじ 文字には おなじ 数字が 入る', W / 2, area.y + 18, 13, CONFIG.C_INK_SOFT, 'center', '700');
-  if (opt.show) text(L + ' ＝ ' + opt.show, W / 2, area.y + area.h - 14, 18, CONFIG.C_OK, 'center', '800');
+  if (opt.check) {
+    const okk = opt.check.ok;
+    text(opt.check.line, W / 2, area.y + area.h - 38, 15, okk ? CONFIG.C_OK : CONFIG.C_NG, 'center', '800');
+    text(okk ? '✓ ぴったり 合う' : '✗ 答えの 行と ちがう',
+      W / 2, area.y + area.h - 16, 15, okk ? CONFIG.C_OK : CONFIG.C_NG, 'center', '800');
+  }
+  else if (opt.show) text(L + ' ＝ ' + opt.show, W / 2, area.y + area.h - 14, 18, CONFIG.C_OK, 'center', '800');
+}
+
+function u22FukuTrials(g){
+  const sol = g.sol || [];
+  const num = (r, asg) => Number(r.map(ch => {
+    const i = U22_LET.indexOf(ch);
+    return i < 0 ? ch : String(asg[i]);
+  }).join(''));
+  const mk = (v) => {
+    const asg = sol.slice(); asg[g.qi] = v;
+    const A = num(g.rows[0], asg), B = num(g.rows[1], asg), C = num(g.rows[2], asg);
+    return { v, asg, line: A + '＋' + B + '＝' + (A + B), want: C, ok: (A + B === C) };
+  };
+  const ans = sol[g.qi];
+  const bad = [];
+  for (const d of shuffleArr([1, 2, 3, 4, 5, 6, 7, 8, 9])) {
+    if (bad.length >= 2) break;
+    const v = (ans + d) % 10;
+    if (v === ans) continue;
+    const t = mk(v);
+    if (t.ok) continue;                       
+    if (String(num(g.rows[0], t.asg))[0] === '0') continue;
+    bad.push(t);
+  }
+  return bad.concat([mk(ans)]);
 }
 
 function u22Gen(lv, kind){
@@ -3858,35 +3976,63 @@ function u22Draw(area, opt){
 function u22TeachBegin(){
   const g = S.g, k = S.kind;
   if (k === 'komachi') {
-    const msgs = ['4つの 数を ならべかえて いい。＋ − × も つかえる',
-      'まず ×で 大きい かたまりを 作ってみる',
-      'のこりを ＋ か − で ととのえる',
-      'ちょうど 10 に なった'];
-    return makeTeach(3, msgs, ['', 'かける', 'ととのえる', '10'], { g, kind: k });
+    const plan = u22KomachiSteps(S.answer);
+    const msgs = ['4つの 数を ならべかえて いい。＋ − × も つかえる。この 式で ためす'];
+    const labels = [''];
+    plan.forEach(st2 => { msgs.push(st2.msg); labels.push(st2.lab); });
+    return makeTeach(msgs.length - 1, msgs, labels, { g, kind: k, plan });
   }
   if (k === 'fuku') {
     const L = U22_LET[g.qi];
-    const msgs = ['おなじ 文字には おなじ 数字が 入る',
-      '一の位から 見る。ここだけで ' + L + ' が しぼれる',
-      '十の位も 見て、くり上がりを たしかめる',
-      'どちらも 合う 数字は 1つだけ'];
-    return makeTeach(3, msgs, ['', '一の位', '十の位', L], { g, kind: k });
+    const plan = u22FukuTrials(g);
+    const msgs = ['おなじ 文字には おなじ 数字。' + L + ' に 数字を あてはめて たしかめる'];
+    const labels = [''];
+    plan.forEach(tr => {
+      msgs.push(L + '＝' + tr.v + ' なら ' + tr.line + '。' +
+        (tr.ok ? '答えの 行と ぴったり 合う' : '答えの 行（' + tr.want + '）と ちがう'));
+      labels.push(L + '＝' + tr.v);
+    });
+    msgs.push('合うのは ' + L + '＝' + S.answer + ' だけ');
+    labels.push(S.answer);
+    return makeTeach(msgs.length - 1, msgs, labels, { g, kind: k, plan });
   }
-  const place = ['一', '十', '百', '千'][g.dg - 1 - g.ci] || '上';
-  const msgs = ['一の位から 順に たしかめる',
-    '一の位を 見る',
-    place + 'の位まで 来た。□が ある ところ',
-    'ここに 入る 数字は 1つだけ'];
-  return makeTeach(3, msgs, ['', '一の位', place + 'の位', '□'], { g, kind: k });
+  const plan = u22MushiPlan(g);
+  const head = g.sub
+    ? 'ひき算は「引く数 ＋ 答え ＝ もとの数」。下の2つを たすと 上に なる'
+    : '一の位から 位ごとに たしかめる';
+  const msgs = [head];
+  const labels = [''];
+  plan.steps.forEach(st2 => { msgs.push(st2.msg); labels.push(st2.place + 'の位'); });
+  msgs.push('だから □ は ' + S.answer + '。ほかの 数では 合わない');
+  labels.push(String(S.answer));
+  return makeTeach(msgs.length - 1, msgs, labels, { g, kind: k, plan });
 }
 function u22TeachDraw(area, T){
   const g = T.g, n = T.shown, k = T.kind;
   const fa = teachFigArea(area);
-  if (k === 'komachi') { u22KomachiDraw(fa, { g, show: n >= 3 ? S.answer : null }); return; }
-  if (k === 'fuku') { u22FukuDraw(fa, { g, show: n >= 3 ? S.answer : null }); return; }
-  const col = (n === 1) ? g.dg - 1 : (n >= 2 ? g.ci : null);
-  u22MushiDraw(fa, { g, col, reveal: n >= 3,
-    note: n >= 3 ? ('□ は ' + S.answer) : null });
+  if (k === 'komachi') {
+    const plan = T.plan || u22KomachiSteps(S.answer);
+    const lines = plan.slice(0, Math.max(0, Math.min(n, plan.length))).map(x => x.line);
+    u22KomachiDraw(fa, { g, lines, done: n >= plan.length });
+    return;
+  }
+  if (k === 'fuku') {
+    const plan = T.plan || u22FukuTrials(g);
+    const tr = (n >= 1 && n <= plan.length) ? plan[n - 1] : null;
+    u22FukuDraw(fa, { g, try: tr ? tr.asg : null,
+      check: tr ? { line: tr.line, ok: tr.ok } : null,
+      show: (n > plan.length) ? S.answer : null });
+    return;
+  }
+  const plan = T.plan || u22MushiPlan(g);
+  const i = n - 1;                                   
+  const cur = (i >= 0 && i < plan.steps.length) ? plan.steps[i] : null;
+  const last = (n >= T.total);
+  u22MushiDraw(fa, { g,
+    col: cur ? cur.j : (last ? g.ci : null),
+    reveal: last,
+    eq: cur ? cur.eq : null,
+    note: last ? ('□ は ' + S.answer) : null });
 }
 function u22KindIcon(kind, x, y, s){
   ctx.save();
@@ -3949,7 +4095,7 @@ function u23Gen1(lv, kind){
 function u23Board(area, g, opt){
   opt = opt || {};
   const n = g.n, cells = n + 1;
-  const cw = Math.max(26, Math.min(46, (area.w - 20) / cells - 5));
+  const cw = Math.max(opt.small ? 18 : 26, Math.min(opt.small ? 30 : 46, (area.w - 20) / cells - 5));
   const s = cw + 5;
   const ox = W / 2 - (cells - 1) * s / 2;
   const y = area.y + (opt.y != null ? opt.y : area.h * 0.42);
@@ -3967,10 +4113,12 @@ function u23Board(area, g, opt){
       ctx.beginPath(); ctx.moveTo(x + cw / 2, y); ctx.lineTo(x + s - cw / 2, y); ctx.stroke(); }
   }
   if (opt.piece != null) {
+    
     const x = ox + opt.piece * s;
-    ctx.beginPath(); ctx.arc(x, y - cw * 0.78, cw * 0.22, 0, Math.PI * 2);
+    const hop = opt.hop ? Math.sin(opt.hop * Math.PI) * cw * 0.38 : 0;
+    ctx.beginPath(); ctx.arc(x, y - cw * 0.78 - hop, cw * 0.24, 0, Math.PI * 2);
     ctx.fillStyle = CONFIG.C_GOLD; ctx.fill();
-    ctx.strokeStyle = CONFIG.C_EDGE; ctx.lineWidth = 1.4; ctx.stroke();
+    ctx.strokeStyle = CONFIG.C_EDGE; ctx.lineWidth = 1.6; ctx.stroke();
   }
   ctx.restore();
   return { ox, s, y, cw };
@@ -3996,14 +4144,19 @@ function u23Draw(area, opt){
     W / 2, area.y + 16, 12, CONFIG.C_INK_SOFT, 'center', '700');
   if (k === 'pair') {
     
-    if (opt.table != null) { u23Table(area, g, opt.table); ctx.restore(); return; }
+    if (opt.table != null) {
+      u23Board(area, g, { y: 40, piece: 0, small: true });
+      text('さいころの 目は 1〜' + g.D, W / 2, area.y + 76, 12, CONFIG.C_INK_SOFT, 'center', '700');
+      u23Table(area, g, opt.table, area.y + 92);
+      ctx.restore(); return;
+    }
     u23Board(area, g, { y: area.h * 0.38, piece: 0 });
     text('さいころの 目は 1〜' + g.D, W / 2, area.y + area.h * 0.66, 14, CONFIG.C_INK, 'center', '800');
     text('2回 ふって ちょうど 上がりに つく 出方は？', W / 2, area.y + area.h * 0.66 + 24, 13, CONFIG.C_GOLD, 'center', '800');
     ctx.restore(); return;
   }
   const piece = (opt.piece != null) ? opt.piece : 0;
-  u23Board(area, g, { y: area.h * 0.36, piece, hi: opt.hi });
+  u23Board(area, g, { y: area.h * 0.36, piece, hop: opt.hop, hi: opt.hi });
   const ds = Math.min(40, area.w * 0.13);
   const by = area.y + area.h * 0.72;
   u23Dice(W / 2 - ds * 0.85, by, ds, g.a, opt.step >= 1);
@@ -4014,12 +4167,14 @@ function u23Draw(area, opt){
   ctx.restore();
 }
 
-function u23Table(area, g, upto){
+function u23Table(area, g, upto, top){
   const D = g.D, n = g.n;
+  const t0 = (top != null) ? top : (area.y + 26);
+  const avail = area.y + area.h - t0 - 16;
   
-  const cw = Math.max(16, Math.min(30, (area.w - 96) / (D + 1), (area.h - 46) / (D + 1)));
+  const cw = Math.max(14, Math.min(30, (area.w - 96) / (D + 1), avail / (D + 1)));
   const ox = W / 2 - (D + 1) * cw / 2 + 10;
-  const oy = area.y + 26 + Math.max(0, (area.h - 46 - (D + 1) * cw) / 2);
+  const oy = t0 + Math.max(0, (avail - (D + 1) * cw) / 2);
   ctx.save();
   for (let r = 0; r <= D; r++) for (let c = 0; c <= D; c++) {
     const x = ox + c * cw, y = oy + r * cw;
@@ -4040,10 +4195,20 @@ function u23Table(area, g, upto){
   text('1回め', ox - 18, oy + (D + 1) * cw / 2, 10, CONFIG.C_INK_SOFT, 'center', '700');
   ctx.restore();
 }
+
+function u23Anim(from, d, n, prog){
+  const total = Math.abs(d);
+  const f = Math.max(0, Math.min(total, prog * total));
+  const k = Math.floor(f);
+  const frac = Math.min(1, (f - k) * 2.0);
+  const cellAt = (i) => { const q = from + i; return (q > n) ? (n - (q - n)) : q; };
+  const a = cellAt(Math.min(k, total)), b = cellAt(Math.min(k + 1, total));
+  return { pos: a + (b - a) * frac, hop: (k < total) ? frac : 0 };
+}
 function u23TeachBegin(){
   const g = S.g, k = S.kind;
   if (k === 'pair') {
-    const msgs = ['1回目の目ごとに、2回目で どこに 行くかを 表に 書く'];
+    const msgs = ['この すごろくを 2回で ちょうど 上がりに したい'];
     const labels = [''];
     for (let r = 1; r <= g.D; r++) { msgs.push('1回目が ' + r + ' のとき'); labels.push(r + 'のだん'); }
     msgs.push('「上」と 書けた ますを 数える'); labels.push('数える');
@@ -4062,8 +4227,12 @@ function u23TeachDraw(area, T){
   const g = T.g, n = T.shown, k = T.kind;
   const fa = teachFigArea(area);
   if (k === 'pair') { u23Draw(fa, { g, kind: k, table: Math.min(n, g.D) }); return; }
-  const piece = (n <= 0) ? 0 : (n === 1 ? g.p1 : (n === 2 ? Math.min(g.n, g.p1 + g.b) : g.p2));
-  u23Draw(fa, { g, kind: 'land', piece, step: n, hi: n >= 3 ? g.p2 : null,
+  
+  let piece = 0, hop = 0;
+  if (n === 1) { const a = u23Anim(0, g.a, g.n, teachProg(T, 0.28 * g.a + 0.2)); piece = a.pos; hop = a.hop; }
+  else if (n === 2) { const a = u23Anim(g.p1, g.b, g.n, teachProg(T, 0.28 * g.b + 0.2)); piece = a.pos; hop = a.hop; }
+  else if (n >= 3) { piece = g.p2; }
+  u23Draw(fa, { g, kind: 'land', piece, hop, step: n, hi: n >= 3 ? g.p2 : null,
     note: n >= 3 ? ('こたえは ' + u23Label(g.p2, g.n)) : null });
 }
 function u23KindIcon(kind, x, y, s){
@@ -4154,28 +4323,71 @@ const U24_DIV = [
   { q: '平面', a: '直線', w: ['点', '平面'] },
   { q: '空間', a: '平面', w: ['点', '直線'] },
 ];
+
+function u24DivRow(cx, cy, sc, what, cut, on){
+  ctx.save();
+  const ink = on ? CONFIG.C_INK : '#b9b1a1';
+  const c1 = on ? 'rgba(143,184,232,0.45)' : 'rgba(143,184,232,0.20)';
+  const c2 = on ? 'rgba(201,150,63,0.35)' : 'rgba(201,150,63,0.16)';
+  if (what === '直線') {
+    const L = 96 * sc;
+    ctx.strokeStyle = cut ? '#4a7fc9' : ink; ctx.lineWidth = 3; ctx.lineCap = 'round';
+    ctx.beginPath(); ctx.moveTo(cx - L, cy); ctx.lineTo(cx - 2, cy); ctx.stroke();
+    ctx.strokeStyle = cut ? '#c98b3f' : ink;
+    ctx.beginPath(); ctx.moveTo(cx + 2, cy); ctx.lineTo(cx + L, cy); ctx.stroke();
+    if (cut) {                                   
+      ctx.beginPath(); ctx.arc(cx, cy, 5.5, 0, Math.PI * 2);
+      ctx.fillStyle = CONFIG.C_GOLD; ctx.fill();
+      ctx.strokeStyle = CONFIG.C_EDGE; ctx.lineWidth = 1.4; ctx.stroke();
+      text('点', cx, cy - 16, 12, CONFIG.C_GOLD, 'center', '800');
+    }
+  } else if (what === '平面') {
+    const w = 104 * sc, h = 30 * sc, sk = 28 * sc;
+    const A = [cx - w, cy + h], B = [cx - w + sk, cy - h], C = [cx + w, cy - h], D = [cx + w - sk, cy + h];
+    const M1 = [cx - sk / 2 + sk / 2, cy - h], M2 = [cx - sk / 2, cy + h];
+    if (cut) {
+      poly([A, B, [cx, cy - h], [cx - sk, cy + h]], c1, ink, 1.8);
+      poly([[cx - sk, cy + h], [cx, cy - h], C, D], c2, ink, 1.8);
+      ctx.strokeStyle = CONFIG.C_GOLD; ctx.lineWidth = 2.6; ctx.lineCap = 'round';
+      ctx.beginPath(); ctx.moveTo(cx, cy - h); ctx.lineTo(cx - sk, cy + h); ctx.stroke();
+      text('直線', cx + 4, cy - h - 12, 12, CONFIG.C_GOLD, 'center', '800');
+    } else {
+      poly([A, B, C, D], c1, ink, 1.8);
+    }
+  } else {
+    const w = 66 * sc, h = 34 * sc, d = 18 * sc, gap = cut ? 12 * sc : 0;
+    const box = (ox, fill) => {
+      poly([[ox, cy], [ox + w, cy], [ox + w, cy + h], [ox, cy + h]], fill, ink, 1.6);
+      poly([[ox, cy], [ox + d, cy - d], [ox + w + d, cy - d], [ox + w, cy]], fill, ink, 1.6);
+      poly([[ox + w, cy], [ox + w + d, cy - d], [ox + w + d, cy + h - d], [ox + w, cy + h]], fill, ink, 1.6);
+    };
+    box(cx - w - d / 2 - gap, c1);
+    box(cx + d / 2 + gap, c2);
+    if (cut) {                                   
+      poly([[cx - 3, cy + h + 6], [cx - 3 + d + 6, cy - d - 6], [cx + 3 + d + 6, cy - d - 6], [cx + 3, cy + h + 6]],
+        'rgba(201,150,63,0.45)', CONFIG.C_GOLD, 2);
+      text('平面', cx + d + 16, cy - d - 16, 12, CONFIG.C_GOLD, 'center', '800');
+    }
+  }
+  ctx.restore();
+}
 function u24DivDraw(area, opt){
   opt = opt || {};
   const g = opt.g || S.g;
-  const cx = W / 2, cy = area.y + area.h * 0.5;
   ctx.save();
   text(g.what + 'を 2つに 分けるのは？', W / 2, area.y + 18, 14, CONFIG.C_INK, 'center', '800');
-  ctx.strokeStyle = CONFIG.C_EDGE; ctx.lineWidth = 2;
-  if (g.what === '直線') {
-    ctx.beginPath(); ctx.moveTo(cx - 100, cy); ctx.lineTo(cx + 100, cy); ctx.stroke();
-  } else if (g.what === '平面') {
-    poly([[cx - 110, cy + 34], [cx - 60, cy - 34], [cx + 110, cy - 34], [cx + 60, cy + 34]],
-      'rgba(143,184,232,0.28)', CONFIG.C_EDGE, 2);
-  } else {
-    const b = (ox, oy, w, h, d) => {
-      poly([[ox, oy], [ox + w, oy], [ox + w, oy + h], [ox, oy + h]], 'rgba(143,184,232,0.28)', CONFIG.C_EDGE, 1.8);
-      poly([[ox, oy], [ox + d, oy - d], [ox + w + d, oy - d], [ox + w, oy]], 'rgba(143,184,232,0.16)', CONFIG.C_EDGE, 1.8);
-      poly([[ox + w, oy], [ox + w + d, oy - d], [ox + w + d, oy + h - d], [ox + w, oy + h]], 'rgba(143,184,232,0.10)', CONFIG.C_EDGE, 1.8);
-    };
-    b(cx - 96, cy - 4, 84, 46, 22);
-    b(cx + 6, cy - 4, 56, 46, 22);
-  }
-  if (opt.show) text('→ ' + opt.show, W / 2, area.y + area.h - 16, 17, CONFIG.C_OK, 'center', '800');
+  const all = opt.all;                            
+  const list = all ? ['直線', '平面', '空間'] : [g.what];
+  const top = area.y + 44, bot = area.y + area.h - (opt.show ? 34 : 12);
+  const rowH = (bot - top) / list.length;
+  const sc = Math.min(1, rowH / 86, area.w / 300);
+  list.forEach((wh, i) => {
+    const cy = top + rowH * (i + 0.5);
+    const on = !all || (wh === g.what);
+    u24DivRow(W / 2 + (all ? 26 : 0), cy, sc, wh, all ? (opt.cut > i) : opt.cut, on);
+    if (all) text(wh, 26, cy, 13, on ? CONFIG.C_INK : CONFIG.C_INK_SOFT, 'left', '800');
+  });
+  if (opt.show) text('→ ' + opt.show, W / 2, area.y + area.h - 14, 17, CONFIG.C_OK, 'center', '800');
   ctx.restore();
 }
 function u24Gen(lv, kind){
@@ -4222,11 +4434,12 @@ function u24Draw(area, opt){
 function u24TeachBegin(){
   const g = S.g, k = S.kind;
   if (k === 'divide') {
-    const msgs = ['直線の 上に 点を うつと、線は 2つに 分かれる',
-      '平面は 直線 1本で 2つに 分かれる',
-      '空間（あつみの ある もの）は 平面で 2つに 分かれる',
+    const msgs = ['直線・平面・空間を、上から 順に 2つに 分けてみる',
+      '**直線**の 上に **点**を うつと、線は 2つに 分かれた',
+      '**平面**は **直線**を 1本 引くと 2つに 分かれた',
+      '**空間**（あつみの あるもの）は **平面**で 切ると 2つに 分かれた',
       'だから ' + g.what + 'を 分けるのは ' + S.answer];
-    return makeTeach(3, msgs, ['', '点', '直線', S.answer], { g, kind: k });
+    return makeTeach(4, msgs, ['', '点', '直線', '平面', S.answer], { g, kind: k });
   }
   const f = U24_FACES.find(x => x.n === g.f);
   if (k === 'face') {
@@ -4246,7 +4459,7 @@ function u24TeachBegin(){
 function u24TeachDraw(area, T){
   const g = T.g, n = T.shown, k = T.kind;
   const fa = teachFigArea(area);
-  if (k === 'divide') { u24DivDraw(fa, { g, show: n >= 3 ? S.answer : null }); return; }
+  if (k === 'divide') { u24DivDraw(fa, { g, all: true, cut: n, show: n >= 4 ? S.answer : null }); return; }
   if (k === 'face') {
     u24Draw(fa, { g, kind: k, showFace2: n >= 3 ? S.answer : null,
       show: n >= 3 ? ('平行な 面は ' + S.answer) : null });
@@ -4285,7 +4498,9 @@ const U25_TURN = { 'ア': 'ウ', 'ウ': 'ア', 'イ': 'エ', 'エ': 'イ' };
 function u25RectDraw(area, opt){
   opt = opt || {};
   const g = opt.g || S.g;
-  const w = Math.min(area.w * 0.60, 200, (area.h - 96) * 1.8);
+  
+  let w = Math.min(area.w * 0.60, 200, (area.h - 96) * 1.8);
+  if (opt.room) w = Math.min(w, (area.h - 74) * 0.82, (area.w - 30) * 0.80);
   const h = Math.min(area.h * 0.40, w * 0.62);
   const x0 = W / 2 - w / 2, y0 = area.y + 52 + Math.max(0, (area.h - 66 - h) / 2);
   const TL = [x0, y0], TR = [x0 + w, y0], BR = [x0 + w, y0 + h], BL = [x0, y0 + h];
@@ -4301,19 +4516,96 @@ function u25RectDraw(area, opt){
     poly([TL, BR, BL], 'rgba(201,150,63,0.30)', CONFIG.C_GOLD, 2);
     ctx.restore();
   }
+  
+  const nrm = (v) => { const L = Math.hypot(v[0], v[1]) || 1; return [v[0] / L, v[1] / L]; };
+  const bis = (p, d1, d2, dist) => {
+    const a = nrm(d1), b = nrm(d2), m = nrm([a[0] + b[0], a[1] + b[1]]);
+    return [p[0] + m[0] * dist, p[1] + m[1] * dist];
+  };
+  const DD = 32;
   const P = {
-    'ア': [x0 + 30, y0 + 13], 'イ': [x0 + 13, y0 + 32],
-    'ウ': [x0 + w - 30, y0 + h - 13], 'エ': [x0 + w - 13, y0 + h - 32],
+    'ア': bis(TL, [1, 0], [w, h], DD), 'イ': bis(TL, [w, h], [0, 1], DD),
+    'ウ': bis(BR, [-1, 0], [-w, -h], DD), 'エ': bis(BR, [-w, -h], [0, -1], DD),
   };
   U25_NAME.forEach(nm => {
     const on = (opt.hi || []).includes(nm);
-    
-    ctx.beginPath(); ctx.arc(P[nm][0], P[nm][1], 10.5, 0, Math.PI * 2);
+    ctx.beginPath(); ctx.arc(P[nm][0], P[nm][1], 9.5, 0, Math.PI * 2);
     ctx.fillStyle = on ? 'rgba(201,150,63,0.32)' : '#ffffff'; ctx.fill();
-    text(nm, P[nm][0], P[nm][1], 14, on ? CONFIG.C_GOLD : CONFIG.C_INK, 'center', '800');
+    text(nm, P[nm][0], P[nm][1], 13, on ? CONFIG.C_GOLD : CONFIG.C_INK, 'center', '800');
   });
   ctx.restore();
   return { x0, y0, w, h };
+}
+
+const U25_WCOL = ['rgba(143,184,232,0.72)', 'rgba(201,150,63,0.62)', 'rgba(74,157,95,0.55)'];
+function u25Wedge(cx, cy, R, a0, sweep, fill){
+  ctx.beginPath(); ctx.moveTo(cx, cy);
+  ctx.arc(cx, cy, R, a0, a0 + sweep, sweep < 0);
+  ctx.closePath();
+  ctx.fillStyle = fill; ctx.fill();
+  ctx.strokeStyle = CONFIG.C_EDGE; ctx.lineWidth = 1.3; ctx.stroke();
+}
+function u25TriDraw(area, opt){
+  opt = opt || {};
+  const t = Math.max(0, Math.min(1, opt.gather || 0));
+  const R = Math.max(26, Math.min(44, area.w * 0.13, area.h * 0.15));
+  const tw = Math.min(area.w * 0.52, 176), th = Math.min(area.h * 0.26, 92);
+  const cx = W / 2, top = area.y + 38;
+  const V = [[cx - tw * 0.42, top + th], [cx + tw * 0.5, top + th], [cx - tw * 0.16, top]];
+  ctx.save();
+  poly(V, '#ffffff', CONFIG.C_EDGE, 2);
+  
+  const wedges = V.map((p, i) => {
+    const a = V[(i + 1) % 3], b = V[(i + 2) % 3];
+    let t1 = Math.atan2(a[1] - p[1], a[0] - p[0]);
+    let t2 = Math.atan2(b[1] - p[1], b[0] - p[0]);
+    let d = t2 - t1;
+    while (d <= -Math.PI) d += Math.PI * 2;
+    while (d > Math.PI) d -= Math.PI * 2;
+    if (d < 0) { t1 = t1 + d; d = -d; }
+    return { p, a0: t1, sw: d };
+  });
+  
+  const P = [cx, Math.min(area.y + area.h - R - 34, top + th + R * 1.9)];
+  let acc = Math.PI;
+  const dst = wedges.map(wg => { const a0 = acc; acc += wg.sw; return a0; });
+  if (t > 0.02) {
+    ctx.strokeStyle = CONFIG.C_INK; ctx.lineWidth = 2.2; ctx.lineCap = 'round';
+    ctx.globalAlpha = Math.min(1, t * 2);
+    ctx.beginPath(); ctx.moveTo(P[0] - R * 1.6, P[1]); ctx.lineTo(P[0] + R * 1.6, P[1]); ctx.stroke();
+    ctx.globalAlpha = 1;
+  }
+  wedges.forEach((wg, i) => {
+    const px = wg.p[0] + (P[0] - wg.p[0]) * t;
+    const py = wg.p[1] + (P[1] - wg.p[1]) * t;
+    let d = dst[i] - wg.a0;
+    while (d <= -Math.PI) d += Math.PI * 2;
+    while (d > Math.PI) d -= Math.PI * 2;
+    u25Wedge(px, py, R, wg.a0 + d * t, wg.sw, U25_WCOL[i]);
+  });
+  if (opt.right) {
+    
+    const m = 15;
+    ctx.strokeStyle = CONFIG.C_GOLD; ctx.lineWidth = 2.4;
+    ctx.beginPath(); ctx.moveTo(P[0], P[1]); ctx.lineTo(P[0], P[1] - R * 1.32); ctx.stroke();
+    [-1, 1].forEach(sgn => {
+      ctx.beginPath();
+      ctx.moveTo(P[0] + sgn * m, P[1]); ctx.lineTo(P[0] + sgn * m, P[1] - m); ctx.lineTo(P[0], P[1] - m);
+      ctx.stroke();
+    });
+    
+    [[-1, '直角'], [1, '直角']].forEach(([sgn, lab]) => {
+      const a = Math.PI + (sgn < 0 ? 0.42 : 1.0) * Math.PI / 2 * (sgn < 0 ? 1 : 1);
+      const ax = P[0] + Math.cos(Math.PI + (sgn < 0 ? 0.28 : 0.72) * Math.PI) * (R + 20);
+      const ay = P[1] + Math.sin(Math.PI + (sgn < 0 ? 0.28 : 0.72) * Math.PI) * (R + 20);
+      const fw = textWidth(lab, 12, '800');
+      ctx.fillStyle = '#ffffff'; ctx.fillRect(ax - fw / 2 - 2, ay - 8, fw + 4, 16);
+      text(lab, ax, ay, 12, CONFIG.C_GOLD, 'center', '800');
+    });
+  }
+  text(opt.head || '三角形の 3つの 角', W / 2, area.y + 14, 13, CONFIG.C_INK, 'center', '800');
+  if (opt.show) text(opt.show, W / 2, area.y + area.h - 10, 16, CONFIG.C_OK, 'center', '800');
+  ctx.restore();
 }
 
 const U25_POLY = [[3, '三'], [4, '四'], [5, '五'], [6, '六']];
@@ -4451,11 +4743,21 @@ function u25Draw(area, opt){
 function u25TeachBegin(){
   const g = S.g, k = S.kind;
   if (k === 'sum') {
-    const msgs = [g.name + '角形の 角を ぜんぶ 合わせると？',
-      '1つの 頂点から 線を 引いて 三角形に 分ける → ' + (g.n - 2) + 'こ',
-      '三角形の 3つの角は 直角 2つ分',
-      '直角 2つ分 × ' + (g.n - 2) + ' ＝ 直角 ' + ((g.n - 2) * 2) + 'つ分'];
-    return makeTeach(3, msgs, ['', '分ける', '三角形は2', String((g.n - 2) * 2)], { g, kind: k });
+    
+    const msgs = ['まず 三角形で たしかめる。3つの 角に 色を つけた',
+      '3つの 角を 切りとって、1つの 点に あつめる',
+      'あつめると **まっすぐ 1本**。まっすぐは **直角 2つ分**'];
+    const labels = ['', 'あつめる', '直角2つ分'];
+    if (g.n > 3) {
+      msgs.push(g.name + '角形は、1つの 頂点から 線を 引くと 三角形 ' + (g.n - 2) + 'こ');
+      labels.push('三角形' + (g.n - 2) + 'こ');
+      msgs.push('直角2つ分 × ' + (g.n - 2) + ' ＝ 直角 ' + ((g.n - 2) * 2) + 'つ分');
+      labels.push(String((g.n - 2) * 2));
+    } else {
+      msgs.push('三角形の 角は ぜんぶで 直角 2つ分');
+      labels.push('2');
+    }
+    return makeTeach(msgs.length - 1, msgs, labels, { g, kind: k });
   }
   if (k === 'count') {
     const msgs = ['かどを 1つずつ 見る',
@@ -4465,24 +4767,36 @@ function u25TeachBegin(){
     return makeTeach(3, msgs, ['', 'かどを見る', 'しるし', S.answer + 'こ'], { g, kind: k });
   }
   const msgs = ['長方形を 対角線で 2つの 直角三角形に 切る',
-    '下がわの 三角形を、まん中を じくに して まわす',
-    '半かい転（直角 2つ分）まわすと、上の 三角形に ぴったり 重なる',
-    'そのとき ' + g.ask + 'の角に 重なるのは ' + S.answer + 'の角'];
+    '下がわの 三角形を、まん中を じくに して **半分**まわす',
+    'もう **半分**まわすと、上の 三角形に ぴったり 重なった',
+    '重なった ところを 見ると、' + g.ask + 'の角に 重なるのは ' + S.answer + 'の角'];
   return makeTeach(3, msgs, ['', 'まわす', 'ぴったり', S.answer], { g, kind: k });
 }
 function u25TeachDraw(area, T){
   const g = T.g, n = T.shown, k = T.kind;
   const fa = teachFigArea(area);
   if (k === 'sum') {
-    u25PolyDraw(fa, { g, split: n >= 1, show: n >= 3 ? ('直角 ' + ((g.n - 2) * 2) + 'つ分') : null });
+    if (n <= 2) {
+      const prog = (n === 1) ? teachProg(T, 0.9) : 1;
+      u25TriDraw(fa, { gather: (n >= 1) ? prog : 0, right: n >= 2,
+        head: (g.n > 3) ? ('まず 三角形で たしかめる') : '三角形の 3つの 角',
+        show: n >= 2 ? 'まっすぐ ＝ 直角 2つ分' : null });
+    } else {
+      u25PolyDraw(fa, { g, split: true,
+        show: n >= 4 ? ('直角 ' + ((g.n - 2) * 2) + 'つ分') : null });
+    }
     return;
   }
   if (k === 'count') {
     u25QuadDraw(fa, { g, marks: n >= 2, show: n >= 3 ? ('直角は ' + S.answer + 'こ') : null });
     return;
   }
-  const spin = (n <= 0) ? null : Math.min(1, (n - 0) / 2);
-  u25RectDraw(fa, { g, spin, hi: n >= 3 ? [g.ask, S.answer] : [] });
+  
+  let spin = null;
+  if (n === 1) spin = 0.5 * teachProg(T, 0.75);
+  else if (n === 2) spin = 0.5 + 0.5 * teachProg(T, 0.75);
+  else if (n >= 3) spin = 1;
+  u25RectDraw(fa, { g, room: true, spin, hi: n >= 3 ? [g.ask, S.answer] : [g.ask] });
   text('長方形を 対角線で 2つに 切った', W / 2, fa.y + 12, 12, CONFIG.C_INK_SOFT, 'center', '700');
   if (n >= 3) text(g.ask + 'の角 ＝ ' + S.answer + 'の角', W / 2, fa.y + fa.h - 12, 16, CONFIG.C_OK, 'center', '800');
 }
@@ -4607,13 +4921,49 @@ function u26RingDraw(area, opt){
     poly(p, col, null, 0);
   };
   if (opt.hi) Object.keys(opt.hi).forEach(k => paint(Number(k), opt.hi[k]));
+  
+  if (opt.fold != null && opt.axisDeg != null) {
+    const aR = opt.axisDeg * Math.PI / 180;
+    const f = Math.max(0, Math.min(1, opt.fold));
+    const R2 = r * 1.6;
+    const kk = (opt.foldSide != null) ? opt.foldSide : g.k;
+    const th = (90 + kk * 30 + 15) * Math.PI / 180;
+    const localY = Math.sin(aR - th);
+    ctx.save();
+    ctx.translate(cx, cy); ctx.rotate(-aR);
+    ctx.beginPath(); ctx.rect(-R2, (localY < 0) ? -R2 : 0, R2 * 2, R2);
+    ctx.clip();
+    ctx.rotate(aR); ctx.translate(-cx, -cy);
+    const sy = (Math.abs(1 - 2 * f) < 0.03) ? 0.03 : (1 - 2 * f);   
+    ctx.translate(cx, cy); ctx.rotate(-aR); ctx.scale(1, sy); ctx.rotate(aR); ctx.translate(-cx, -cy);
+    for (let kx = 0; kx < n; kx++) paint(kx, (f > 0.5) ? 'rgba(74,157,95,0.30)' : 'rgba(201,150,63,0.26)');
+    poly(outer, null, CONFIG.C_EDGE, 2);
+    
+    for (let kx = 0; kx < n; kx++) {
+      if (Math.sin(aR - (90 + kx * 30 + 15) * Math.PI / 180) * localY <= 0) continue;
+      const pm = mid(kx);
+      text(U26_RING[kx], pm[0], pm[1], 13, CONFIG.C_INK, 'center', '900');
+    }
+    ctx.restore();
+  }
   if (opt.axis != null) {
     const a = opt.axis * Math.PI / 180, L = r * 1.18;
     ctx.strokeStyle = CONFIG.C_GOLD; ctx.lineWidth = 2.2; ctx.setLineDash([7, 5]);
     ctx.beginPath(); ctx.moveTo(cx - L * Math.cos(a), cy + L * Math.sin(a));
     ctx.lineTo(cx + L * Math.cos(a), cy - L * Math.sin(a)); ctx.stroke(); ctx.setLineDash([]);
   }
+  
+  let skipSide = null;
+  if (opt.fold != null && opt.fold > 0.02 && opt.axisDeg != null) {
+    const aR2 = opt.axisDeg * Math.PI / 180;
+    const kk2 = (opt.foldSide != null) ? opt.foldSide : g.k;
+    skipSide = Math.sign(Math.sin(aR2 - (90 + kk2 * 30 + 15) * Math.PI / 180));
+  }
   for (let k = 0; k < n; k++) {
+    if (skipSide != null && opt.axisDeg != null) {
+      const aR2 = opt.axisDeg * Math.PI / 180;
+      if (Math.sign(Math.sin(aR2 - (90 + k * 30 + 15) * Math.PI / 180)) === skipSide) continue;
+    }
     const p = mid(k);
     
     const named = (k === g.i || k === g.j || k === g.k) || (opt.hi && opt.hi[k]);
@@ -4623,6 +4973,20 @@ function u26RingDraw(area, opt){
   text(U26_RING[g.i] + ' と ' + U26_RING[g.j] + ' が かさなるように おる',
     W / 2, area.y + 16, 13, CONFIG.C_INK, 'center', '800');
   text(U26_RING[g.k] + ' は どれと かさなる？', W / 2, bot + 13, 13, CONFIG.C_GOLD, 'center', '800');
+  if (opt.pairArrow) {
+    const a = mid(opt.pairArrow[0]), b = mid(opt.pairArrow[1]);
+    ctx.strokeStyle = CONFIG.C_OK; ctx.lineWidth = 2.4; ctx.lineCap = 'round';
+    ctx.beginPath();
+    ctx.moveTo(a[0], a[1]);
+    ctx.quadraticCurveTo((a[0] + b[0]) / 2 + (a[1] - b[1]) * 0.22,
+      (a[1] + b[1]) / 2 + (b[0] - a[0]) * 0.22, b[0], b[1]);
+    ctx.stroke();
+    const ang = Math.atan2(b[1] - a[1], b[0] - a[0]);
+    [2.5, -2.5].forEach(t => {
+      ctx.beginPath(); ctx.moveTo(b[0], b[1]);
+      ctx.lineTo(b[0] + Math.cos(ang + t) * 9, b[1] + Math.sin(ang + t) * 9); ctx.stroke();
+    });
+  }
   if (opt.show) text(opt.show, W / 2, area.y + area.h - 4, 15, CONFIG.C_OK, 'center', '800');
   ctx.restore();
 }
@@ -4637,12 +5001,12 @@ function u26TeachBegin(){
   const g = S.g, k = S.kind;
   if (k === 'ring') {
     const msgs = [U26_RING[g.i] + ' と ' + U26_RING[g.j] + ' が かさなるように おる',
-      'その 2つの まん中を とおる 線が 折り目',
-      '折り目から 同じだけ はなれた ところ どうしが かさなる',
-      U26_RING[g.k] + ' は ' + S.answer + ' と かさなる'];
-    return makeTeach(3, msgs, ['', '折り目', 'おなじだけ', S.answer], { g, kind: k });
+      'その 2つの まん中を とおる 線が **折り目**',
+      '折り目で パタンと おる。' + U26_RING[g.k] + ' の ある がわが たおれていく',
+      'おり終わった。' + U26_RING[g.k] + ' の 上に かさなったのは ' + S.answer];
+    return makeTeach(3, msgs, ['', '折り目', 'おる', S.answer], { g, kind: k });
   }
-  const msgs = ['たてに 折り線を 引く', '右半分を、線の ところで 折る',
+  const msgs = ['たてに 折り線を 引く', '右半分を、線の ところで **パタンと** 折る',
     '左半分と ぴったり かさなった', 'こういう 文字を さがす'];
   return makeTeach(3, msgs, ['', 'おる', 'ぴったり', g.ch], { g, kind: k });
 }
@@ -4653,12 +5017,19 @@ function u26TeachDraw(area, T){
     const hi = {};
     if (n >= 1) { hi[g.i] = 'rgba(201,150,63,0.30)'; hi[g.j] = 'rgba(201,150,63,0.30)'; }
     if (n >= 3) { hi[g.k] = 'rgba(74,157,95,0.30)'; hi[U26_RING.indexOf(S.answer)] = 'rgba(74,157,95,0.30)'; }
-    u26RingDraw(fa, { g, hi, axis: n >= 1 ? (105 + 15 * (g.i + g.j)) : null,
+    const axis = 105 + 15 * (g.i + g.j);
+    
+    const fold = (n === 2) ? teachProg(T, 0.95) : null;
+    u26RingDraw(fa, { g, hi, axis: n >= 1 ? axis : null,
+      axisDeg: axis, fold,
+      pairArrow: n >= 3 ? [g.k, U26_RING.indexOf(S.answer)] : null,
       show: n >= 3 ? (U26_RING[g.k] + ' → ' + S.answer) : null });
     return;
   }
-  u26Draw(fa, { g, ch: g.ch, line: n >= 1,
-    fold: n >= 2 ? Math.min(1, (n - 1)) : null, reveal: n >= 3 ? ('「' + g.ch + '」は かさなる') : null });
+  
+  const fold = (n === 2) ? teachProg(T, 0.85) : (n >= 3 ? 1 : null);
+  u26Draw(fa, { g, ch: g.ch, line: n >= 1, fold,
+    reveal: n >= 3 ? ('「' + g.ch + '」は かさなる') : null });
 }
 function u26KindIcon(kind, x, y, s){
   ctx.save();
@@ -4739,12 +5110,19 @@ function u27Draw(area, opt){
     const d = Math.min(26, maxW / g.n);
     const ox = W / 2 - (g.n - 1) * d / 2;
     const y = area.y + area.h * 0.56;
+    const cnt = (opt.count != null) ? opt.count : 0;
     for (let i = 0; i < g.n; i++) {
+      const on = (opt.one && i === 0) || (i < cnt);
       ctx.beginPath(); ctx.arc(ox + i * d, y, d * 0.47, 0, Math.PI * 2);
-      ctx.fillStyle = '#d9cfb4'; ctx.fill();
-      ctx.strokeStyle = CONFIG.C_EDGE; ctx.lineWidth = 1.2; ctx.stroke();
+      ctx.fillStyle = on ? '#f0dfae' : '#d9cfb4'; ctx.fill();
+      ctx.strokeStyle = on ? CONFIG.C_GOLD : CONFIG.C_EDGE; ctx.lineWidth = on ? 2 : 1.2; ctx.stroke();
+      if (i < cnt) text(String(i + 1), ox + i * d, y, Math.round(d * 0.38), CONFIG.C_INK, 'center', '800');
     }
     u27Arrow(ox - d * 0.47, ox + d * 0.47, y + d * 0.47 + 18, g.a + 'cm');
+    if (opt.one) text('これが 1つ分', ox, y - d * 0.47 - 14, 12, CONFIG.C_GOLD, 'center', '800');
+    
+    if (cnt > 0) u27Arrow(ox - d * 0.47, ox + (cnt - 1) * d + d * 0.47, y + d * 0.47 + 44,
+      cnt + 'まいで ' + (g.a * cnt) + 'cm');
     if (opt.show) text(opt.show, W / 2, area.y + area.h - 14, 16, CONFIG.C_OK, 'center', '800');
     ctx.restore(); return;
   }
@@ -4771,7 +5149,21 @@ function u27Draw(area, opt){
     };
     drawPile(W / 2 - 62, 1, g.m);
     drawPile(W / 2 + 62, g.t, 0);
-    text(g.m + 'まい', W / 2 - 62, base + 14, 12, CONFIG.C_INK_SOFT, 'center', '700');
+    
+    const put = (opt.put != null) ? opt.put : 0;
+    if (put > 0) {
+      const cx2 = W / 2 + 62, bw2 = 44;
+      for (let i = 0; i < put; i++) {
+        const yTop = base - hUnit * (i + 1);
+        rrect(cx2 - bw2 / 2, yTop, bw2, hUnit, 3);
+        ctx.fillStyle = 'rgba(201,150,63,0.30)'; ctx.fill();
+        ctx.strokeStyle = CONFIG.C_GOLD; ctx.lineWidth = 1.6; ctx.stroke();
+        text(g.m + 'まい', cx2, yTop + hUnit / 2, 11, CONFIG.C_INK, 'center', '800');
+      }
+      text('ここまで ' + (g.m * put) + 'まい', cx2, base - hUnit * g.t - 16, 12, CONFIG.C_GOLD, 'center', '800');
+    }
+    text(g.m + 'まい', W / 2 - 62, base + 14, 12, opt.one ? CONFIG.C_GOLD : CONFIG.C_INK_SOFT, 'center', '800');
+    if (opt.one) text('これが 1つ分（1cm）', W / 2 - 62, base + 30, 11, CONFIG.C_GOLD, 'center', '800');
     text('？まい', W / 2 + 62, base + 14, 12, CONFIG.C_GOLD, 'center', '800');
     if (opt.show) text(opt.show, W / 2, area.y + area.h - 6, 15, CONFIG.C_OK, 'center', '800');
     ctx.restore(); return;
@@ -4793,7 +5185,12 @@ function u27Draw(area, opt){
     text(g.names[i], x + w / 2, y - 26, 10, CONFIG.C_INK_SOFT, 'center', '700');
     x += w;
   });
-  u27Arrow(W / 2 - maxW / 2, W / 2 + maxW / 2, y + 34, opt.show ? (tot + 'cm') : '？cm');
+  if (upto > 0 && upto < g.lens.length) {
+    let sofar = 0; for (let i = 0; i < upto; i++) sofar += g.lens[i];
+    u27Arrow(W / 2 - maxW / 2, W / 2 - maxW / 2 + maxW * sofar / tot, y + 34, 'ここまで ' + sofar + 'cm');
+  } else {
+    u27Arrow(W / 2 - maxW / 2, W / 2 + maxW / 2, y + 34, opt.show ? (tot + 'cm') : '？cm');
+  }
   if (opt.show) text(opt.show, W / 2, area.y + area.h - 14, 16, CONFIG.C_OK, 'center', '800');
   ctx.restore();
 }
@@ -4823,8 +5220,16 @@ function u27TeachBegin(){
 function u27TeachDraw(area, T){
   const g = T.g, n = T.shown, k = T.kind, last = T.total;
   const fa = teachFigArea(area);
-  if (k === 'times') { u27Draw(fa, { g, kind: k, show: n >= 3 ? (g.a * g.n) + 'cm' : null }); return; }
-  if (k === 'stack') { u27Draw(fa, { g, kind: k, show: n >= 3 ? (g.m * g.t) + 'まい' : null }); return; }
+  if (k === 'times') {
+    const cnt = (n === 2) ? Math.max(1, Math.round(teachProg(T, 0.13 * g.n + 0.3) * g.n)) : (n >= 3 ? g.n : 0);
+    u27Draw(fa, { g, kind: k, one: n >= 1, count: cnt, show: n >= 3 ? (g.a * g.n) + 'cm' : null });
+    return;
+  }
+  if (k === 'stack') {
+    const put = (n === 2) ? Math.max(1, Math.round(teachProg(T, 0.35 * g.t + 0.3) * g.t)) : (n >= 3 ? g.t : 0);
+    u27Draw(fa, { g, kind: k, one: n >= 1, put, show: n >= 3 ? (g.m * g.t) + 'まい' : null });
+    return;
+  }
   u27Draw(fa, { g, kind: 'line', upto: n,
     show: n >= last ? (g.lens.reduce((a, b) => a + b, 0) + 'cm') : null });
 }
@@ -4932,42 +5337,82 @@ function u28Draw(area, opt){
   let x = 0, y = 0;
   const pts = [P(0, 0)];
   Z.segs.forEach(([dx, dy]) => { x += dx; y += dy; pts.push(P(x, y)); });
-  poly(pts, '#ffffff', CONFIG.C_EDGE, 2);
+  
+  ctx.strokeStyle = 'rgba(141,133,119,0.40)'; ctx.lineWidth = 0.9;
+  for (let i = 0; i <= Z.w; i++) {
+    const a = P(Z.mnx + i, Z.mny), b = P(Z.mnx + i, Z.mny + Z.h);
+    ctx.beginPath(); ctx.moveTo(a[0], a[1]); ctx.lineTo(b[0], b[1]); ctx.stroke();
+  }
+  for (let j = 0; j <= Z.h; j++) {
+    const a = P(Z.mnx, Z.mny + j), b = P(Z.mnx + Z.w, Z.mny + j);
+    ctx.beginPath(); ctx.moveTo(a[0], a[1]); ctx.lineTo(b[0], b[1]); ctx.stroke();
+  }
+  poly(pts, 'rgba(255,255,255,0.42)', CONFIG.C_EDGE, 2.6);
   const mi = u28MissIdx(g);
-  let missAt = null;                                 
+  
+  const labs = [];
   x = 0; y = 0;
   Z.segs.forEach(([dx, dy], i) => {
     const x1 = x, y1 = y; x += dx; y += dy;
     const L = Math.abs(dx) + Math.abs(dy);
     const p1 = P(x1, y1), p2 = P(x, y);
     const mx = (p1[0] + p2[0]) / 2, my = (p1[1] + p2[1]) / 2;
+    const ex = p2[0] - p1[0], ey = p2[1] - p1[1];
+    const el = Math.hypot(ex, ey) || 1;
+    const nx = -ey / el, ny = ex / el;                 
     const vert = (dx === 0);
     const on = (opt.hi === 'tate' && vert) || (opt.hi === 'yoko' && !vert);
     if (on) {
-      ctx.strokeStyle = CONFIG.C_GOLD; ctx.lineWidth = 3.4; ctx.lineCap = 'round';
+      ctx.strokeStyle = CONFIG.C_GOLD; ctx.lineWidth = 3.6; ctx.lineCap = 'round';
       ctx.beginPath(); ctx.moveTo(p1[0], p1[1]); ctx.lineTo(p2[0], p2[1]); ctx.stroke();
     }
     const isMiss = (k === 'miss' && i === mi && !opt.show);
-    const lab = isMiss ? '○' : (L + 'cm');
-    if (isMiss) { missAt = [mx, my, vert, dx, dy]; return; }
-    
-    const off = vert ? 21 : 14;
-    const dxL = vert ? ((dy > 0) ? off : -off) : 0;
-    const dyL = vert ? 0 : ((dx > 0) ? off : -off);
-    const fs = isMiss ? 17 : 11;
-    const fw = textWidth(lab, fs, '800');
-    ctx.fillStyle = '#ffffff';
-    ctx.fillRect(mx + dxL - fw / 2 - 2, my + dyL - fs * 0.68, fw + 4, fs * 1.36);
-    text(lab, mx + dxL, my + dyL, fs, on ? CONFIG.C_GOLD : CONFIG.C_INK_SOFT, 'center', '800');
+    const txt = isMiss ? '' : (L + 'cm');
+    const fs = 12;
+    labs.push({ mx, my, nx, ny, txt, fs, on, isMiss,
+      fw: isMiss ? 24 : textWidth(txt, fs, '800'), fh: isMiss ? 24 : fs * 1.35,
+      x: mx + nx * 17, y: my + ny * 17 });
   });
-  if (missAt) {
-    const [mx, my, vert, dx, dy] = missAt;
-    const lx = mx + (vert ? ((dy > 0) ? 22 : -22) : 0);
-    const ly = my + (vert ? 0 : ((dx > 0) ? 17 : -17));
-    ctx.beginPath(); ctx.arc(lx, ly, 15, 0, Math.PI * 2);
+  
+  for (let pass = 0; pass < 14; pass++) {
+    let moved = false;
+    for (let a = 0; a < labs.length; a++) for (let b = a + 1; b < labs.length; b++) {
+      const A = labs[a], B = labs[b];
+      const ox = (A.fw + B.fw) / 2 + 5 - Math.abs(A.x - B.x);
+      const oy = (A.fh + B.fh) / 2 + 3 - Math.abs(A.y - B.y);
+      if (ox <= 0 || oy <= 0) continue;
+      moved = true;
+      if (ox < oy) {
+        const sgn = (B.x >= A.x) ? 1 : -1, d = ox / 2 + 0.5;
+        A.x -= sgn * d; B.x += sgn * d;
+      } else {
+        const sgn = (B.y >= A.y) ? 1 : -1, d = oy / 2 + 0.5;
+        A.y -= sgn * d; B.y += sgn * d;
+      }
+    }
+    
+    labs.forEach(l => {
+      const d = (l.x - l.mx) * l.nx + (l.y - l.my) * l.ny;
+      if (d < 15) { l.x += l.nx * (15 - d); l.y += l.ny * (15 - d); }
+    });
+    if (!moved) break;
+  }
+  labs.forEach(l => {
+    if (l.isMiss) return;
+    ctx.fillStyle = '#ffffff';
+    ctx.fillRect(l.x - l.fw / 2 - 2, l.y - l.fs * 0.7, l.fw + 4, l.fs * 1.4);
+    text(l.txt, l.x, l.y, l.fs, l.on ? CONFIG.C_GOLD : CONFIG.C_INK_SOFT, 'center', '800');
+  });
+  const miss = labs.find(l => l.isMiss);
+  if (miss) {
+    
+    ctx.strokeStyle = CONFIG.C_GOLD; ctx.lineWidth = 1.4; ctx.setLineDash([3, 3]);
+    ctx.beginPath(); ctx.moveTo(miss.mx, miss.my); ctx.lineTo(miss.x, miss.y); ctx.stroke();
+    ctx.setLineDash([]);
+    ctx.beginPath(); ctx.arc(miss.x, miss.y, 15, 0, Math.PI * 2);
     ctx.fillStyle = '#ffffff'; ctx.fill();
-    ctx.beginPath(); ctx.arc(lx, ly, 10.5, 0, Math.PI * 2);
-    ctx.strokeStyle = CONFIG.C_GOLD; ctx.lineWidth = 2.4; ctx.stroke();
+    ctx.beginPath(); ctx.arc(miss.x, miss.y, 10.5, 0, Math.PI * 2);
+    ctx.strokeStyle = CONFIG.C_GOLD; ctx.lineWidth = 2.6; ctx.stroke();
   }
   
   text('かどは ぜんぶ 直角', W / 2, area.y + 18, 12, CONFIG.C_INK_SOFT, 'center', '700');
@@ -7011,7 +7456,7 @@ const STAGES = [
     intros: [
       { kind: 'mushi', label: '虫食い算', g: { a: 74, b: 28, c: 46, sub: true, dg: 2, ri: 1, ci: 1 }, answer: '8' },
       { kind: 'komachi', label: '小町算', g: { nums: [2, 3, 4, 5] }, answer: '2×4＋5−3' },
-      { kind: 'fuku', label: 'ふく面算', g: { rows: [['A', '7'], ['4', '5'], ['7', 'A']], nLet: 1, qi: 0, dg: 2 }, answer: '2' },
+      { kind: 'fuku', label: 'ふく面算', g: { rows: [['A', '7'], ['4', '5'], ['7', 'A']], nLet: 1, qi: 0, sol: [2], dg: 2 }, answer: '2' },
     ],
     txt: {
       mushi: ['□に 入る ', ['数', 'すう'], ['字', 'じ'], 'は？'],
