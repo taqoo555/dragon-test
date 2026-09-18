@@ -92,7 +92,7 @@
 
 
 const CONFIG = {
-  VERSION: 'v72',
+  VERSION: 'v73',
 
   
   
@@ -430,8 +430,31 @@ function sfxBreath(kind){
   if (kind === 'thunder') return sfxThunder();
   if (kind === 'flame')   return sfxFlame();
   if (kind === 'ice')     return sfxIce();
+  if (kind === 'forest')  return sfxForest();
+  if (kind === 'shine')   return sfxShine();
+  if (kind === 'dark')    return sfxDark();
   noiseHit(0.35, 2400, 400, 0.6, 0.18, 'bandpass');           
   sweep(660, 160, 0.34, 'triangle', 0.12);
+}
+
+function sfxForest(){
+  noiseHit(0.42, 900, 240, 0.7, 0.17, 'lowpass');             
+  sweep(420, 150, 0.22, 'triangle', 0.12);                    
+  noiseHit(0.16, 1800, 600, 1.2, 0.13, 'bandpass', 0.16);     
+  sweep(90, 58, 0.34, 'sine', 0.16, 0.16);
+}
+
+function sfxShine(){
+  [880, 1318.5, 1760].forEach((f, i) => tone(f, 0.55, 'sine', 0.10, i * 0.04));
+  sweep(520, 1560, 0.40, 'triangle', 0.09);                   
+  noiseHit(0.34, 5200, 9000, 0.8, 0.07, 'bandpass', 0.06);    
+}
+
+function sfxDark(){
+  sweep(220, 44, 0.46, 'sawtooth', 0.15);                     
+  noiseHit(0.40, 300, 90, 0.7, 0.13, 'lowpass');
+  noiseHit(0.30, 2400, 260, 0.5, 0.20, 'bandpass', 0.40);     
+  sweep(64, 30, 0.6, 'sine', 0.20, 0.40);
 }
 
 function sfxIntro(){
@@ -3448,15 +3471,26 @@ function groupKindIcon(kind, x, y, s){
 }
 
 
-const U16_PAIRS = [[2, 5], [4, 25], [5, 20], [2, 50], [4, 5]]; 
+
+const U16_PAIRS = [[2, 5], [4, 25], [4, 5], [2, 15], [4, 15], [2, 25]];
+const U16_CS = [
+  [3, 7, 9, 11],
+  [3, 7, 9, 11, 13],
+  [3, 7, 9, 11, 13, 17],
+  [7, 9, 11, 13, 17, 19],
+  [7, 9, 11, 13, 17, 19, 21, 23],
+];
 const U16_LAST = [];
 function u16Gen(lv){
   let p, q, c, key, arr, defs;
   for (let tries = 0; tries < 60; tries++){
     [p, q] = U16_PAIRS[randInt(0, Math.min(U16_PAIRS.length - 1, 1 + lv))];
     
-    c = randInt(2, 7 + lv * 3);
+    const cs = U16_CS[Math.min(lv, U16_CS.length - 1)];
+    c = cs[randInt(0, cs.length - 1)];
     if (c === p || c === q) continue;             
+    
+    if ((c * p) % 10 === 0 || (c * q) % 10 === 0) continue;
     key = p + ':' + q + ':' + c;
     if (U16_LAST.includes(key)) continue;
     arr = [p, q, c];
@@ -3478,7 +3512,7 @@ function u16Gen(lv){
       nice: niceVal.has(arr[i]) && niceVal.has(arr[j]) }));
     key = p + ':' + q + ':' + c;
   }
-  U16_LAST.push(key); if (U16_LAST.length > 4) U16_LAST.shift();
+  U16_LAST.push(key); if (U16_LAST.length > 5) U16_LAST.shift();
   const correctDef = defs.find(d => d.nice) || defs[0];
   const total = p * q * c;
   const choices = shuffleArr(defs.map(d => ({ v: d.label, txt: d.label })));
@@ -8150,9 +8184,9 @@ const DRAGONS = [
   { id: 0, img: 'dragon0', tint: null, name: 'STAGE 1', dname: 'フレイムドラゴン',  sname: 'フレイム',   breath: 'flame',   c1: '#8a4b52', c2: '#c46c74' },
   { id: 1, img: 'dragon1', tint: null, name: 'STAGE 2', dname: 'サンダードラゴン',  sname: 'サンダー',   breath: 'thunder', c1: '#3a4a7a', c2: '#6c8cc4' },
   { id: 2, img: 'dragon-ice', tint: null, name: 'STAGE 3', dname: 'アイスドラゴン',   sname: 'アイス',     breath: 'ice',     c1: '#3f6b58', c2: '#5fa384' },
-  { id: 3, img: 'dragon-forest', tint: null, name: 'STAGE 4', dname: 'フォレストドラゴン', sname: 'フォレスト', breath: 'beam',    c1: '#8a6b3f', c2: '#c4a06c' },
-  { id: 4, img: 'dragon-shine', tint: null, name: 'STAGE 5', dname: 'シャインドラゴン',  sname: 'シャイン',   breath: 'beam',    c1: '#3a3a3a', c2: '#6c6c6c' },
-  { id: 5, img: 'dragon-dark', tint: null, name: 'STAGE 6', dname: 'ダークドラゴン',   sname: 'ダーク',     breath: 'beam',    c1: '#6b3f8a', c2: '#a06cc4' },
+  { id: 3, img: 'dragon-forest', tint: null, name: 'STAGE 4', dname: 'フォレストドラゴン', sname: 'フォレスト', breath: 'forest',  c1: '#8a6b3f', c2: '#c4a06c' },
+  { id: 4, img: 'dragon-shine', tint: null, name: 'STAGE 5', dname: 'シャインドラゴン',  sname: 'シャイン',   breath: 'shine',   c1: '#3a3a3a', c2: '#6c6c6c' },
+  { id: 5, img: 'dragon-dark', tint: null, name: 'STAGE 6', dname: 'ダークドラゴン',   sname: 'ダーク',     breath: 'dark',    c1: '#6b3f8a', c2: '#a06cc4' },
 ];
 function dragonImage(d){
   const im = d.img && IMG[d.img];
@@ -9844,13 +9878,63 @@ function startBreath(){
     }
   }
   if (kind === 'ice') {
-    for (let i = 0; i < 7; i++) {
-      fx.sparks.push({ a: -Math.PI * (0.18 + Math.random() * 0.34), r: 70 + Math.random() * 60, w: 3 + Math.random() * 4, d: Math.random() * 0.2 });
+    
+    fx.mx = a.x - 34; fx.my = a.y + a.h * 0.16;
+    fx.shards = [];
+    for (let i = 0; i < 18; i++) {
+      fx.shards.push({ d: Math.random() * 0.42, off: Math.random() * 2 - 1,
+        len: 14 + Math.random() * 24, w: 1.4 + Math.random() * 1.9,
+        sp: 0.85 + Math.random() * 0.55 });
     }
+    fx.crys = [];
+    for (let i = 0; i < 6; i++) fx.crys.push({ a: i * Math.PI / 3 + 0.26, len: 24 + Math.random() * 18 });
+  }
+  if (kind === 'forest') {
+    fx.vines = [];
+    for (let i = 0; i < 3; i++) {
+      fx.vines.push({
+        p0: [a.x + a.w + 46, a.y + a.h * (0.16 + i * 0.30)],
+        c: [W / 2 + 92 - i * 74, ty - 104 + i * 86],
+        delay: i * 0.07, w: 6.4 - i * 1.2,
+      });
+    }
+    fx.leaves = [];
+    for (let i = 0; i < 24; i++) {
+      fx.leaves.push({ d: Math.random() * 0.46, r: 58 + Math.random() * 95,
+        a0: Math.random() * Math.PI * 2, sp: 1.1 + Math.random() * 0.9,
+        sz: 5 + Math.random() * 7, rot: Math.random() * 6.3 });
+    }
+  }
+  if (kind === 'shine') {
+    fx.rays = [];
+    for (let i = 0; i < 12; i++) fx.rays.push({ a: i * Math.PI / 6 + Math.random() * 0.12, len: 46 + Math.random() * 78, w: 0.05 + Math.random() * 0.05 });
+    fx.stars = [];
+    for (let i = 0; i < 9; i++) fx.stars.push({ a: Math.random() * Math.PI * 2, r: 30 + Math.random() * 90, sz: 4 + Math.random() * 6, d: Math.random() * 0.4 });
+  }
+  if (kind === 'dark') {
+    fx.dots = [];
+    for (let i = 0; i < 26; i++) fx.dots.push({ a: Math.random() * Math.PI * 2, r: 70 + Math.random() * 110, sz: 2.5 + Math.random() * 4, d: Math.random() * 0.22 });
+    fx.arms = [];
+    for (let i = 0; i < 9; i++) fx.arms.push({ a: i * Math.PI * 2 / 9 + Math.random() * 0.25, len: 70 + Math.random() * 70, bend: (Math.random() * 2 - 1) * 0.9, w: 3 + Math.random() * 3 });
   }
   S.breathFx = fx;
   S.breathT = 1;
   sfxBreath(kind);
+}
+
+function breathLeaf(x, y, sz, rot, col, al){
+  ctx.save();
+  ctx.globalAlpha = Math.max(0, Math.min(1, al));
+  ctx.translate(x, y); ctx.rotate(rot);
+  ctx.beginPath();
+  ctx.moveTo(0, -sz);
+  ctx.quadraticCurveTo(sz * 0.82, 0, 0, sz);
+  ctx.quadraticCurveTo(-sz * 0.82, 0, 0, -sz);
+  ctx.closePath();
+  ctx.fillStyle = col; ctx.fill();
+  ctx.strokeStyle = 'rgba(28,66,36,0.55)'; ctx.lineWidth = 1; ctx.stroke();
+  ctx.beginPath(); ctx.moveTo(0, -sz); ctx.lineTo(0, sz); ctx.stroke();
+  ctx.restore();
 }
 
 function jag(p0, p1, seg, amp){
@@ -9956,23 +10040,241 @@ function drawBreath(){
       ctx.globalAlpha = 1;
     }
   } else if (fx.kind === 'ice') {
+    
+    const mx = (fx.mx != null) ? fx.mx : a.x - 34, my = (fx.my != null) ? fx.my : a.y + a.h * 0.16;
+    const dx = W / 2 - mx, dy = ty - my, dl = Math.hypot(dx, dy) || 1;
+    const ux = dx / dl, uy = dy / dl, px = -uy, py = ux;          
+    const q = Math.min(1, p * 2.1);
+    const halfW = (t) => 7 + 46 * t;                              
     ctx.globalCompositeOperation = 'lighter';
-    for (const sp of fx.sparks) {
-      const q = Math.max(0, Math.min(1, (p - sp.d) * 3.0));
-      if (q <= 0) continue;
-      const x0 = W / 2 - Math.cos(sp.a) * sp.r * (1 - q) - 40;
-      const y0 = ty - Math.sin(sp.a) * sp.r * (1 - q) + 60 * (1 - q);
-      ctx.globalAlpha = Math.min(1, b * 2) * 0.95;
-      ctx.strokeStyle = '#dff2ff'; ctx.lineWidth = sp.w; ctx.lineCap = 'round';
-      ctx.beginPath(); ctx.moveTo(x0, y0); ctx.lineTo(W / 2, ty); ctx.stroke();
+    
+    const steps = 16;
+    ctx.beginPath();
+    for (let i = 0; i <= steps; i++) {
+      const t = q * i / steps, hw = halfW(t);
+      const cx2 = mx + dx * t, cy2 = my + dy * t;
+      const pt = [cx2 + px * hw, cy2 + py * hw];
+      if (i === 0) ctx.moveTo(pt[0], pt[1]); else ctx.lineTo(pt[0], pt[1]);
     }
-    const rr = 14 + 40 * (1 - b);
+    for (let i = steps; i >= 0; i--) {
+      const t = q * i / steps, hw = halfW(t);
+      const cx2 = mx + dx * t, cy2 = my + dy * t;
+      ctx.lineTo(cx2 - px * hw, cy2 - py * hw);
+    }
+    ctx.closePath();
+    const lg = ctx.createLinearGradient(mx, my, W / 2, ty);
+    lg.addColorStop(0, 'rgba(226,248,255,' + (0.66 * b).toFixed(3) + ')');
+    lg.addColorStop(0.55, 'rgba(150,215,255,' + (0.46 * b).toFixed(3) + ')');
+    lg.addColorStop(1, 'rgba(120,190,255,0)');
+    ctx.fillStyle = lg; ctx.fill();
+    
+    (fx.shards || []).forEach(sh => {
+      const t = Math.max(0, Math.min(1.05, (p - sh.d) * sh.sp * 2.6));
+      if (t <= 0) return;
+      const hw = halfW(Math.min(1, t)) * 0.82;
+      const cx2 = mx + dx * t + px * sh.off * hw;
+      const cy2 = my + dy * t + py * sh.off * hw;
+      ctx.globalAlpha = Math.min(1, b * 2.2) * (t > 1 ? 0.3 : 0.95);
+      ctx.save();
+      ctx.translate(cx2, cy2); ctx.rotate(Math.atan2(uy, ux));
+      
+      ctx.beginPath();
+      ctx.moveTo(sh.len * 0.62, 0);
+      ctx.lineTo(sh.len * 0.10, -sh.w);
+      ctx.lineTo(-sh.len * 0.38, 0);
+      ctx.lineTo(sh.len * 0.10, sh.w);
+      ctx.closePath();
+      ctx.fillStyle = 'rgba(224,246,255,0.92)'; ctx.fill();
+      ctx.beginPath();
+      ctx.moveTo(sh.len * 0.6, 0); ctx.lineTo(-sh.len * 0.36, 0);
+      ctx.strokeStyle = 'rgba(255,255,255,0.95)'; ctx.lineWidth = 1; ctx.stroke();
+      ctx.restore();
+    });
+    ctx.globalAlpha = 1;
+    
+    if (p > 0.42) {
+      const g2 = Math.min(1, (p - 0.42) / 0.3);
+      const al = Math.min(1, b * 2.2);
+      ctx.globalAlpha = al;
+      ctx.strokeStyle = '#e8f8ff'; ctx.lineCap = 'round';
+      (fx.crys || []).forEach(cr => {
+        const L = cr.len * g2;
+        const ex = W / 2 + Math.cos(cr.a) * L, ey = ty + Math.sin(cr.a) * L;
+        ctx.lineWidth = 3.2;
+        ctx.beginPath(); ctx.moveTo(W / 2, ty); ctx.lineTo(ex, ey); ctx.stroke();
+        ctx.lineWidth = 2;
+        [0.45, 0.75].forEach(f => {
+          const bx = W / 2 + Math.cos(cr.a) * L * f, by = ty + Math.sin(cr.a) * L * f;
+          [-0.7, 0.7].forEach(o => {
+            ctx.beginPath(); ctx.moveTo(bx, by);
+            ctx.lineTo(bx + Math.cos(cr.a + o) * L * 0.3, by + Math.sin(cr.a + o) * L * 0.3);
+            ctx.stroke();
+          });
+        });
+      });
+      const rr = 12 + 44 * g2;
+      const rg = ctx.createRadialGradient(W / 2, ty, 2, W / 2, ty, rr);
+      rg.addColorStop(0, 'rgba(255,255,255,' + (0.95 * b).toFixed(3) + ')');
+      rg.addColorStop(0.45, 'rgba(165,225,255,' + (0.55 * b).toFixed(3) + ')');
+      rg.addColorStop(1, 'rgba(165,225,255,0)');
+      ctx.fillStyle = rg;
+      ctx.beginPath(); ctx.arc(W / 2, ty, rr, 0, Math.PI * 2); ctx.fill();
+      ctx.globalAlpha = 1;
+    }
+    
+    ctx.globalCompositeOperation = 'source-over';
+    ctx.globalAlpha = 0.16 * b;
+    ctx.fillStyle = '#9fd8ff'; ctx.fillRect(a.x, a.y, a.w, a.h);
+    ctx.globalAlpha = 1;
+  } else if (fx.kind === 'forest') {
+    
+    const al = Math.min(1, b * 2.2);
+    (fx.vines || []).forEach(v => {
+      const t = Math.max(0, Math.min(1, (p - v.delay) * 2.8));
+      if (t <= 0) return;
+      
+      const P0 = v.p0, C = v.c, P1 = [W / 2, ty];
+      const lerp = (A, B, k) => [A[0] + (B[0] - A[0]) * k, A[1] + (B[1] - A[1]) * k];
+      const A1 = lerp(P0, C, t), B1 = lerp(C, P1, t), E = lerp(A1, B1, t);
+      ctx.globalAlpha = al;
+      [[ 'rgba(38,84,46,0.95)', v.w + 2.4 ], [ 'rgba(84,150,88,0.95)', v.w ],
+       [ 'rgba(178,222,160,0.9)', v.w * 0.34 ]].forEach(([c, lw]) => {
+        ctx.beginPath(); ctx.moveTo(P0[0], P0[1]);
+        ctx.quadraticCurveTo(A1[0], A1[1], E[0], E[1]);
+        ctx.strokeStyle = c; ctx.lineWidth = lw; ctx.lineCap = 'round'; ctx.stroke();
+      });
+      
+      for (let k = 1; k <= 6; k++) {
+        const kk = k / 7;
+        if (kk > t) break;
+        const a2 = lerp(P0, C, kk * t), b2 = lerp(C, P1, kk * t), e2 = lerp(a2, b2, kk * t);
+        breathLeaf(e2[0], e2[1], 6.5, kk * 5 + v.delay * 9, '#5aa860', al * 0.95);
+      }
+    });
+    (fx.leaves || []).forEach(lf => {
+      const t = Math.max(0, Math.min(1, (p - lf.d) * lf.sp * 2.2));
+      if (t <= 0) return;
+      const ang = lf.a0 + t * 3.4;
+      const r = lf.r * (1 - t);
+      breathLeaf(W / 2 + Math.cos(ang) * r, ty + Math.sin(ang) * r, lf.sz,
+        lf.rot + t * 7, (lf.sz > 9) ? '#8fd07a' : '#63b566', al * (t > 0.96 ? 0.25 : 1));
+    });
+    if (p > 0.5) {
+      const g2 = Math.min(1, (p - 0.5) / 0.35);
+      ctx.globalCompositeOperation = 'lighter';
+      const rr = 16 + 52 * g2;
+      const rg = ctx.createRadialGradient(W / 2, ty, 2, W / 2, ty, rr);
+      rg.addColorStop(0, 'rgba(226,255,206,' + (0.85 * b).toFixed(3) + ')');
+      rg.addColorStop(0.5, 'rgba(110,200,110,' + (0.45 * b).toFixed(3) + ')');
+      rg.addColorStop(1, 'rgba(110,200,110,0)');
+      ctx.fillStyle = rg;
+      ctx.beginPath(); ctx.arc(W / 2, ty, rr, 0, Math.PI * 2); ctx.fill();
+      ctx.globalCompositeOperation = 'source-over';
+    }
+    ctx.globalAlpha = 1;
+  } else if (fx.kind === 'shine') {
+    
+    const al = Math.min(1, b * 2.2);
+    const grow = Math.min(1, p * 3.4);
+    const colW = (16 + 64 * grow) * (0.5 + 0.5 * b);
+    ctx.globalCompositeOperation = 'lighter';
+    const lg = ctx.createLinearGradient(W / 2 - colW, 0, W / 2 + colW, 0);
+    lg.addColorStop(0, 'rgba(255,240,190,0)');
+    lg.addColorStop(0.5, 'rgba(255,252,232,' + (0.78 * b).toFixed(3) + ')');
+    lg.addColorStop(1, 'rgba(255,240,190,0)');
+    ctx.fillStyle = lg;
+    ctx.fillRect(W / 2 - colW, a.y, colW * 2, (ty - a.y) + 34 * grow);
+    
+    ctx.globalAlpha = al;
+    (fx.rays || []).forEach(ry => {
+      const L = ry.len * grow;
+      const a2 = ry.a + p * 0.5;
+      ctx.beginPath();
+      ctx.moveTo(W / 2, ty);
+      ctx.lineTo(W / 2 + Math.cos(a2 - ry.w) * L, ty + Math.sin(a2 - ry.w) * L);
+      ctx.lineTo(W / 2 + Math.cos(a2 + ry.w) * L, ty + Math.sin(a2 + ry.w) * L);
+      ctx.closePath();
+      ctx.fillStyle = 'rgba(255,238,176,0.55)'; ctx.fill();
+    });
+    
+    [0, 0.18, 0.36].forEach(d => {
+      const t = (p - d) * 1.9;
+      if (t <= 0 || t > 1) return;
+      ctx.beginPath(); ctx.ellipse(W / 2, ty, 24 + 120 * t, (24 + 120 * t) * 0.34, 0, 0, Math.PI * 2);
+      ctx.strokeStyle = 'rgba(255,248,214,' + (0.7 * (1 - t) * b).toFixed(3) + ')';
+      ctx.lineWidth = 3.4 * (1 - t) + 1; ctx.stroke();
+    });
+    
+    (fx.stars || []).forEach(st => {
+      const t = Math.max(0, Math.min(1, (p - st.d) * 2.4));
+      if (t <= 0) return;
+      const x = W / 2 + Math.cos(st.a) * st.r * t, y = ty + Math.sin(st.a) * st.r * t;
+      const sz = st.sz * (1 - t * 0.5);
+      ctx.globalAlpha = al * (1 - t) * 0.95;
+      ctx.strokeStyle = '#fffbe8'; ctx.lineWidth = 2; ctx.lineCap = 'round';
+      ctx.beginPath(); ctx.moveTo(x - sz, y); ctx.lineTo(x + sz, y);
+      ctx.moveTo(x, y - sz); ctx.lineTo(x, y + sz); ctx.stroke();
+    });
+    ctx.globalAlpha = al;
+    const rr = 14 + 56 * grow;
     const rg = ctx.createRadialGradient(W / 2, ty, 2, W / 2, ty, rr);
-    rg.addColorStop(0, 'rgba(255,255,255,' + (0.9 * b).toFixed(3) + ')');
-    rg.addColorStop(0.5, 'rgba(150,220,255,' + (0.5 * b).toFixed(3) + ')');
-    rg.addColorStop(1, 'rgba(150,220,255,0)');
+    rg.addColorStop(0, 'rgba(255,255,255,0.98)');
+    rg.addColorStop(0.42, 'rgba(255,236,168,0.8)');
+    rg.addColorStop(1, 'rgba(255,236,168,0)');
     ctx.fillStyle = rg;
     ctx.beginPath(); ctx.arc(W / 2, ty, rr, 0, Math.PI * 2); ctx.fill();
+    ctx.globalAlpha = 1;
+  } else if (fx.kind === 'dark') {
+    
+    const gather = Math.min(1, p / 0.5);
+    const burst = Math.max(0, (p - 0.5) / 0.5);
+    
+    ctx.globalAlpha = 0.42 * b * (0.35 + 0.65 * gather);
+    ctx.fillStyle = '#140a22'; ctx.fillRect(a.x, a.y, a.w, a.h);
+    ctx.globalAlpha = 1;
+    if (burst <= 0) {
+      (fx.dots || []).forEach(dt2 => {
+        const t = Math.max(0, Math.min(1, (gather - dt2.d) * 1.6));
+        if (t <= 0) return;
+        const r = dt2.r * (1 - t);
+        ctx.globalAlpha = 0.85 * b;
+        ctx.fillStyle = '#b57ce0';
+        ctx.beginPath(); ctx.arc(W / 2 + Math.cos(dt2.a) * r, ty + Math.sin(dt2.a) * r, dt2.sz, 0, Math.PI * 2); ctx.fill();
+      });
+    }
+    const core = burst > 0 ? (30 * (1 - Math.min(1, burst * 3))) : (8 + 26 * gather);
+    if (core > 0.5) {
+      const rg = ctx.createRadialGradient(W / 2, ty, 1, W / 2, ty, core);
+      rg.addColorStop(0, 'rgba(10,4,18,0.98)');
+      rg.addColorStop(0.72, 'rgba(60,20,92,0.9)');
+      rg.addColorStop(1, 'rgba(160,100,220,0)');
+      ctx.globalAlpha = b;
+      ctx.fillStyle = rg;
+      ctx.beginPath(); ctx.arc(W / 2, ty, core, 0, Math.PI * 2); ctx.fill();
+    }
+    if (burst > 0) {
+      ctx.globalCompositeOperation = 'lighter';
+      const al = Math.min(1, b * 2.4);
+      (fx.arms || []).forEach(ar => {
+        const t = Math.min(1, burst * 1.6);
+        const L = ar.len * t;
+        const ex = W / 2 + Math.cos(ar.a) * L, ey = ty + Math.sin(ar.a) * L;
+        const mxp = W / 2 + Math.cos(ar.a) * L * 0.55 - Math.sin(ar.a) * ar.bend * L * 0.35;
+        const myp = ty + Math.sin(ar.a) * L * 0.55 + Math.cos(ar.a) * ar.bend * L * 0.35;
+        ctx.globalAlpha = al * (1 - t * 0.35);
+        [[ '#7a3fb5', ar.w + 3 ], [ '#c79bf0', ar.w ]].forEach(([c, lw]) => {
+          ctx.beginPath(); ctx.moveTo(W / 2, ty);
+          ctx.quadraticCurveTo(mxp, myp, ex, ey);
+          ctx.strokeStyle = c; ctx.lineWidth = lw; ctx.lineCap = 'round'; ctx.stroke();
+        });
+      });
+      const t2 = Math.min(1, burst * 1.35);
+      ctx.globalAlpha = al * (1 - t2);
+      ctx.strokeStyle = '#d7b3ff'; ctx.lineWidth = 5 * (1 - t2) + 1.5;
+      ctx.beginPath(); ctx.arc(W / 2, ty, 16 + 120 * t2, 0, Math.PI * 2); ctx.stroke();
+      ctx.globalCompositeOperation = 'source-over';
+      ctx.globalAlpha = 1;
+    }
   }
   ctx.restore();
   if (b > 0.88) {
@@ -11542,7 +11844,7 @@ resize();
 requestAnimationFrame(frame);
 
 
-window.__cube = { CONFIG, S, genShape, shapeTotal, allTopsVisible, noInvisibleAddition, playBasis, basisIso, basisOblique, STAGES, mapRect, onDown, submit, visibleCubeCount, columnCount, cubeList, cubeFaces, visibleFlags, pointInPoly, figArea, choiceRect, get H(){ return H; }, visiblePerColumn, teachStep, introList, introTabRects, teachArea, toLocal, get offX(){ return offX; }, get offY(){ return offY; }, get scale(){ return scale; }, QUIT_BTN, quitPanel, bossBarRect, mapTabletRect, enemyFor, ENEMY_ART, ENEMY_STAGE_ART, ENEMY_GROUP, isPerfect, perfectSlots, dragonGold, lineGen, balGen, pairGen, weekGen, WEEK, weekName, sfxHit, sfxSlash, sfxCritical, sfxHurt, sfxPiece, sfxCorrect, sfxWrong, sfxDefeat, sfxIntro, audioCtl: { set(a){ audio = a; master = null; }, get(){ return audio; } }, bgmRender, bgmStart, bgmStop, BGM, clearedSlots, groupSize, dragonDone, curPage, setPage, pageStages, DRAGONS, dragonName, startBoss, bossState, bossOpen, bossBag, finishBoss, bossWinButtons, PIECE_SHAPES, makeKindBag, nextQuestion, newQuestion, newBattle, enterStage, startIntro, teachNext, magicGen, magicLines, magicHas, stageLv, save, makeCode, makeKidCode, applyKidCode, applyCode, openCode, BTN_EXPORT, BTN_IMPORT };
+window.__cube = { CONFIG, S, startBreath, genShape, shapeTotal, allTopsVisible, noInvisibleAddition, playBasis, basisIso, basisOblique, STAGES, mapRect, onDown, submit, visibleCubeCount, columnCount, cubeList, cubeFaces, visibleFlags, pointInPoly, figArea, choiceRect, get H(){ return H; }, visiblePerColumn, teachStep, introList, introTabRects, teachArea, toLocal, get offX(){ return offX; }, get offY(){ return offY; }, get scale(){ return scale; }, QUIT_BTN, quitPanel, bossBarRect, mapTabletRect, enemyFor, ENEMY_ART, ENEMY_STAGE_ART, ENEMY_GROUP, isPerfect, perfectSlots, dragonGold, lineGen, balGen, pairGen, weekGen, WEEK, weekName, sfxHit, sfxSlash, sfxCritical, sfxHurt, sfxPiece, sfxCorrect, sfxWrong, sfxDefeat, sfxIntro, audioCtl: { set(a){ audio = a; master = null; }, get(){ return audio; } }, bgmRender, bgmStart, bgmStop, BGM, clearedSlots, groupSize, dragonDone, curPage, setPage, pageStages, DRAGONS, dragonName, startBoss, bossState, bossOpen, bossBag, finishBoss, bossWinButtons, PIECE_SHAPES, makeKindBag, nextQuestion, newQuestion, newBattle, enterStage, startIntro, teachNext, magicGen, magicLines, magicHas, stageLv, save, makeCode, makeKidCode, applyKidCode, applyCode, openCode, BTN_EXPORT, BTN_IMPORT };
 </script>
 </body>
 </html>
