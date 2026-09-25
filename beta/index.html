@@ -92,7 +92,7 @@
 
 
 const CONFIG = {
-  VERSION: 'v76',
+  VERSION: 'v77',
 
   
   
@@ -1570,17 +1570,20 @@ function magicTeachBegin(){
     onReset(){ this.lit = {}; this.label = ''; this.reveal = null; this.revealT = 0; },
     msgFn(){
       const k = this.shown - 1, g2 = S.g, st = k >= 0 ? this.steps[k] : null;
-      if (!st) return S.intro ? '？に入る数を\nもとめる考え方' : 'そろっている一列から\n？をもとめる';
-      if (st.t === 'rule') return 'たて・よこ・ななめ、どの一列をたしても\nおなじ数になる。これが魔方陣';
+      
+      if (!st) return S.intro ? '？に入る数をもとめる考え方です。'
+        : (S.kind === 'sum' ? 'この表は、どの1列をたしても同じ数になります。\nどれか1列をたせば、答えが出ます。'
+                            : 'この表は、どの1列をたしても同じ数になります。\nまず、その数をもとめます。');
+      if (st.t === 'rule') return 'たて・横・ななめ、どの1列をたしても、\n同じ数になります。これが魔方陣です。';
       if (st.t === 'line') {
         const kindName = st.L.kind === 'row' ? 'よこ' : (st.L.kind === 'col' ? 'たて' : 'ななめ');
-        return (st.i === 0 ? ('まず ' + kindName + 'の一列。たすと ' + g2.sum) : ('これも ' + g2.sum + '（' + kindName + '）')) + '\n' + (st.i + 1) + '本目 ／ ' + st.n + '本';
+        return (st.i === 0 ? ('まず、' + kindName + 'の1列をたすと' + g2.sum + 'です。') : (kindName + 'の列も、たすと' + g2.sum + 'です。')) + '\n（' + st.n + '本のうち' + (st.i + 1) + '本目）';
       }
-      if (st.t === 'alldone') return '？のない列は ぜんぶ ' + g2.sum + '！\nこれが魔方陣のひみつ';
-      if (st.t === 'lit1') { const n = L1.cells.slice(0, k).map(p => g2.m[p.r][p.c]); return 'まず ？のない一列を見つけて、たす\n' + (n.length ? n.join('＋') : '') ; }
-      if (st.t === 'sum1') return '一列たすと ' + g2.sum + '。\nたて・よこ・ななめ、どの列も ' + g2.sum + ' になる';
-      if (st.t === 'lit2') return '？のある列も ' + g2.sum + ' のはず。\nわかっている数を ' + g2.sum + ' から ひく';
-      if (st.t === 'reveal') return 'のこりは ' + this.reveal + '。\n？は ' + this.reveal;
+      if (st.t === 'alldone') return '？のない列は、どれもたすと' + g2.sum + 'です。\nこれが魔方陣のひみつです。';
+      if (st.t === 'lit1') { const n = L1.cells.slice(0, k).map(p => g2.m[p.r][p.c]); return '？がない列を1つえらんで、左からたします。\n' + (n.length ? n.join('＋') : '') ; }
+      if (st.t === 'sum1') return '1列たすと' + g2.sum + 'です。\nたて・横・ななめ、どの列も' + g2.sum + 'です。';
+      if (st.t === 'lit2') return '？が1つだけある列も、たすと' + g2.sum + 'です。\nだから、' + g2.sum + 'から、わかっている数をひきます。';
+      if (st.t === 'reveal') return 'のこりは' + this.reveal + 'です。\nだから、？は' + this.reveal + 'です。';
       return '';
     },
     onStep(k){
@@ -1744,7 +1747,7 @@ function lineDraw(area, opt){
   }
   
   if (opt.count) {
-    for (let i = 1; i <= g.mark; i++) text(String(i), px(i), y + 26, 11, '#3f7a52', 'center', '700');
+    for (let i = 1; i <= g.mark; i++) text(String(i), px(i), y + 48, 11, '#3f7a52', 'center', '700');   
   }
   
   text('0', px(0), y + 28, 15, CONFIG.C_INK, 'center', '700');
@@ -1774,12 +1777,14 @@ function lineDraw(area, opt){
 }
 function lineTeachBegin(){
   const g = S.g, ans = g.mark * g.step;
+
+  
   const msgs = [
-    '★の 数を もとめる',
-    '0から ' + g.label + ' までに\nめもりが ' + g.n + 'こ ある',
-    g.label + ' を ' + g.n + 'こに 分けると\n1めもりは ' + g.step,
-    '★は 0から ' + g.mark + 'こ目',
-    g.step + 'ずつ ' + g.mark + 'こで ' + ans,
+    '数の線の1めもりは、どこも同じ大きさです。\nまず、1めもりがいくつかを考えます。',
+    '0から' + g.label + 'までは、\n同じ大きさの' + g.n + 'つに分かれています。',
+    g.n + 'つ分で' + g.label + 'なので、1つ分は' + g.step + 'です。',
+    '★は、0からめもり' + g.mark + 'つ分のところにあります。',
+    '1めもりは' + g.step + 'なので、' + g.step + 'が' + g.mark + 'つ分で\n' + g.step + '×' + g.mark + '＝' + ans + 'です。★は' + ans + 'です。',
   ];
   const labels = ['', '0〜' + g.label, '1めもり=' + g.step, g.step + '×' + g.mark, g.step + '×' + g.mark + '=' + ans];
   return makeTeach(4, msgs, labels);
@@ -1885,14 +1890,16 @@ function balDraw(area, opt){
 }
 function balTeachBegin(){
   const g = S.g, ans = g.b * g.k;
+
+  
   const msgs = [
-    'つりあっている＝\nおなじ 重さ',
-    '● ' + g.a + 'こ と ▲ ' + g.right + 'こが\nつりあっている',
-    '● 1つ分に 分けると\n● 1つは ▲ ' + g.k + 'こ',
-    '● ' + g.b + 'こ なら\n' + g.k + 'ずつ ' + g.b + 'つ分',
-    g.k + '×' + g.b + ' で ' + ans,
+    'てんびんがつり合っているとき、\n左と右の重さは同じです。',
+    '●' + g.a + 'こと▲' + g.right + 'こが、同じ重さです。',
+    (g.a > 1 ? ('▲' + g.right + 'こを、●の数と同じ' + g.a + 'つに分けると、' + g.k + 'こずつです。\n') : '') + '●1こは、▲' + g.k + 'こと同じ重さです。',
+    '●' + g.b + 'こは、▲' + g.k + 'こが' + g.b + 'つ分です。',
+    g.k + '×' + g.b + '＝' + ans + 'なので、\n●' + g.b + 'こは▲' + ans + 'こ分の重さです。',
   ];
-  const labels = ['', '●' + g.a + '=▲' + g.right, '●1=▲' + g.k, g.k + '×' + g.b, g.k + '×' + g.b + '=' + ans];
+  const labels = ['', '●' + g.a + 'こ＝▲' + g.right + 'こ', '●1こ＝▲' + g.k + 'こ', g.k + '×' + g.b, g.k + '×' + g.b + '=' + ans];
   return makeTeach(4, msgs, labels);
 }
 function balTeachDraw(area, T){
@@ -1988,8 +1995,8 @@ function fieldDraw(area, opt){
       fieldShape(k, x - 26, ty, 9, FIELD_COL[k], CONFIG.C_EDGE, 1.4);
       const big = g.c[k] === g.mx, small = g.c[k] === g.mn;
       text(g.c[k] + 'こ', x + 6, ty, 17, big ? CONFIG.C_GOLD : (small ? '#4a8fd6' : CONFIG.C_INK), 'center', '800');
-      if (big) text('おおい', x + 6, ty + 18, 10, CONFIG.C_GOLD, 'center', '800');
-      else if (small) text('すくない', x + 6, ty + 18, 10, '#4a8fd6', 'center', '800');
+      if (big) text('多い', x + 6, ty + 18, 10, CONFIG.C_GOLD, 'center', '800');
+      else if (small) text('少ない', x + 6, ty + 18, 10, '#4a8fd6', 'center', '800');
     }
   }
   if (opt.reveal != null) text(g.mx + ' － ' + g.mn + ' ＝ ' + opt.reveal, W / 2, area.y + area.h - 16, 19, CONFIG.C_OK);
@@ -1997,13 +2004,15 @@ function fieldDraw(area, opt){
 }
 function fieldTeachBegin(){
   const g = S.g, d = g.mx - g.mn;
+
+  const NM = ['○', '□', '△'], iMx = g.c.indexOf(g.mx), iMn = g.c.indexOf(g.mn);
   const msgs = [
-    'ちらばって いるので、**種類ごと** に かぞえる',
-    '○を かぞえる … ' + g.c[0] + 'こ',
-    '□を かぞえる … ' + g.c[1] + 'こ',
-    '△を かぞえる … ' + g.c[2] + 'こ',
-    'いちばん多いのは **' + g.mx + 'こ**、いちばん少ないのは **' + g.mn + 'こ**',
-    g.mx + ' － ' + g.mn + ' ＝ **' + d + '**',
+    '形がちらばっているので、○、□、△に分けて、\n1つずつ数えます。',
+    '○を1こずつ数えます。○は' + g.c[0] + 'こです。',
+    '□を1こずつ数えます。□は' + g.c[1] + 'こです。',
+    '△を1こずつ数えます。△は' + g.c[2] + 'こです。',
+    'いちばん多い形は' + NM[iMx] + 'で' + g.mx + 'こ、\nいちばん少ない形は' + NM[iMn] + 'で' + g.mn + 'こです。',
+    g.mx + '−' + g.mn + '＝' + d + 'なので、\n' + NM[iMx] + 'は' + NM[iMn] + 'より' + d + 'こ多いです。',
   ];
   const labels = ['', '○' + g.c[0], '□' + g.c[1], '△' + g.c[2], g.mx + ' と ' + g.mn, String(d)];
   return makeTeach(5, msgs, labels, { g, k: 'field' });
@@ -2082,20 +2091,23 @@ function pairDraw(area, opt){
 function pairTeachBegin(){
   if (S.kind === 'field') return fieldTeachBegin();
   const g = S.g, d = g.n1 - g.n2;
+
+  
   const msgs = [
-    '上と下を 1つずつ\nペアに する',
-    'ペアに できたのは ' + g.n2 + 'こ',
-    'ペアに なれずに\nのこったのは ' + d + 'こ',
-    '○は △より ' + d + 'こ 多い\n△は ○より ' + d + 'こ 少ない',
+    '○は' + g.n1 + 'こ、△は' + g.n2 + 'こあります。',
+    '○と△を、1つずつ線でつないで組にします。\n組にすると、どちらが多いかが分かります。',
+    '組になったのは' + g.n2 + '組です。',
+    '組になれなかった○が、' + d + 'こあります。\nこれが、○と△の数のちがいです。',
+    g.n1 + '−' + g.n2 + '＝' + d + 'なので、○は△より' + d + 'こ多いです。\n△は○より' + d + 'こ少ないです。',
   ];
-  const labels = ['', g.n2 + 'ペア', g.n1 + '−' + g.n2 + '=' + d, g.n1 + '−' + g.n2 + '=' + d];
-  return makeTeach(3, msgs, labels);
+  const labels = ['', '線でつなぐ', g.n2 + '組', 'のこり' + d + 'こ', g.n1 + '−' + g.n2 + '=' + d];
+  return makeTeach(4, msgs, labels);
 }
 function pairTeachDraw(area, T){
   if (T.k === 'field') return fieldTeachDraw(area, T);
   pairDraw(teachFigArea(area), {
-    pair: T.shown >= 1, rest: T.shown >= 2,
-    reveal: T.shown >= 2 ? (S.g.n1 - S.g.n2) : null,
+    pair: T.shown >= 1, rest: T.shown >= 3,
+    reveal: T.shown >= 3 ? (S.g.n1 - S.g.n2) : null,
   });
 }
 function pairKindIcon(kind, x, y, s){
@@ -3103,22 +3115,25 @@ function codeTeachBegin(){
   };
   if (g.add) {
     const onA = namesFor(g.a, g.digits), onB = namesFor(g.b, g.digits);
+
     const msgs = [
-      '○ は 0、｜ は 1',
-      '1つ目：｜の ところを ひろう\n' + (onA.length ? onA.join(' ＋ ') : '0') + ' ＝ ' + g.a,
-      '2つ目：｜の ところを ひろう\n' + (onB.length ? onB.join(' ＋ ') : '0') + ' ＝ ' + g.b,
-      g.a + ' ＋ ' + g.b + ' ＝ **' + (g.a + g.b) + '**',
+      '○はおった指、｜はのばした指です。\n｜のところのねうちだけを、数に入れます。',
+      '＋の左のあんごうは、｜のところのねうちをたして\n' + (onA.length ? onA.join('＋') : '0') + '＝' + g.a + 'です。',
+      '＋の右のあんごうも、同じようにたして\n' + (onB.length ? onB.join('＋') : '0') + '＝' + g.b + 'です。',
+      g.a + '＋' + g.b + '＝**' + (g.a + g.b) + '**です。',
     ];
     const labels = ['', String(g.a), String(g.b), String(g.a + g.b)];
     return makeTeach(3, msgs, labels, { g, k: 'code' });
   }
   const on = namesFor(g.v, g.digits);
-  const vals = CODE_VALS.slice(CODE_VALS.length - g.digits).join('・');
+
+  
+  const valsR = CODE_VALS.slice(CODE_VALS.length - g.digits).reverse().join('、');
   const msgs = [
-    '○ は 0、｜ は 1',
-    '右から **' + vals + '** の **ねうち** を 書く',
-    '｜ の ところ だけ ひろう → **' + (on.length ? on.join('・') : '0') + '**',
-    (on.length ? on.join(' ＋ ') : '0') + ' ＝ **' + g.v + '**',
+    '○はおった指、｜はのばした指です。\n｜のところだけを、数に入れます。',
+    'しるしの上に「ねうち」を書きます。右から' + valsR + '。\n左へ1つ進むたびに、2ばいになります。',
+    '｜のところのねうちは、' + (on.length ? on.join('と') : 'ありません') + 'です。\n○のところは数えません。',
+    (on.length ? on.join('＋') : '0') + '＝**' + g.v + '**です。',
   ];
   const labels = ['', 'ねうち', on.join('+') || '0', String(g.v)];
   return makeTeach(3, msgs, labels, { g, k: 'code' });
@@ -3192,15 +3207,18 @@ function triTeachBegin(){
   while (a < b) { pairs.push([a, b]); a++; b--; }
   const mid = (a === b) ? a : null;
   const pairSum = n + 1;
-  const msgs = [n + 'だんの せきを かぞえる'];
+
+  
+  const msgs = [n + 'だんならんだ点を、ぜんぶ数えます。\n上から1こ、2こ、3こ…とふえています。'];
   const labels = [''];
   pairs.forEach(([x, y]) => {
-    msgs.push(x + 'だんめ と ' + y + 'だんめ を ペアに\n' + x + ' ＋ ' + y + ' ＝ ' + pairSum);
+    msgs.push(x + 'だんめと' + y + 'だんめを組にします。\n' + x + '＋' + y + '＝' + pairSum + 'で、' + (x === 1 ? '' : 'これも') + pairSum + 'こです。');
     labels.push(String(pairSum));
   });
   let total = pairs.length * pairSum;
-  if (mid) { msgs.push(mid + 'だんめだけ のこる（' + mid + 'こ）'); labels.push(String(mid)); total += mid; }
-  msgs.push(pairs.length + '組 × ' + pairSum + (mid ? ' ＋ ' + mid : '') + ' ＝ **' + total + '**');
+  if (mid) { msgs.push('まん中の' + mid + 'だんめは、組にするあいてがいません。\n' + mid + 'こです。'); labels.push(String(mid)); total += mid; }
+  
+  msgs.push(pairSum + 'こずつの組が' + pairs.length + 'つ' + (mid ? 'と、のこりが' + mid + 'こ' : '') + 'なので、\n' + pairSum + '×' + pairs.length + (mid ? '＋' + mid : '') + '＝**' + total + '**です。');
   labels.push(String(total));
   return makeTeach(msgs.length - 1, msgs, labels, { g, pairs, mid, mk: 'tri' });
 }
@@ -3265,12 +3283,12 @@ function mixrowDraw(area, opt){
 function mixrowTeachBegin(){
   const g = S.g, n = g.n, rowW = g.rowW;
   const msgs = [
-    '黒は 1だんめ 1こ、2だんめ 2こ…と ふえる。\n白は へっていく',
-    'よこ 1だんの 合計を かぞえる\n（黒＋白）',
-    'どの だんも いつも **' + rowW + 'こ**（かわらない）',
-    n + 'だん ある から\n' + rowW + ' × ' + n + ' ＝ **' + (rowW * n) + '**',
+    '黒い点は、上から1こ、2こ…とふえます。\n白い点は、' + (rowW - 1) + 'こ、' + (rowW - 2) + 'こ…とへります。',
+    'いちばん上のだんは、黒が1こ、白が' + (rowW - 1) + 'こで、\nあわせて' + rowW + 'こです。',
+    '下のだんへ行くと、黒が1こふえて、白が1こへります。\nだから、どのだんも**' + rowW + 'こ**です。',
+    rowW + 'このだんが' + n + 'だんあるので、\n' + rowW + '×' + n + '＝**' + (rowW * n) + '**です。',
   ];
-  const labels = ['', '1だん', rowW + 'こ', String(rowW * n)];
+  const labels = ['', '1だんめ', rowW + 'こ', String(rowW * n)];
   return makeTeach(3, msgs, labels, { g, mk: 'mixrow' });
 }
 function mixrowTeachDraw(area, T){
@@ -3472,7 +3490,7 @@ function perDraw(area, opt){
   opt = opt || {};
   const g = opt.g || S.g;
   ctx.save();
-  if (!qAsked()) text(g.total + 'こを ' + g.groups + '人で 同じ数ずつ 分けると？',
+  if (!qAsked()) text(g.total + 'こを ' + g.groups + '人で 同じ数ずつ 分けます',
        W / 2, area.y + 14, 13, CONFIG.C_INK_SOFT, 'center', '700');
   const inner = { x: area.x, y: area.y + 26, w: area.w, h: area.h - 46 };
   if (opt.rows != null) u14Split(inner, { groups: opt.rows, q: g.per, rem: 0 }, {});
@@ -3482,10 +3500,14 @@ function perDraw(area, opt){
 }
 function perTeachBegin(){
   const g = S.g;
-  const msgs = [g.total + 'こを ' + g.groups + '人に 同じ数ずつ 配る'];
+
+  const msgs = [g.total + 'こを' + g.groups + '人で同じ数ずつ分けます。\n1人ずつ、じゅんに配ってみます。'];
   const labels = [''];
-  for (let i = 0; i < g.groups; i++) { msgs.push((i + 1) + '人めに 配ると のこりが へる'); labels.push((i + 1) + '人め'); }
-  msgs.push(g.total + '÷' + g.groups + '＝' + g.per + '（1人ぶん）');
+  for (let i = 0; i < g.groups; i++) {
+    msgs.push((i + 1) + '人めに' + g.per + 'こ配ります。\nのこりは' + (g.total - g.per * (i + 1)) + 'こです。');
+    labels.push((i + 1) + '人め');
+  }
+  msgs.push('1人分は' + g.per + 'こです。\n式は' + g.total + '÷' + g.groups + '＝' + g.per + 'です。');
   labels.push(g.total + '÷' + g.groups);
   return makeTeach(msgs.length - 1, msgs, labels, { g });
 }
@@ -3572,7 +3594,7 @@ function u14RemDraw(area, opt){
   opt = opt || {};
   const g = opt.g || S.g;
   ctx.save();
-  if (!qAsked()) text(g.total + 'こを ' + g.groups + '人で 同じ数ずつ 分けると？',
+  if (!qAsked()) text(g.total + 'こを ' + g.groups + '人で 同じ数ずつ 分けます',
        W / 2, area.y + 14, 13, CONFIG.C_INK_SOFT, 'center', '700');
   const inner = { x: area.x, y: area.y + 26, w: area.w, h: area.h - 46 };
   if (opt.split) u14Split(inner, g, { showRem: opt.showRem });
@@ -3583,10 +3605,10 @@ function u14RemDraw(area, opt){
 function u14RemTeachBegin(){
   const g = S.g;
   const msgs = [
-    g.total + 'こを ' + g.groups + '人で 同じ数ずつ 分ける',
-    g.groups + '人に ' + g.q + 'こずつ 配れる',
-    'のこりは ' + g.rem + 'こ。' + g.groups + '人には もう 配れない＝あまり',
-    g.total + '÷' + g.groups + '＝' + g.q + ' あまり ' + g.rem,
+    g.total + 'こを' + g.groups + '人で同じ数ずつ分けます。',
+    g.groups + '人に' + g.q + 'こずつ配れます。',
+    'のこりは' + g.rem + 'こです。' + g.groups + '人に配るには' + g.groups + 'こいるので、\nもう配れません。この' + g.rem + 'こを、あまりといいます。',
+    '1人' + g.q + 'こまで分けられます。\n式は' + g.total + '÷' + g.groups + '＝' + g.q + 'あまり' + g.rem + 'です。',
   ];
   return makeTeach(3, msgs, ['', g.q + 'こずつ', 'あまり' + g.rem, String(g.q)], { g, mk: 'rem' });
 }
@@ -3726,10 +3748,13 @@ function u16TeachBegin(){
   const g = S.g;
   const [i, j] = g.niceIdx;
   const nice = g.arr[i] * g.arr[j];
+
+  
+  const rest = g.arr[3 - i - j];
   const msgs = [
-    'さきに 計算すると 楽な 2つを さがす',
-    g.arr[i] + 'と' + g.arr[j] + 'で ちょうど ' + nice,
-    nice + ' × ' + g.arr[3 - i - j] + ' ＝ ' + g.total,
+    'かける じゅん番をかえても、答えは同じです。\n先にかけると、10や100のようなきりのいい数になる2つをさがします。',
+    g.arr[i] + '×' + g.arr[j] + '＝' + nice + 'です。\nきりのいい数になりました。',
+    'のこりの' + rest + 'をかけます。\n' + nice + '×' + rest + '＝' + g.total + 'です。',
   ];
   return makeTeach(2, msgs, ['', g.arr[i] + '×' + g.arr[j], String(g.total)], { g, mk: 'u16' });
 }
@@ -3972,21 +3997,23 @@ function u22MushiPlan(g){
       if (which === 't') {
         const sm = P[j] + Q[j] + carry;
         eq = P[j] + '＋' + Q[j] + (carry ? '＋1' : '') + '＝' + sm;
-        msg = place + 'の位は ' + eq + '。だから □ は ' + (sm % 10);
+        msg = place + 'のくらいを見ます。' + eq + 'なので、□は' + (sm % 10) + 'です。';
       } else {
         const known = (which === 'p') ? Q[j] : P[j];
         const need = Tt[j];
         const ans = ((need - known - carry) % 10 + 10) % 10;
-        eq = '□＋' + known + (carry ? '＋1' : '') + ' の 一の位が ' + need;
-        msg = place + 'の位：' + eq + '。あてはまるのは ' + ans + ' だけ';
+        eq = '□＋' + known + (carry ? '＋1' : '') + ' の 答えの 一のくらいが ' + need;
+        
+        msg = place + 'のくらいを見ます。□＋' + known + (carry ? '＋1（くり上がり）' : '') + 'の答えの一のくらいが' + need + 'になる数をさがします。\n'
+          + ans + '＋' + known + (carry ? '＋1' : '') + '＝' + (ans + known + carry) + 'なので、□は' + ans + 'です。';
       }
       steps.push({ j, place, eq, msg, hidden: true });
       break;
     }
     const sm = P[j] + Q[j] + carry;
     const eq = P[j] + '＋' + Q[j] + (carry ? '＋1' : '') + '＝' + sm;
-    const msg = place + 'の位：' + eq + '。' +
-      (sm >= 10 ? ('だから ' + Tt[j] + ' で、1 くり上がる') : ('だから ' + Tt[j]));
+    const msg = place + 'のくらいは' + eq + 'です。' +
+      (sm >= 10 ? ('答えの' + place + 'のくらいは' + Tt[j] + 'で、1くり上がります。') : ('答えの' + Tt[j] + 'と合います。'));
     steps.push({ j, place, eq, msg, hidden: false });
     carry = (sm >= 10) ? 1 : 0;
   }
@@ -4071,8 +4098,18 @@ function u22KomachiSteps(expr){
   if (hasMul) {
     const shown = parts.map((x, i) => (sg[i] < 0 ? '−' : (i ? '＋' : '')) + x).join('');
     const done = terms.map((v, i) => (sg[i] < 0 ? '−' : (i ? '＋' : '')) + v).join('');
-    out.push({ msg: '×が あるので そこを さきに 計算する：' + shown + ' → ' + done,
+    out.push({ msg: '×は、＋や−より先に計算するきまりです。\n' + shown + 'は、' + done + 'になります。',
       lab: 'かける', line: done });
+  }
+  
+  let pre = 0, neg = false;
+  terms.forEach((v, i) => { pre += sg[i] * v; if (pre < 0) neg = true; });
+  if (neg) {
+    const idx = terms.map((_, i) => i);
+    const order = idx.filter(i => sg[i] > 0).concat(idx.filter(i => sg[i] < 0));
+    terms = order.map(i => terms[i]); sg = order.map(i => sg[i]);
+    out.push({ msg: 'このままでは、左から計算すると ひけない所があります。\n先に、たし算をまとめてから ひきます。',
+      lab: 'たし算を先に', line: terms.map((v, i) => (sg[i] < 0 ? '−' : (i ? '＋' : '')) + v).join('') });
   }
   
   let acc = terms[0] * sg[0], line = String(acc);
@@ -4080,9 +4117,9 @@ function u22KomachiSteps(expr){
     const before = acc;
     acc += sg[i] * terms[i];
     line = before + (sg[i] < 0 ? '−' : '＋') + terms[i] + '＝' + acc;
-    out.push({ msg: '左から 計算する：' + line, lab: (sg[i] < 0 ? '−' : '＋') + terms[i], line });
+    out.push({ msg: '左から、じゅんに計算します。' + line + 'です。', lab: (sg[i] < 0 ? '−' : '＋') + terms[i], line });
   }
-  out.push({ msg: 'ちょうど 10 に なった。だから この 式', lab: '10', line: expr + '＝10', done: true });
+  out.push({ msg: 'ちょうど10になりました。だから、この式が答えです。', lab: '10', line: expr + '＝10', done: true });
   return out;
 }
 
@@ -4138,7 +4175,7 @@ function u22FukuDraw(area, opt){
   if (opt.check) {
     const okk = opt.check.ok;
     text(opt.check.line, W / 2, area.y + area.h - 38, 15, okk ? CONFIG.C_OK : CONFIG.C_NG, 'center', '800');
-    text(okk ? '✓ ぴったり 合う' : '✗ 答えの 行と ちがう',
+    text(okk ? '✓ ぴったり 合う' : '✗ 合わない',
       W / 2, area.y + area.h - 16, 15, okk ? CONFIG.C_OK : CONFIG.C_NG, 'center', '800');
   }
   else if (opt.show) text(L + ' ＝ ' + opt.show, W / 2, area.y + area.h - 14, 18, CONFIG.C_OK, 'center', '800');
@@ -4188,7 +4225,7 @@ function u22TeachBegin(){
   const g = S.g, k = S.kind;
   if (k === 'komachi') {
     const plan = u22KomachiSteps(S.answer);
-    const msgs = ['4つの 数を ならべかえて いい。＋ − × も つかえる。この 式で ためす'];
+    const msgs = [S.answer + 'を計算して、10になるかたしかめます。'];
     const labels = [''];
     plan.forEach(st2 => { msgs.push(st2.msg); labels.push(st2.lab); });
     return makeTeach(msgs.length - 1, msgs, labels, { g, kind: k, plan });
@@ -4196,25 +4233,25 @@ function u22TeachBegin(){
   if (k === 'fuku') {
     const L = U22_LET[g.qi];
     const plan = u22FukuTrials(g);
-    const msgs = ['おなじ 文字には おなじ 数字。' + L + ' に 数字を あてはめて たしかめる'];
+    const msgs = ['同じ文字には、同じ数字が入ります。\n' + L + 'に数字を入れて、式が合うかたしかめます。'];
     const labels = [''];
     plan.forEach(tr => {
-      msgs.push(L + '＝' + tr.v + ' なら ' + tr.line + '。' +
-        (tr.ok ? '答えの 行と ぴったり 合う' : '答えの 行（' + tr.want + '）と ちがう'));
+      msgs.push(L + 'が' + tr.v + 'だと、' + tr.line + '。\n' +
+        (tr.ok ? '線の下の数とぴったり合います。' : '線の下の数は' + tr.want + 'なので、合いません。'));
       labels.push(L + '＝' + tr.v);
     });
-    msgs.push('合うのは ' + L + '＝' + S.answer + ' だけ');
+    msgs.push('合うのは、' + L + 'が' + S.answer + 'のときです。');
     labels.push(S.answer);
     return makeTeach(msgs.length - 1, msgs, labels, { g, kind: k, plan });
   }
   const plan = u22MushiPlan(g);
   const head = g.sub
-    ? 'ひき算は「引く数 ＋ 答え ＝ もとの数」。下の2つを たすと 上に なる'
-    : '一の位から 位ごとに たしかめる';
+    ? 'ひき算は、ひく数と答えをたすと、ひかれる数になります。\nだから、下の2つの数をたして、上の数と合うかを見ます。'
+    : '一のくらいから、じゅんに見ていきます。';
   const msgs = [head];
   const labels = [''];
-  plan.steps.forEach(st2 => { msgs.push(st2.msg); labels.push(st2.place + 'の位'); });
-  msgs.push('だから □ は ' + S.answer + '。ほかの 数では 合わない');
+  plan.steps.forEach(st2 => { msgs.push(st2.msg); labels.push(st2.place + 'のくらい'); });
+  msgs.push('だから、□は' + S.answer + 'です。');
   labels.push(String(S.answer));
   return makeTeach(msgs.length - 1, msgs, labels, { g, kind: k, plan });
 }
@@ -4735,9 +4772,10 @@ function u24Draw(area, opt){
   if (k === 'divide') return u24DivDraw(area, opt);
   const f = U24_FACES.find(x => x.n === g.f);
   ctx.save();
+  const nm = u24FaceName(f).replace(/^.*の/, '');
   const head = (k === 'face')
-    ? (u24FaceName(f) + ' と 平行な 面は？')
-    : (u24FaceName(f) + ' に ' + U24_REL_TXT[g.rel] + ' 辺は？');
+    ? (nm + ' と 平行な 面は？')
+    : (nm + (g.rel === 'in' ? ' に ' : ' と ') + U24_REL_TXT[g.rel] + ' へんは？');
   if (!qAsked()) text(head, W / 2, area.y + 16, 13, CONFIG.C_INK, 'center', '800');
   u24Box(area, { face: f, hiEdge: opt.hiEdge, mark: opt.mark,
     face2: opt.showFace2 ? U24_FACES.find(x => x.n === opt.showFace2) : null });
@@ -4747,26 +4785,32 @@ function u24Draw(area, opt){
 function u24TeachBegin(){
   const g = S.g, k = S.kind;
   if (k === 'divide') {
-    const msgs = ['直線・平面・空間を、上から 順に 2つに 分けてみる',
-      '**直線**の 上に **点**を うつと、線は 2つに 分かれた',
-      '**平面**は **直線**を 1本 引くと 2つに 分かれた',
-      '**空間**（あつみの あるもの）は **平面**で 切ると 2つに 分かれた',
-      'だから ' + g.what + 'を 分けるのは ' + S.answer];
+
+    const msgs = ['直線、平面、空間を、1つずつ2つに分けてみます。',
+      '**直線**の上に**点**を1つうつと、直線は2つに分かれます。',
+      '**平面**に**直線**を1本引くと、平面は2つに分かれます。',
+      '**空間**（箱のように、あつみのあるところ）は、\n**平面**で切ると2つに分かれます。',
+      'だから、' + g.what + 'を2つに分けるのは' + S.answer + 'です。'];
     return makeTeach(4, msgs, ['', '点', '直線', '平面', S.answer], { g, kind: k });
   }
   const f = U24_FACES.find(x => x.n === g.f);
   if (k === 'face') {
-    const msgs = ['灰色の 面を 見る：' + u24FaceName(f),
-      'この 面と 同じ 頂点を もつ 面は、ぶつかる（すい直）',
-      '頂点を 1つも 分けあわない 面が、平行な 面',
-      '平行なのは ' + S.answer];
-    return makeTeach(3, msgs, ['', 'ぶつかる', 'はなれている', S.answer], { g, kind: k });
+
+    
+    const nm = u24FaceName(f).replace(/^.*の/, '');
+    const msgs = ['色をぬった' + nm + 'を見ます。',
+      nm + 'と同じ文字（ちょう点）が1つでもある面は、\nくっついているので、平行ではありません。',
+      '同じ文字が1つもない面が、平行な面です。',
+      'だから、平行な面は' + S.answer + 'です。'];
+    return makeTeach(3, msgs, ['', 'くっつく', 'はなれている', S.answer], { g, kind: k });
   }
-  const msgs = ['灰色の 面を 見る：' + u24FaceName(f),
-    '両はしとも 面の 上に ある 辺 → ふくまれる',
-    'かた方だけ 面に ついて いる 辺 → 交わる',
-    'どちらも 面に ついて いない 辺 → 平行',
-    U24_REL_TXT[g.rel] + ' 辺は ' + S.answer];
+
+  const nm = u24FaceName(f).replace(/^.*の/, '');
+  const msgs = ['色をぬった' + nm + 'を見ます。',
+    'へんの両はしが、どちらも面の上にあるとき、\nそのへんは面に「ふくまれる」といいます。',
+    'かたほうのはしだけが面の上にあるとき、\nそのへんは面と「交わる」といいます。',
+    'どちらのはしも面の上にないとき、\nそのへんは面と「平行」といいます。',
+    U24_REL_TXT[g.rel] + 'へんの1つは、' + S.answer + 'です。'];
   return makeTeach(4, msgs, ['', 'ふくまれる', '交わる', '平行', S.answer], { g, kind: k });
 }
 function u24TeachDraw(area, T){
@@ -5057,32 +5101,34 @@ function u25TeachBegin(){
   const g = S.g, k = S.kind;
   if (k === 'sum') {
     
-    const msgs = ['まず 三角形で たしかめる。3つの 角に 色を つけた',
-      '3つの 角を 切りとって、1つの 点に あつめる',
-      'あつめると **まっすぐ 1本**。まっすぐは **直角 2つ分**'];
+
+    const msgs = ['三角形の3つの角を全部あわせると、\n直角いくつ分になるかを、まずたしかめます。',
+      '3つの角を切りとって、1つの点にあつめます。',
+      'あつめると、**まっすぐな1本の線**になります。\nまっすぐは、**直角2つ分**です。'];
     const labels = ['', 'あつめる', '直角2つ分'];
     if (g.n > 3) {
-      msgs.push(g.name + '角形は、1つの 頂点から 線を 引くと 三角形 ' + (g.n - 2) + 'こ');
+      msgs.push(g.name + '角形は、1つのかどからななめに線を引くと、\n三角形' + (g.n - 2) + 'こに分かれます。');
       labels.push('三角形' + (g.n - 2) + 'こ');
-      msgs.push('直角2つ分 × ' + (g.n - 2) + ' ＝ 直角 ' + ((g.n - 2) * 2) + 'つ分');
+      msgs.push('三角形1こで直角2つ分なので、\n' + (g.n - 2) + 'こで直角' + ((g.n - 2) * 2) + 'つ分です。');
       labels.push(String((g.n - 2) * 2));
     } else {
-      msgs.push('三角形の 角は ぜんぶで 直角 2つ分');
+      msgs.push('三角形の角は、全部で直角2つ分です。');
       labels.push('2');
     }
     return makeTeach(msgs.length - 1, msgs, labels, { g, kind: k });
   }
   if (k === 'count') {
-    const msgs = ['かどを 1つずつ 見る',
-      '2つの 辺が きちんと 直角に なっている かどを さがす',
-      '見つけた かどに しるしを つける',
-      'ぜんぶで ' + S.answer + 'こ'];
+    const msgs = ['かどを1つずつ見ます。',
+      '三角じょうぎの直角をあてて、\nぴったり合うかどをさがします。',
+      '直角のかどに、しるしをつけます。',
+      (String(S.answer) === '0') ? '直角のかどは1つもありません。だから0こです。' : ('直角のかどは、全部で' + S.answer + 'こです。')];
     return makeTeach(3, msgs, ['', 'かどを見る', 'しるし', S.answer + 'こ'], { g, kind: k });
   }
-  const msgs = ['長方形を 対角線で 2つの 直角三角形に 切る',
-    '下がわの 三角形を、まん中を じくに して **半分**まわす',
-    'もう **半分**まわすと、上の 三角形に ぴったり 重なった',
-    '重なった ところを 見ると、' + g.ask + 'の角に 重なるのは ' + S.answer + 'の角'];
+  
+  const msgs = ['長方形を、かどからかどへ切ると、\n三角形が2つできます。',
+    '下の三角形を、長方形のまん中を中心にして、\nまわしていきます。',
+    'さかさまになるまでまわすと、\n上の三角形にぴったり重なりました。',
+    'まわすと、' + S.answer + 'の角は' + g.ask + 'の角のところに来ます。\nだから、' + g.ask + 'と' + S.answer + 'が重なります。'];
   return makeTeach(3, msgs, ['', 'まわす', 'ぴったり', S.answer], { g, kind: k });
 }
 function u25TeachDraw(area, T){
@@ -5110,7 +5156,7 @@ function u25TeachDraw(area, T){
   else if (n === 2) spin = 0.5 + 0.5 * teachProg(T, 0.75);
   else if (n >= 3) spin = 1;
   u25RectDraw(fa, { g, room: true, spin, hi: n >= 3 ? [g.ask, S.answer] : [g.ask] });
-  text('長方形を 対角線で 2つに 切った', W / 2, fa.y + 12, 12, CONFIG.C_INK_SOFT, 'center', '700');
+  text(g.ask + 'の角と 重なるのは、どの角？', W / 2, fa.y + 12, 12, CONFIG.C_INK_SOFT, 'center', '700');   
   if (n >= 3) text(g.ask + 'の角 ＝ ' + S.answer + 'の角', W / 2, fa.y + fa.h - 12, 16, CONFIG.C_OK, 'center', '800');
 }
 function u25KindIcon(kind, x, y, s){
@@ -5317,14 +5363,17 @@ function u26DrawQ(area, opt){
 function u26TeachBegin(){
   const g = S.g, k = S.kind;
   if (k === 'ring') {
-    const msgs = [U26_RING[g.i] + ' と ' + U26_RING[g.j] + ' が かさなるように おる',
-      'その 2つの まん中を とおる 線が **折り目**',
-      '折り目で パタンと おる。' + U26_RING[g.k] + ' の ある がわが たおれていく',
-      'おり終わった。' + U26_RING[g.k] + ' の 上に かさなったのは ' + S.answer];
-    return makeTeach(3, msgs, ['', '折り目', 'おる', S.answer], { g, kind: k });
+
+    
+    const I = U26_RING[g.i], J = U26_RING[g.j], K = U26_RING[g.k];
+    const msgs = [I + 'と' + J + 'がかさなるように、2つにおります。',
+      I + 'と' + J + 'のちょうどまん中に、線を引きます。\nこれが**おり目**です。',
+      K + 'のあるほうを、おり目でパタンとおります。',
+      'おると、' + K + 'は' + S.answer + 'にかさなりました。\nだから、答えは' + S.answer + 'です。'];
+    return makeTeach(3, msgs, ['', 'おり目', 'おる', S.answer], { g, kind: k });
   }
-  const msgs = ['たてに 折り線を 引く', '右半分を、線の ところで **パタンと** 折る',
-    '左半分と ぴったり かさなった', 'こういう 文字を さがす'];
+  const msgs = ['文字のまん中に、たての点線を引きます。', '点線のところで、右半分を**パタンと**おります。',
+    '左半分とぴったりかさなりました。', '「' + g.ch + '」は、ぴったりかさなります。\nだから、答えは' + g.ch + 'です。'];
   return makeTeach(3, msgs, ['', 'おる', 'ぴったり', g.ch], { g, kind: k });
 }
 function u26TeachDraw(area, T){
@@ -5516,24 +5565,29 @@ function u27Draw(area, opt){
 function u27TeachBegin(){
   const g = S.g, k = S.kind;
   if (k === 'times') {
-    const msgs = ['1まいの はばが ' + g.a + 'cm。これが 「1つ分」',
-      'それが ' + g.n + 'まい ならぶ。これが 「いくつ分」',
-      '1つ分 × いくつ分 ＝ ' + g.a + ' × ' + g.n,
-      'こたえは ' + (g.a * g.n) + 'cm'];
+
+    const msgs = ['1まいのはばは' + g.a + 'cmです。これが「1つ分」です。',
+      g.a + 'cmのコインが、' + g.n + 'まいならびます。\nこの' + g.n + 'が「いくつ分」です。',
+      '長さは、1つ分×いくつ分です。\n' + g.a + '×' + g.n + 'になります。',
+      
+      (g.n > 9 ? (g.a + '×' + g.n + 'は、' + g.a + '×10＝' + (g.a * 10) + 'と' + g.a + '×' + (g.n - 10) + '＝' + (g.a * (g.n - 10)) + 'をあわせて' + (g.a * g.n) + '。\n')
+               : (g.a + '×' + g.n + '＝' + (g.a * g.n) + 'なので、')) + '答えは' + (g.a * g.n) + 'cmです。'];
     return makeTeach(3, msgs, ['', 'いくつ分', g.a + '×' + g.n, (g.a * g.n) + 'cm'], { g, kind: k });
   }
   if (k === 'stack') {
-    const msgs = [g.m + 'まいで 1cm。これが 「1つ分」',
-      'ほしい 高さは ' + g.t + 'cm。1cmの ' + g.t + 'つ分',
-      'まい数も ' + g.t + 'つ分 → ' + g.m + ' × ' + g.t,
-      'こたえは ' + (g.m * g.t) + 'まい'];
+    const msgs = [g.m + 'まい重ねると1cmです。\nこの1cmを「1つ分」とします。',
+      'つくりたい高さは' + g.t + 'cmです。\n' + g.t + 'cmは、1cmの' + g.t + 'つ分です。',
+      '高さが' + g.t + 'つ分なら、まい数も' + g.t + 'つ分です。\n' + g.m + 'まいの' + g.t + 'つ分で、' + g.m + '×' + g.t + 'です。',
+      g.m + '×' + g.t + '＝' + (g.m * g.t) + 'なので、答えは' + (g.m * g.t) + 'まいです。'];
     return makeTeach(3, msgs, ['', g.t + 'つ分', g.m + '×' + g.t, (g.m * g.t) + 'まい'], { g, kind: k });
   }
-  const msgs = ['ならべた ものを 左から 見る'];
+  const msgs = ['左から1つずつ、長さをたしていきます。'];
   const labels = [''];
   let s = 0;
-  g.lens.forEach((L, i) => { s += L; msgs.push(g.names[i] + ' ' + L + 'cm　→ ここまで ' + s + 'cm'); labels.push('+' + L); });
-  msgs.push('ぜんぶで ' + s + 'cm'); labels.push(s + 'cm');
+  g.lens.forEach((L, i) => { s += L;
+    msgs.push(i === 0 ? (g.names[i] + 'は' + L + 'cmです。ここまでで' + s + 'cmです。') : (g.names[i] + 'の' + L + 'cmをたします。\nここまでで' + s + 'cmです。'));
+    labels.push('+' + L); });
+  msgs.push('全体の長さは' + s + 'cmです。'); labels.push(s + 'cm');
   return makeTeach(msgs.length - 1, msgs, labels, { g, kind: k });
 }
 function u27TeachDraw(area, T){
@@ -5773,30 +5827,32 @@ function u28Draw(area, opt){
 function u28TateWords(Z){
   const extra = Z.tate - Z.h * 2;
   return (extra > 0)
-    ? ('外がわ ' + Z.h + '×2 ＝ ' + (Z.h * 2) + '、くぼみの 2本で ＋' + extra + ' → ' + Z.tate + 'cm')
-    : ('ずらして そろえると ' + Z.h + '×2 ＝ ' + Z.tate + 'cm');
+    ? ('外がわのたて線は、' + Z.h + 'cmが2本で' + (Z.h * 2) + 'cm。\nくぼみのたて線2本で' + extra + 'cm。あわせて' + Z.tate + 'cmです。')
+    : ('右のたて線をつなげると、左と同じ' + Z.h + 'cmです。\n' + Z.h + '×2＝' + Z.tate + 'cmです。');
 }
 function u28TeachBegin(){
   const g = S.g, k = S.kind, Z = u28Size(g);
   if (k === 'miss') {
     const other = Z.w - S.answer;
-    const msgs = ['金いろの ところが ？。よこ線を くらべて 出す',
-      '**下の 辺**は ' + Z.w + 'cm。上がわの よこ線を ぜんぶ たすと、これと 同じに なる',
-      '上がわで **青**に なって いるのは あわせて ' + other + 'cm',
-      'だから ？ は ' + Z.w + ' − ' + other + ' ＝ **' + S.answer + 'cm**'];
-    return makeTeach(3, msgs, ['', '下の辺 ' + Z.w, '青 ' + other, S.answer + 'cm'], { g, kind: k });
+
+    
+    const msgs = ['？の長さを、よこの線の長さからもとめます。',
+      'いちばん下のよこ線は' + Z.w + 'cmです。\n上のほうのよこ線をつなげても、' + Z.w + 'cmになります。',
+      '上のほうで、長さがわかっているよこ線は、\nあわせて' + other + 'cmです。',
+      'だから、？は' + Z.w + '−' + other + '＝**' + S.answer + 'cm**です。'];
+    return makeTeach(3, msgs, ['', '下 ' + Z.w + 'cm', 'わかっている ' + other + 'cm', S.answer + 'cm'], { g, kind: k });
   }
   if (k === 'tate') {
-    const msgs = ['たての 線だけを 見る',
-      'たての 線に 色を つけた',
+    const msgs = ['たての線だけを見ます。',
+      'たての線に、色をつけました。',
       u28TateWords(Z),
-      'たて線の 合計は ' + Z.tate + 'cm'];
+      'たての線の合計は' + Z.tate + 'cmです。'];
     return makeTeach(3, msgs, ['', 'たてだけ', 'そろえる', Z.tate + 'cm'], { g, kind: k });
   }
-  const msgs = ['まわりを 1本ずつ 足さない。たてと よこに 分ける',
-    'たての 線：' + u28TateWords(Z),
-    'よこの 線：ずらして そろえると ' + Z.w + '×2 ＝ ' + Z.yoko + 'cm',
-    'まわりは ' + Z.tate + ' ＋ ' + Z.yoko + ' ＝ ' + Z.peri + 'cm'];
+  const msgs = ['まわりの線を、たての線とよこの線に分けてたします。',
+    u28TateWords(Z),
+    'よこの線は、上をつなげると下と同じ' + Z.w + 'cmです。\n' + Z.w + '×2＝' + Z.yoko + 'cmです。',
+    'まわりの長さは、' + Z.tate + '＋' + Z.yoko + '＝' + Z.peri + 'cmです。'];
   return makeTeach(3, msgs, ['', 'たて ' + Z.tate, 'よこ ' + Z.yoko, Z.peri + 'cm'], { g, kind: k });
 }
 function u28TeachDraw(area, T){
@@ -5954,28 +6010,35 @@ function u29Draw(area, opt){
 function u29TeachBegin(){
   const g = S.g, k = S.kind;
   if (k === 'seg') {
-    const msgs = (g.ask === 'tot')
-      ? ['家から 学校まで ' + g.a + 'm', '学校から 公園まで ' + g.b + 'm',
-         '2つを つなげた ぜんぶが 聞かれて いる', g.a + ' ＋ ' + g.b + ' ＝ ' + g.tot + 'm']
-      : ['家から 公園まで ぜんぶで ' + g.tot + 'm', 'そのうち 家から 学校までは ' + g.a + 'm',
-         'のこりが 学校から 公園まで', g.tot + ' − ' + g.a + ' ＝ ' + g.b + 'm'];
-    return makeTeach(3, msgs, ['', g.a + 'm', 'のこり', S.answer + 'm'], { g, kind: k });
+
+    
+    const tot = (g.ask === 'tot');
+    const msgs = tot
+      ? ['家から学校まで' + g.a + 'mです。', '学校から公園まで' + g.b + 'mです。',
+         '聞かれているのは、家から公園までの\n全部の長さです。', g.a + '＋' + g.b + '＝' + g.tot + 'mです。']
+      : ['家から公園まで、全部で' + g.tot + 'mです。', 'そのうち、家から学校までは' + g.a + 'mです。',
+         'のこりが、学校から公園までの長さです。', g.tot + '−' + g.a + '＝' + g.b + 'mです。'];
+    return makeTeach(3, msgs, tot ? ['', g.b + 'm', 'ぜんぶ', S.answer + 'm'] : ['', g.a + 'm', 'のこり', S.answer + 'm'], { g, kind: k });
   }
   if (k === 'diff') {
     const longer = (g.sA > g.sB) ? '消ぼうしょ' : '図書館';
-    const msgs = ['消ぼうしょの 道：' + g.a + ' ＋ ' + g.b + ' ＋ ' + g.c + ' ＝ ' + g.sA + 'm',
-      '図書館の 道：' + g.d + ' ＋ ' + g.e + ' ＝ ' + g.sB + 'm',
-      '長い方から 短い方を 引く',
-      longer + 'の道が ' + Math.abs(g.sA - g.sB) + 'm 長い'];
+    
+    const msgs = ['2つの道の長さを、くらべます。',
+      '消ぼうしょの前を通る道は、\n' + g.a + '＋' + g.b + '＋' + g.c + '＝' + g.sA + 'mです。',
+      '図書館の前を通る道は、\n' + g.d + '＋' + g.e + '＝' + g.sB + 'mです。',
+      '長い道から短い道をひくと、' + Math.abs(g.sA - g.sB) + 'mです。\n' + longer + 'の道が' + Math.abs(g.sA - g.sB) + 'm長いです。'];
     return makeTeach(3, msgs, ['', g.sA + 'm', g.sB + 'm', Math.abs(g.sA - g.sB) + 'm'], { g, kind: k });
   }
   const viaA = (g.via === 'A');
   const nums = viaA ? [g.a, g.b, g.c] : [g.d, g.e];
-  const msgs = [(viaA ? '消ぼうしょ' : '図書館') + 'の 前を 通る 道を なぞる'];
+  const msgs = [(viaA ? '消ぼうしょ' : '図書館') + 'の前を通る道を、なぞっていきます。'];
   const labels = [''];
+  const stops = viaA ? ['家', '銀行', '消ぼうしょ', '駅'] : ['家', '図書館', '駅'];
   let s = 0;
-  nums.forEach((v, i) => { s += v; msgs.push((i + 1) + '本目 ＋' + v + ' → ' + s + 'm'); labels.push('+' + v); });
-  msgs.push('ぜんぶで ' + s + 'm'); labels.push(s + 'm');
+  nums.forEach((v, i) => { s += v;
+    msgs.push(stops[i] + 'から' + stops[i + 1] + 'まで' + v + 'mです。' + (i ? '\nここまでで' + s + 'mです。' : ''));
+    labels.push('+' + v); });
+  msgs.push('全部で' + s + 'm歩きます。'); labels.push(s + 'm');
   return makeTeach(msgs.length - 1, msgs, labels, { g, kind: k });
 }
 function u29TeachDraw(area, T){
@@ -6275,12 +6338,13 @@ function basicSqDraw(area, opt){
 function basicSqTeachBegin(){
   const g = S.g, n = g.n;
   const msgs = [
-    n + '番目の 四角数を もとめる',
-    'たてに ' + n + 'こ',
-    'よこに ' + n + 'こ',
-    n + ' × ' + n + ' ＝ **' + (n * n) + '**',
+    
+    'たてとよこに、同じ数ずつならんだ点を数えます。',
+    'よこ1だんに、' + n + 'こならんでいます。',
+    'そのだんが、たてに' + n + 'だんあります。',
+    n + 'こが' + n + 'だんあるので、\n' + n + '×' + n + '＝**' + (n * n) + '**です。',
   ];
-  const labels = ['', 'たて' + n, 'よこ' + n, String(n * n)];
+  const labels = ['', 'よこ' + n, n + 'だん', String(n * n)];
   return makeTeach(3, msgs, labels, { g, mk: 'basicSq' });
 }
 function basicSqTeachDraw(area, T){
@@ -6345,10 +6409,10 @@ function sqDraw(area, opt){
 function sqTeachBegin(){
   const g = S.g, n = g.n, black = g.black, white = g.white;
   const msgs = [
-    n + '番目の 四角数を、2つの 三角数に 分ける',
-    '黒い三角＝' + n + '番目の 三角数（ペアで もとめる）＝**' + black + '**',
-    '白い三角＝' + (n - 1) + '番目の 三角数＝**' + white + '**',
-    '黒 ＋ 白 ＝ ' + black + ' ＋ ' + white + ' ＝ **' + (black + white) + '**',
+    '黒の三角と白の三角を、べつべつに数えます。',
+    '黒は' + n + 'だんの三角です。\n上と下のだんを組にして数えると、**' + black + 'こ**です。',
+    '白は' + (n - 1) + 'だんの三角です。\n同じように数えると、**' + white + 'こ**です。',
+    '黒と白をあわせて、' + black + '＋' + white + '＝**' + (black + white) + '**です。\nたて' + n + 'こ、よこ' + n + 'この四角と同じ数です。',
   ];
   const labels = ['', '黒' + black, '白' + white, String(black + white)];
   return makeTeach(3, msgs, labels, { g, mk: 'sq' });
@@ -6473,13 +6537,15 @@ function u11TeachBegin(){
     ? (g.A + ' ＋ ' + g.B + ' ＝ ' + g.ans)
     : (g.W + ' － ' + known + ' ＝ ' + g.ans);
   
+
+  const parts = isWhole ? ('□、中の2つが' + g.A + 'と' + g.B) : (g.W + '、中の2つが□と' + known);
   const msgs = [
-    g.stmt,
-    '1本の 線に して、上と 下に かっこを つける',
+    g.stmt.replace(/ /g, '') + 'の□にあてはまる数を考えます。',
+    '1本の線で表します。\nぜんぶが' + parts + 'です。',
     isWhole
-      ? '上の 2つを たすと 下の かっこ\n' + calc
-      : '下の かっこから わかっている 方を 引く\n' + calc,
-    calcAns,
+      ? '中の2つをたすと、ぜんぶになります。\n' + calc
+      : 'ぜんぶの' + g.W + 'から、わかっている' + known + 'をひきます。\n' + calc,
+    calcAns + 'なので、□は' + g.ans + 'です。',
   ];
   return makeTeach(3, msgs, ['', '線に する', calc, String(g.ans)], { g });
 }
@@ -6543,14 +6609,15 @@ function u12Draw(area, opt){
 }
 function u12TeachBegin(){
   const g = S.g;
+
   const msgs = [
-    g.stmt,
-    g.a + ' は ' + g.base + ' まで あと ' + g.diff,
-    g.base + ' を ' + (g.minus ? 'ひく' : 'たす'),
-    g.diff + ' ' + (g.minus ? 'ひきすぎた' : 'たしすぎた'),
-    'だから ' + g.diff + ' を ' + (g.minus ? 'たす' : 'ひく') + '\n' + g.correct,
+    g.stmt.replace(/ /g, '') + 'を、計算しやすい式に直します。\n答えは同じになるようにします。',
+    g.a + 'は、あと' + g.diff + 'で' + g.base + 'になります。',
+    g.a + 'のかわりに、きりのいい' + g.base + 'を' + (g.minus ? 'ひきます。' : 'たします。'),
+    '本当に' + (g.minus ? 'ひく' : 'たす') + 'のは' + g.a + 'なので、\n' + g.diff + 'だけ多く' + (g.minus ? 'ひきすぎます。' : 'たしすぎます。'),
+    (g.minus ? 'ひきすぎた' : 'たしすぎた') + g.diff + 'を、' + (g.minus ? 'たして' : 'ひいて') + 'もどします。\n式は' + g.correct + 'です。',
   ];
-  return makeTeach(4, msgs, ['', 'あと' + g.diff, g.minus ? '−' + g.base : '+' + g.base, 'いきすぎ', g.correct], { g });
+  return makeTeach(4, msgs, ['', 'あと' + g.diff, g.minus ? '−' + g.base : '+' + g.base, (g.minus ? 'ひきすぎ' : 'たしすぎ') + g.diff, g.correct], { g });
 }
 function u12TeachDraw(area, T){
   const g = T.g, n = T.shown;
@@ -6694,29 +6761,33 @@ function u13Draw(area, opt){
 function u13TeachBegin(){
   const g = S.g;
   if (g.k === 'zu') {
+
+    
     const msgs = [
-      (g.vis === 'line') ? ('1つ分は ' + g.per) : ('よこに ' + g.per + 'こ ならぶ'),
-      (g.vis === 'line') ? ('それが ' + g.bags + 'つ分') : ('それが たてに ' + g.bags + 'だん'),
-      g.per + ' × ' + g.bags + ' ＝ ' + (g.per * g.bags),
+      (g.vis === 'line') ? ('小さい1くぎりの長さは' + g.per + 'です。\nこれが1つ分です。') : ('よこの1だんに、点が' + g.per + 'こならんでいます。\nこれが1つ分です。'),
+      (g.vis === 'line') ? (g.per + 'のくぎりが、' + g.bags + 'こならんでいます。\n' + g.per + 'が' + g.bags + 'つ分です。') : (g.per + 'こが、たてに' + g.bags + 'だんあります。\n' + g.per + 'こが' + g.bags + 'つ分です。'),
+      'かけ算は「1つ分の数×いくつ分」の順に書きます。\nだから' + g.per + '×' + g.bags + '＝' + (g.per * g.bags) + 'です。',
     ];
     return makeTeach(2, msgs, ['', g.bags + 'つ分', g.per + '×' + g.bags], { g });
   }
   
   const P = u13Pairs(g), n = g.nums.length;
-  const msgs = ['同じ数の くり返しに できないか 見る'];
+  const msgs = [P === 0 ? 'このたし算は、同じ数をくり返したしています。' : 'このたし算は、数がそろっていません。\n同じ数にそろえられないか考えます。'];
   const labels = [''];
   for (let i = 0; i < P; i++) {
     if (g.t === 'group') {
-      msgs.push(g.nums[0] + ' と ' + g.nums[g.cnt] + ' で 1くみ ＝ ' + g.mid);
+      msgs.push(g.nums[0] + 'と' + g.nums[g.cnt] + 'を1組にすると、' + g.mid + 'になります。');
       labels.push('1くみ ' + g.mid);
     } else {
-      msgs.push(g.nums[i] + ' と ' + g.nums[n - 1 - i] + ' を ならすと どちらも ' + g.mid);
-      labels.push('ならす');
+      
+      const mv = g.nums[n - 1 - i] - g.mid;
+      msgs.push(g.nums[n - 1 - i] + 'から' + mv + 'を' + g.nums[i] + 'にうつすと、どちらも' + g.mid + 'になります。\nうつしただけなので、ぜんぶの数はかわりません。');
+      labels.push(mv + 'うつす');
     }
   }
-  msgs.push(g.t === 'group' ? (g.mid + ' が ' + g.cnt + 'くみ') : (g.mid + ' が ' + g.cnt + 'こ'));
+  msgs.push(g.t === 'group' ? (g.mid + 'の組が' + g.cnt + 'つできました。\nだから' + g.mid + '×' + g.cnt + 'です。') : (g.mid + 'が' + g.cnt + '回たされています。\nだから' + g.mid + '×' + g.cnt + 'です。'));
   labels.push(g.mid + '×' + g.cnt);
-  msgs.push(g.mid + ' × ' + g.cnt + ' ＝ ' + (g.mid * g.cnt));
+  msgs.push(g.mid + '×' + g.cnt + '＝' + (g.mid * g.cnt) + 'です。もとのたし算と同じ答えです。');
   labels.push(String(g.mid * g.cnt));
   return makeTeach(P + 2, msgs, labels, { g, P });
 }
@@ -6808,10 +6879,10 @@ function u15Draw(area, opt){
 function u15TeachBegin(){
   const g = S.g;
   const msgs = [
-    g.total + ' ÷ ' + g.div + ' を 考える',
-    g.total + ' を ' + g.tens + ' と ' + g.ones + ' に 分ける',
-    g.tens + '÷' + g.div + '＝' + (g.tens / g.div) + '、' + g.ones + '÷' + g.div + '＝' + (g.ones / g.div),
-    (g.tens / g.div) + ' ＋ ' + (g.ones / g.div) + ' ＝ ' + (g.total / g.div),
+    g.total + '÷' + g.div + 'は、そのままでは答えがすぐに出ません。\n' + g.total + 'を2つの数に分けて考えます。',
+    g.total + 'を、' + g.tens + 'と' + g.ones + 'に分けます。\nどちらも' + g.div + 'でわりきれる数です。',
+    g.tens + 'も' + g.ones + 'も、' + g.div + 'でわります。\n' + g.tens + '÷' + g.div + '＝' + (g.tens / g.div) + '、' + g.ones + '÷' + g.div + '＝' + (g.ones / g.div) + 'です。',
+    'わった答えをあわせて、' + (g.tens / g.div) + '＋' + (g.ones / g.div) + '＝' + (g.total / g.div) + 'です。\nだから、' + g.tens + 'と' + g.ones + 'に分けると計算しやすいです。',
   ];
   return makeTeach(3, msgs, ['', g.tens + 'と' + g.ones, 'それぞれ', String(g.total / g.div)], { g });
 }
@@ -6916,16 +6987,20 @@ function u17Draw(area, opt){
 function u17TeachBegin(){
   if (S.kind === 'ratio2' || S.kind === 'ratio3') return u17RatioTeachBegin();
   const g = S.g;
+
+  
+  const d = g.diff;
+  const alt = (g.said.indexOf('△') === 0) ? ('○は△より' + d + 'こ多い') : ('△は○より' + d + 'こ少ない');
   const msgs = [
-    g.said,
-    '○の線を、△より ' + g.diff + ' だけ 長く する',
-    
-    '「△は ○より ' + g.diff + ' 少ない」と 言いかえても\n**おなじ 図**',
-    'あわせて ' + g.sum + '。ちがいの ' + g.diff + ' を 切ると\n△が 2本 ぶん',
-    '（' + g.sum + '－' + g.diff + '）÷2 ＝ ' + g.small + ' → ○は ' + g.big,
+    '○と△の数を、線の長さで表します。\n数が多いほうを、長い線にします。',
+    '○は△より' + d + 'こ多いので、\n○の線を△の線より' + d + 'こぶん長くかきます。',
+    '「' + alt + '」と言っても、同じことです。\n図も同じになります。',
+    'あわせて' + g.sum + 'こです。○から、多い' + d + 'こぶんを切りとると、\n○と△は同じ長さの2本になります。',
+    '2本で' + (g.sum - d) + 'こなので、△は（' + g.sum + '−' + d + '）÷2＝' + g.small + 'こ。\n○は' + g.small + '＋' + d + '＝' + g.big + 'こです。',
   ];
-  return makeTeach(4, msgs, ['', '○が長い', 'おなじ図', 'きると', String(g.big)], { g });
+  return makeTeach(4, msgs, ['', '○が長い', 'おなじ図', '切りとる', String(g.big)], { g });
 }
+
 function u17TeachDraw(area, T){
   if (T.kk === 'ratio') return u17RatioTeachDraw(area, T);
   const g = T.g, n = T.shown;
@@ -6977,7 +7052,7 @@ function u17RatioDraw(area, opt){
     ctx.strokeStyle = (i === g.ask) ? CONFIG.C_GOLD : CONFIG.C_EDGE;
     ctx.lineWidth = (i === g.ask) ? 2.4 : 1.4; ctx.stroke();
     text(NAMES[i], x0 - 12, y + bh / 2, 13, CONFIG.C_INK, 'right', '800');
-    const lab = (i === 0) ? '×1（もとに する）' : ('×' + g.mults[i]);
+    const lab = (i === 0) ? '×1（1つぶん）' : ('×' + g.mults[i]);   
     text(lab, x0 + len + 8, y + bh / 2, 11, CONFIG.C_INK_SOFT, 'left', '700');
     if (i === g.ask && !opt.reveal) text('？', x0 + len / 2, y + bh / 2 + 1, 14, CONFIG.C_GOLD, 'center', '800');
     if (i === g.ask && opt.reveal) text(String(g.vals[i]), x0 + len / 2, y + bh / 2 + 1, 14, CONFIG.C_INK, 'center', '800');
@@ -6989,17 +7064,20 @@ function u17RatioTeachBegin(){
   const g = S.g, n = g.people;
   const NAMES = ['①', '②', '③'];
   const unit = g.mults.reduce((a, b) => a + b, 0);
-  const msgs = [g.sum + 'こを、' + NAMES.slice(0, n).join('・') + ' に 分ける'];
+
+  const msgs = ['あわせて' + g.sum + 'こを、' + NAMES.slice(0, n).join('と') + 'に分けます。'];
   const labels = [''];
-  msgs.push('①を **1つぶん** と 考える');
+  msgs.push('①の数を「1つぶん」とします。');
   labels.push('1つぶん');
   for (let i = 1; i < n; i++) {
-    msgs.push(NAMES[i] + ' は ①の ' + g.mults[i] + '倍 → ' + g.mults[i] + 'つぶん');
+    msgs.push(NAMES[i] + 'は①の' + g.mults[i] + '倍なので、' + g.mults[i] + 'つぶんです。');
     labels.push(g.mults[i] + 'つぶん');
   }
-  msgs.push('ぜんぶで ' + unit + 'つぶん。' + g.sum + ' ÷ ' + unit + ' ＝ ' + g.base + '（①）');
+  msgs.push('あわせると' + unit + 'つぶんで、' + g.sum + 'こです。\n1つぶんは' + g.sum + '÷' + unit + '＝' + g.base + 'こです。');
   labels.push(String(g.base));
-  msgs.push(NAMES[g.ask] + 'は ' + g.base + (g.ask === 0 ? '' : ('×' + g.mults[g.ask])) + ' ＝ ' + g.vals[g.ask]);
+  
+  msgs.push(g.ask === 0 ? ('①は1つぶんなので、' + g.base + 'こです。')
+    : (NAMES[g.ask] + 'は' + g.mults[g.ask] + 'つぶんなので、' + g.base + '×' + g.mults[g.ask] + '＝' + g.vals[g.ask] + 'こです。'));
   labels.push(String(g.vals[g.ask]));
   return makeTeach(msgs.length - 1, msgs, labels, { g, kk: 'ratio' });
 }
@@ -7070,7 +7148,7 @@ function u18Draw(area, opt){
   const s = box + GAP;
   const ox = W / 2 - (n - 1) * s / 2, oy = area.y + area.h * 0.46;
   ctx.save();
-  if (!qAsked()) text((g.up ? '切り上げ' : '切り捨て') + 'て ' + U18_PLACE[g.p] + 'の位までの およその数に',
+  if (!qAsked()) text((g.up ? '切り上げ' : '切りすて') + 'て ' + U18_PLACE[g.p] + 'の くらいまでの およその数に',
        W / 2, area.y + 16, 13, CONFIG.C_INK_SOFT, 'center', '700');
   ds.forEach((d, i) => {
     const place = n - 1 - i, on = (place === g.p), x = ox + i * s;
@@ -7094,14 +7172,16 @@ function u18Draw(area, opt){
 }
 function u18TeachBegin(){
   const g = S.g;
-  const word = g.up ? '切り上げ' : '切り捨て';
-  const ans = g.up ? g.upv : g.dn;
+
+  
+  const word = g.up ? '切り上げ' : '切りすて';
+  const ans = g.up ? g.upv : g.dn, P = U18_PLACE[g.p];
   const msgs = [
-    U18_PLACE[g.p] + 'の位までの およその数に する',
-    U18_PLACE[g.p] + 'の位より 下で 切る',
-    g.up ? ('切り上げ は 下を 0 に して、' + U18_PLACE[g.p] + 'の位を 1つ ふやす')
-         : ('切り捨て は 下を そのまま 0 に する'),
-    g.n + ' を ' + word + 'ると ' + ans,
+    g.n + 'を' + word + 'て、' + P + 'のくらいまでのおよその数にします。',
+    P + 'のくらいのすぐ右で切ります。\n線より右の数を見ます。',
+    g.up ? ('切り上げは、線より右を全部0にして、\n' + P + 'のくらいを1つふやします。')
+         : ('切りすては、線より右を全部0にするだけです。\n' + P + 'のくらいは、そのままです。'),
+    g.n + 'を' + word + 'ると、' + ans + 'です。',
   ];
   return makeTeach(3, msgs, ['', 'ここで 切る', word, String(ans)], { g, mk: 'u18' });
 }
@@ -7339,14 +7419,15 @@ function u20Draw(area, opt){
 }
 function u20TeachBegin(){
   const g = S.g;
-  const msgs = ['手がかりを 1つずつ 読んで、ありえる ならび方を ならべる'];
+
+  const msgs = ['ヒントを1つずつ読んで、あてはまる数を\n表に書いていきます。'];
   const labels = [''];
-  g.clues.forEach((c, i) => { msgs.push('・' + c.t); labels.push((i + 1) + 'つめ'); });
+  g.clues.forEach((c, i) => { msgs.push('ヒント' + (i + 1) + '「' + c.t.replace(/ /g, '') + '」\nこれに合わない組み合わせは、表から消します。'); labels.push('ヒント' + (i + 1)); });
   
   const lastRow = u20Rows(g, g.clues.length)[0] || [];
   msgs.push((lastRow[g.ask] == null)
-    ? ('のこったのは この 1とおりだけ。\nつかっていない数は ' + g.sol[g.ask] + ' だけ → ' + U20_NAME[g.ask] + ' は ' + g.sol[g.ask])
-    : ('のこったのは この 1とおりだけ。\n' + U20_NAME[g.ask] + ' は ' + g.sol[g.ask]));
+    ? ('のこった組み合わせは1つだけです。' + U20_NAME[g.ask] + 'はヒントに出てこないので、\nのこりのカードの' + g.sol[g.ask] + 'です。')
+    : ('のこった組み合わせは1つだけです。\nだから、' + U20_NAME[g.ask] + 'は' + g.sol[g.ask] + 'です。'));
   labels.push(String(g.sol[g.ask]));
   return makeTeach(msgs.length - 1, msgs, labels, { g, mk: 'u20' });
 }
@@ -7418,11 +7499,15 @@ function parityDraw(area, opt){
 }
 function parityTeachBegin(){
   const g = S.g;
+
+  
+  const st = g.stmt.replace(/ /g, '');
   const msgs = [
-    g.stmt + ' を 考える',
-    '1つずつ、じゅんに 計算する',
-    g.stmt + ' ＝ ' + g.val,
-    g.val + ' は 2で わりきれる？\n' + (isEven(g.val) ? 'わりきれる → ぐう数' : 'あまる → き数'),
+    st + 'の答えが、ぐう数か、き数かを考えます。\n2でわりきれる数をぐう数、わりきれない数をき数といいます。',
+    (g.ops && g.ops.length > 1) ? '左から1つずつ、じゅんに計算します。' : ('まず、' + st + 'を計算します。'),
+    st + '＝' + g.val + 'です。',
+    isEven(g.val) ? (g.val + 'を2でわると、' + g.val + '÷2＝' + (g.val / 2) + 'で、あまりが出ません。\nだから、' + g.val + 'はぐう数です。')
+                  : (g.val + 'を2でわると、' + Math.floor(g.val / 2) + 'あまり1です。\nあまりが出るので、' + g.val + 'はき数です。'),
   ];
   const ans = isEven(g.val) ? 'ぐう数' : 'き数';
   return makeTeach(3, msgs, ['', '計算', String(g.val), ans], { g, mk: 'parity' });
@@ -7487,10 +7572,13 @@ function gridmulTeachBegin(){
   const r = Math.floor(g.ask / 2), c = g.ask % 2;
   const other = g.vals[r * 2 + (1 - c)];           
   const rowLab = g.rowLab[r];
+
+  
+  const eq = (c === 0) ? ('？×' + other) : (other + '×？');
   const msgs = [
-    'このマスの ぎょう（だん）は\n' + other + ' × ？ ＝ ' + rowLab,
-    rowLab + ' ÷ ' + other + ' ＝ ' + g.vals[g.ask],
-    'このマスは ' + g.vals[g.ask],
+    '？と同じ横のならびを見ます。\n横の2つの数をかけると、左の' + rowLab + 'になります。',
+    eq + '＝' + rowLab + 'なので、\n？は' + rowLab + '÷' + other + '＝' + g.vals[g.ask] + 'です。',
+    '？に入る数は' + g.vals[g.ask] + 'です。',
   ];
   return makeTeach(2, msgs, ['', String(g.vals[g.ask]), String(g.vals[g.ask])], { g, mk: 'gridmul' });
 }
@@ -7516,7 +7604,7 @@ const STAGES = [
     kinds: CONFIG.KIND_BAG,
     
     ask(g, k){
-      if (k === 'hidden') return ['つみ木がつんであります。', '外から見えないつみ木は何こありますか。'];
+      if (k === 'hidden') return ['つみ木がつんであります。', 'この絵で、見えないつみ木は何こありますか。'];
       if (k === 'cols') return ['このつみ木を上から見ます。', '上から見ると、何マスに見えますか。'];
       return ['つみ木がつんであります。', 'つみ木は全部で何こありますか。'];
     },
@@ -7587,9 +7675,11 @@ const STAGES = [
     gen: magicGen,
     
     ask(g, k){
-      if (k === 'add') return ['3方陣の全部のマスに同じ数を' + (g.op === 'add' ? 'たしても' : 'かけても') + '、', '3方陣のままです。？はいくつですか。'];
+      
+      if (k === 'add') return ['左の表の全部のマスに' + g.k + 'を' + (g.op === 'add' ? 'たして' : 'かけて') + '、', '右の表を作りました。？はいくつですか。'];
+      const two = (g.hidden || []).length > 1;
       if (k === 'sum') return ['たて・横・ななめ、どの1列をたしても', '同じ数です。1列たすと、いくつですか。'];
-      return ['たて・横・ななめ、どの1列をたしても', '同じ数になります。？はいくつですか。'];
+      return ['たて・横・ななめ、どの1列をたしても', '同じ数になります。' + (two ? '太いわくの？は' : '？は') + 'いくつですか。'];
     },
     kindIcon: magicKindIcon,
     drawQ: magicDrawQ,
@@ -7605,7 +7695,7 @@ const STAGES = [
     txt: { line: ['★は いくつ？'] },
     gen: lineGen,
     
-    ask(){ return ['数の線の1めもりは、どこも同じ大きさです。', '★のところの数はいくつですか。']; },
+    ask(){ return ['数の線の1めもりの長さは、どこも同じです。', '★のところの数はいくつですか。']; },
     drawQ(area){ qWrap(area, () => lineDraw(area, {})); },
     kindIcon: lineKindIcon, teachBegin: lineTeachBegin, teachDraw: lineTeachDraw,
     icon(x, y, s){ lineKindIcon('line', x, y, s * 1.4); },
@@ -7613,11 +7703,12 @@ const STAGES = [
   {
     id: 'bal', unlocked: true,
     kinds: ['bal', 'bal', 'bal', 'bal', 'bal', 'bal'],
-    intros: [{ kind: 'bal', label: 'てんびん', g: { k: 3, a: 2, b: 2, right: 6 }, answer: 6 }],
+    
+    intros: [{ kind: 'bal', label: 'てんびん', g: { k: 3, a: 2, b: 3, right: 6 }, answer: 9 }],
     txt: { bal: ['● は ▲ いくつ分？'] },
     gen: balGen,
     
-    ask(g){ return ['上のてんびんはつり合っています。', '●が' + g.b + 'こだと、▲何こ分の重さですか。']; },
+    ask(g){ return ['てんびんがつり合っています。', '●' + g.b + 'こは、▲何こ分の重さですか。']; },
     drawQ(area){ qWrap(area, () => balDraw(area, {})); },
     kindIcon: balKindIcon, teachBegin: balTeachBegin, teachDraw: balTeachDraw,
     icon(x, y, s){ balKindIcon('bal', x, y, s * 1.3); },
@@ -7811,7 +7902,7 @@ const STAGES = [
     txt: { u16: ['さきに ', ['計','けい'], ['算','さん'], 'すると ', ['楽','らく'], 'なのは？'] },
     gen: u16Gen,
     
-    ask(g){ return [g.arr.join('×') + 'を計算します。', 'どの2つを先に計算すると楽ですか。']; },
+    ask(g){ return [g.arr.join('×') + 'を計算します。', 'どの2つを先に計算すると、かんたんですか。']; },
     drawQ(area){ qWrap(area, () => u16Draw(area, {})); },
     kindIcon: u16KindIcon, teachBegin: u16TeachBegin, teachDraw: u16TeachDraw,
     icon(x, y, s){ u16KindIcon('u16', x, y, s * 1.3); },
@@ -7835,7 +7926,7 @@ const STAGES = [
     txt: { up: [['切','き'], 'り', ['上','あ'], 'げると？'], down: [['切','き'], 'り', ['捨','す'], 'てると？'] },
     gen: u18Gen,
     
-    ask(g){ return [g.n + 'を' + (g.up ? '切り上げ' : '切り捨て') + 'て、' + U18_PLACE[g.p] + 'の位までの', 'およその数にします。いくつになりますか。']; },
+    ask(g){ return [g.n + 'を' + (g.up ? '切り上げ' : '切りすて') + 'て、', U18_PLACE[g.p] + 'のくらいまでのおよその数にします。', 'いくつになりますか。']; },
     drawQ(area){ qWrap(area, () => u18Draw(area, {})); },
     kindIcon: u18KindIcon, teachBegin: u18TeachBegin, teachDraw: u18TeachDraw,
     icon(x, y, s){ u18KindIcon('up', x, y, s * 1.3); },
@@ -7864,7 +7955,8 @@ const STAGES = [
     txt: { u20: ['？の カードは いくつ？'] },
     gen: u20Gen,
     
-    ask(g){ return ['1から' + g.n + 'のカードをうらにしてならべました。', '下のヒントから、？の数を考えましょう。']; },
+    
+    ask(g){ return ['1から' + g.n + 'のカードが1まいずつあります。', 'うらにして、下のようにならべました。', '？のカードの数はいくつですか。']; },
     drawQ(area){ qWrap(area, () => u20Draw(area, {})); },
     kindIcon: u20KindIcon, teachBegin: u20TeachBegin, teachDraw: u20TeachDraw,
     icon(x, y, s){ u20KindIcon('u20', x, y, s * 1.3); },
@@ -7885,8 +7977,9 @@ const STAGES = [
     gen: u22Gen,
     
     ask(g, k){
-      if (k === 'komachi') return ['この4つの数を全部使って、', '＋−×で10をつくります。どの式ですか。'];
-      if (k === 'fuku') return ['同じ文字には、同じ数字が入ります。', '光っている文字の数字はいくつですか。'];
+      
+      if (k === 'komachi') return ['この4つの数を全部使って、＋、−、×から', 'えらんで10をつくります。どの式ですか。'];
+      if (k === 'fuku') return ['同じ文字には、同じ数字が入ります。', '色がついた文字の数字はいくつですか。'];
       return [(g.sub ? 'ひき算' : 'たし算') + 'の筆算です。', '□に入る数字はいくつですか。'];
     },
     drawQ(area){ qWrap(area, () => u22Draw(area, {})); },
@@ -7928,10 +8021,13 @@ const STAGES = [
     gen: u24Gen,
     
     ask(g, k){
-      if (k === 'divide') return [g.what + 'を2つに分けるのは、どれですか。'];
-      const f = U24_FACES.find(x => x.n === g.f), nm = u24FaceName(f).replace(/ /g, '');
-      return (k === 'face') ? ['箱の形の、' + nm + 'と', '平行な面はどれですか。']
-                            : ['箱の形の、' + nm + 'に', U24_REL_TXT[g.rel] + '辺はどれですか。'];
+      
+      if (k === 'divide') return (g.what === '空間') ? ['空間（あつみのあるところ）を', '2つに分けるのは、どれですか。'] : [g.what + 'を2つに分けるのは、どれですか。'];
+      const f = U24_FACES.find(x => x.n === g.f), nm = u24FaceName(f).replace(/^.*の/, '');
+      if (k === 'face') return ['図は箱の形です。', nm + 'と平行な面はどれですか。'];
+      if (g.rel === 'cross') return ['図は箱の形です。', nm + 'と交わるへんはどれですか。', nm + 'の上にあるへんは入れません。'];
+      if (g.rel === 'in') return ['図は箱の形です。', nm + 'にふくまれるへんはどれですか。'];
+      return ['図は箱の形です。', nm + 'と平行なへんはどれですか。'];
     },
     drawQ(area){ qWrap(area, () => u24Draw(area, {})); },
     kindIcon: u24KindIcon, teachBegin: u24TeachBegin, teachDraw: u24TeachDraw,
@@ -7953,9 +8049,10 @@ const STAGES = [
     gen: u25Gen,
     
     ask(g, k){
-      if (k === 'turn') return ['長方形を対角線で2つに切りました。', g.ask + 'の角と重なるのは、どの角ですか。'];
-      if (k === 'sum') return [g.name + 'の角を全部あわせると、', '直角いくつ分ですか。'];
-      return ['この形のかどを、1つずつ見ます。', '直角はいくつありますか。'];
+      
+      if (k === 'turn') return ['長方形を、かどからかどへ切りました。', '下の三角形をまわして、上に重ねます。', g.ask + 'の角と重なるのは、どの角ですか。'];
+      if (k === 'sum') return [g.name + '角形の' + g.n + 'つの角を全部あわせると、', '直角いくつ分ですか。'];
+      return ['下の四角形のかどを見ます。', '直角になっているかどは、いくつですか。'];
     },
     drawQ(area){ qWrap(area, () => u25Draw(area, {})); },
     kindIcon: u25KindIcon, teachBegin: u25TeachBegin, teachDraw: u25TeachDraw,
@@ -7973,7 +8070,7 @@ const STAGES = [
     
     ask(g, k){
       if (k === 'ring') return [U26_RING[g.i] + 'と' + U26_RING[g.j] + 'がかさなるように、2つにおります。', U26_RING[g.k] + 'は、どれとかさなりますか。'];
-      return ['2つにおったとき、', 'ぴったりかさなる文字はどれですか。'];
+      return ['点線で2つにおります。', 'ぴったりかさなる文字はどれですか。'];
     },
     drawQ(area){ qWrap(area, () => u26DrawQ(area, {})); },
     kindIcon: u26KindIcon, teachBegin: u26TeachBegin, teachDraw: u26TeachDraw,
@@ -7993,7 +8090,7 @@ const STAGES = [
     gen: u27Gen,
     
     ask(g, k){
-      if (k === 'times') return ['はばが' + g.a + 'cmのコインを' + g.n + 'まいならべます。', '全体の長さは何cmですか。'];
+      if (k === 'times') return ['はばが' + g.a + 'cmのコインを、すきまなく', g.n + 'まいならべます。全体の長さは何cmですか。'];
       if (k === 'stack') return ['10円玉を' + g.m + 'まい重ねると、高さ1cmです。', '高さ' + g.t + 'cmにするには、何まい重ねますか。'];
       return ['下の3つを、はしとはしをつけてならべます。', '全体の長さは何cmですか。'];
     },
@@ -8041,7 +8138,7 @@ const STAGES = [
     
     ask(g, k){
       if (k === 'map') return ['家から駅まで歩きます。', (g.via === 'A' ? '消ぼうしょ' : '図書館') + 'の前を通ると、何m歩きますか。'];
-      if (k === 'diff') return ['家から駅まで歩く道が2つあります。', 'どちらの道が、何m長いですか。'];
+      if (k === 'diff') return ['家から駅まで、消ぼうしょの前を通る道と、', '図書館の前を通る道があります。', 'どちらの道が、何m長いですか。'];
       if (g.ask === 'tot') return ['家から学校まで' + g.a + 'm、', '学校から公園まで' + g.b + 'mです。', '家から学校を通って公園まで何mですか。'];
       if (g.ask === 'b') return ['家から学校を通って公園まで' + g.tot + 'm、', '家から学校までは' + g.a + 'mです。', '学校から公園までは何mですか。'];
       return ['家から学校を通って公園まで' + g.tot + 'm、', '学校から公園までは' + g.b + 'mです。', '家から学校までは何mですか。'];
@@ -8101,7 +8198,7 @@ const STAGES = [
     txt: { u11: ['□は ', ['何','なん'], '？'] },
     gen: u11Gen,
     
-    ask(){ return ['□にあてはまる数を考えます。', '□はいくつですか。']; },
+    ask(){ return ['式の□にあてはまる数は、いくつですか。']; },
     
     drawQ(area){ qWrap(area, () => u11Draw(area, { parts: S.lv <= 1, nums: S.lv <= 1 })); },
     kindIcon: u11KindIcon, teachBegin: u11TeachBegin, teachDraw: u11TeachDraw,
@@ -8114,7 +8211,8 @@ const STAGES = [
     txt: { u12: ['どの しきに ', ['直','なお'], 'す？'] },
     gen: u12Gen,
     
-    ask(g){ return [g.stmt.replace(/ /g, '') + 'を、計算しやすい式に直します。', 'どの式に直せばよいですか。']; },
+    
+    ask(g){ return [g.stmt.replace(/ /g, '') + 'を、計算しやすい式に直します。', '答えは同じになるようにします。', 'どの式に直せばよいですか。']; },
     drawQ(area){ qWrap(area, () => u12Draw(area, {})); },
     kindIcon: u12KindIcon, teachBegin: u12TeachBegin, teachDraw: u12TeachDraw,
     icon(x, y, s){ u12KindIcon('u12', x, y, s * 1.3); },
@@ -8128,8 +8226,12 @@ const STAGES = [
     txt: { zu: ['どの しき？'], kufu: ['かけ ', ['算','ざん'], 'に ', ['直','なお'], 'すと？'] },
     gen: u13Gen,
     
-    ask(g, k){ return (k === 'zu') ? ['点の数を、かけ算の式で表します。', 'どの式になりますか。']
-                                  : ['このたし算を、かけ算の式に直します。', 'どのかけ算になりますか。']; },
+    
+    ask(g, k){
+      if (k === 'zu') return (g.vis === 'line') ? ['□に入る数を、かけ算の式で表します。', 'どの式になりますか。']
+        : ['よこにならんだ点の数を1つ分にして、', '点の数をかけ算の式で表します。', 'どの式になりますか。'];
+      return ['このたし算と、答えが同じになる', 'かけ算の式はどれですか。'];
+    },
     drawQ(area){ qWrap(area, () => u13Draw(area, {})); },
     kindIcon: u13KindIcon, teachBegin: u13TeachBegin, teachDraw: u13TeachDraw,
     icon(x, y, s){ u13KindIcon('kufu', x, y, s * 1.3); },
@@ -8141,7 +8243,8 @@ const STAGES = [
     txt: { u15: ['どう ', ['分','わ'], 'ける？'] },
     gen: u15Gen,
     
-    ask(g){ return [g.total + '÷' + g.div + 'を計算します。', g.total + 'をどう分けると、計算しやすいですか。']; },
+    
+    ask(g){ return [g.total + '÷' + g.div + 'を計算します。', g.total + 'を2つの数に分けてから、わります。', 'どう分けると計算しやすいですか。']; },
     drawQ(area){ qWrap(area, () => u15Draw(area, {})); },
     kindIcon: u15KindIcon, teachBegin: u15TeachBegin, teachDraw: u15TeachDraw,
     icon(x, y, s){ u15KindIcon('u15', x, y, s * 1.3); },
@@ -8183,7 +8286,7 @@ const STAGES = [
     txt: { parity: ['こたえは ぐう', ['数','すう'], '？ き', ['数','すう'], '？'], gridmul: ['？の ますは いくつ？'] },
     gen(lv, kind){ return kind === 'gridmul' ? gridmulGen(lv) : parityGen(lv); },
     
-    ask(g, k){ return (k === 'gridmul') ? ['たての2つの数をかけると上の数、', '横の2つの数をかけると左の数です。', '？はいくつですか。']
+    ask(g, k){ return (k === 'gridmul') ? ['たての2つをかけると、上の数になります。', '横の2つをかけると、左の数になります。', '？はいくつですか。']
                                         : [g.stmt.replace(/ /g, '') + 'の答えを考えます。', '答えはぐう数ですか、き数ですか。']; },
     drawQ(area){ qWrap(area, () => {
       if (S.kind === 'gridmul') return gridmulDraw(area, {});
@@ -9317,19 +9420,20 @@ function startTeach(){
     msgFn(){
       const k = this.shown - 1, n = this.cols.length;
       if (k < 0) {
-        if (kind === 'hidden') return '真上から見て、柱ごとに\nかくれている数を 数える';
-        if (kind === 'cols')   return '真上から見た形を出して\nマスを1つずつ 数える';
-        return '真上から見て、柱ごとに\n何こ積んであるか 数える';
+        
+        if (kind === 'hidden') return '左の絵で見えないつみ木を、柱ごとに数えます。\n右の図は、真上から見た形です。';
+        if (kind === 'cols')   return '右の図は、真上から見た形です。高い柱も\n1マスです。つみ木があるマスを数えます。';
+        return 'たてにつんだ1列を「柱」とよびます。\n右の図は真上から見た形で、1マスが柱1本です。';
       }
       if (k < n) {
         const c = this.cols[k], v = this.val(c.i, c.j);
-        if (kind === 'hidden') return 'この柱で かくれているのは ' + v + 'こ\n（' + (k + 1) + '本目 ／ ぜんぶで ' + n + '本）';
-        if (kind === 'cols')   return 'ここに 柱が 1本 立っている\n（' + (k + 1) + 'マス目）';
-        return 'この柱は ' + v + 'こ\n（' + (k + 1) + '本目 ／ ぜんぶで ' + n + '本）';
+        if (kind === 'hidden') return (k + 1) + '本目の柱では、' + v + 'こが見えません。\n（柱はぜんぶで' + n + '本）';
+        if (kind === 'cols')   return 'ここに柱があります。' + (k + 1) + 'マス目です。';
+        return (k + 1) + '本目の柱には、つみ木が' + v + 'こあります。\n（柱はぜんぶで' + n + '本）';
       }
-      if (kind === 'hidden') return 'たすと ' + this.sum + '。\nかくれているのは ' + this.sum + 'こ';
-      if (kind === 'cols')   return '上から見ると\n' + this.sum + 'マス';
-      return 'たすと ' + this.sum + '。\nぜんぶで ' + this.sum + 'こ';
+      if (kind === 'hidden') return 'ぜんぶたすと' + this.sum + '。\n見えないつみ木は' + this.sum + 'こです。';
+      if (kind === 'cols')   return '上から見ると、' + this.sum + 'マスに見えます。';
+      return 'ぜんぶたすと' + this.sum + '。\nつみ木は、ぜんぶで' + this.sum + 'こです。';
     },
   };
   S.teach = T;
@@ -10831,15 +10935,32 @@ function richAtoms(line){
   const out = [];
   String(line).split('**').forEach((part, i) => {
     const b = (i % 2) === 1;
-    part.split(/(\s+)/).forEach(t => { if (t) out.push({ t, b, nb: NO_HEAD.test(t) }); });
+    
+    part.split(/(\s+)/).forEach(t => { if (!t) return;
+      (/^\s+$/.test(t) ? [t] : t.split(/(?<=[、。])/)).forEach(u => { if (u) out.push({ t: u, b, nb: NO_HEAD.test(u) }); });
+    });
   });
   return out;
 }
 
 function wrapRich(atoms, maxW, fs){
   const lines = []; let cur = [], w = 0;
-  for (const a of atoms) {
+  
+  const q = atoms.slice();
+  while (q.length) {
+    const a = q.shift();
     const aw = textWidth(a.t, fs, a.b ? '900' : '700');
+    if (w + aw > maxW && a.t.length > 1 && !/^\s+$/.test(a.t) && aw > maxW * 0.4) {
+      let k = 0;
+      while (k < a.t.length && w + textWidth(a.t.slice(0, k + 1), fs, a.b ? '900' : '700') <= maxW) k++;
+      while (k > 0 && k < a.t.length && NO_HEAD.test(a.t[k])) k--;
+      if (k > 0) {
+        cur.push({ t: a.t.slice(0, k), b: a.b, nb: a.nb });
+        lines.push(cur); cur = []; w = 0;
+        q.unshift({ t: a.t.slice(k), b: a.b, nb: NO_HEAD.test(a.t[k]) });
+        continue;
+      }
+    }
     if (w + aw > maxW && cur.length && !a.nb) {
       while (cur.length && /^\s+$/.test(cur[cur.length - 1].t)) cur.pop();
       lines.push(cur); cur = []; w = 0;
