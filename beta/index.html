@@ -92,7 +92,7 @@
 
 
 const CONFIG = {
-  VERSION: 'v78',
+  VERSION: 'v79',
 
   
   
@@ -9295,12 +9295,15 @@ function enemyHit(){
     S.boss.dmg += dmg;
     if (crit) S.boss.crits++;
     
+    S.boss.maxHit = Math.max(S.boss.maxHit || 0, dmg);
+    const tier = powTier(dmg);
+    
     const seq = S.results.filter(Boolean).length;
-    S.dmgPops.push({ v: dmg, crit, t: 0,
+    S.dmgPops.push({ v: dmg, crit, tier, t: 0,
       x: W/2 + ((seq % 3) - 1) * 62 + (Math.random() * 14 - 7),
       y: AREA.enemy.y + 104 + (seq % 2) * 14 });
     if (S.dmgPops.length > 4) S.dmgPops.shift();
-    startBreath();
+    startBreath(tier);
   }
   
   S.finish = S.boss
@@ -9365,6 +9368,10 @@ function finishBoss(){
   const gain = Math.max(1, Math.floor(S.boss.dmg / 10)) + (won ? 20 : 0);
   addBossExp(gi, gain);
   const after = bossState(gi);
+  
+  if (!save.maxHit) save.maxHit = {};
+  const best0 = save.maxHit['d' + gi] || 0, hit = S.boss.maxHit || 0;
+  if (hit > best0) { save.maxHit['d' + gi] = hit; putSave(); }
   if (!save.bossWin) save.bossWin = {};
   if (won) { save.bossWin['d' + gi] = (save.bossWin['d' + gi] || 0) + 1; putSave(); }
   S.win = {
@@ -9372,6 +9379,7 @@ function finishBoss(){
     ok, n: CONFIG.BOSS_QS, won, killed, reached, gi,
     dmg: S.boss.dmg, crits: S.boss.crits, gain,
     lv0: before.lv, lv1: after.lv, up: after.lv - before.lv,
+    hit, newRec: hit > best0 && best0 > 0, look: lookGained(before.lv, after.lv),
     atk0: before.atk, atk1: after.atk,
     cur: after.cur, need: after.need,
     wins: (save.bossWin && save.bossWin['d' + gi]) || 0,
@@ -10408,12 +10416,17 @@ function drawHpBar(x, y, w, h){
 
 
 
-function startBreath(){
+
+const POW_STEP = [40, 80, 160, 320, 640];
+function powTier(dmg){ let t = 0; while (t < POW_STEP.length && dmg >= POW_STEP[t]) t++; return t; }
+
+const ELEM_COL = { flame: '#ff8a3c', thunder: '#8fd4ff', ice: '#a8ecff', forest: '#86e07a', shine: '#fff0a0', dark: '#c08cff', beam: '#cfd6ff' };
+function startBreath(tier){
   const d = DRAGONS[S.boss.gi];
   const kind = d.breath || 'beam';
   const a = AREA.enemy;
   const ty = a.y + a.h * 0.44;
-  const fx = { kind, bolts: [], sparks: [] };
+  const fx = { kind, bolts: [], sparks: [], tier: tier || 0 };
   if (kind === 'thunder' || kind === 'beam') {
     
     const mx = -20, my = a.y - 4;                    
@@ -10511,6 +10524,10 @@ function drawBreath(){
   const p = 1 - b;                                  
   ctx.save();
   ctx.beginPath(); ctx.rect(a.x, a.y, a.w, a.h); ctx.clip();
+  
+  const pw = fx.tier || 0;
+  ctx.save();
+  if (pw > 0) { const sc = 1 + 0.1 * pw; ctx.translate(W / 2, ty); ctx.scale(sc, sc); ctx.translate(-W / 2, -ty); }
 
   if (fx.kind === 'thunder' || fx.kind === 'beam') {
     const col = (fx.kind === 'thunder') ? '#8fd4ff' : (d.c2 || '#cfd6ff');
@@ -10829,6 +10846,8 @@ function drawBreath(){
       ctx.globalAlpha = 1;
     }
   }
+  ctx.restore();                                   
+  drawBreathPower(fx, a, ty, p, b);
   ctx.restore();
   if (b > 0.88) {
     ctx.save();
@@ -10836,6 +10855,61 @@ function drawBreath(){
     ctx.fillStyle = '#ffffff'; ctx.fillRect(a.x, a.y, a.w, a.h);
     ctx.restore();
   }
+}
+
+function drawBreathPower(fx, a, ty, p, b){
+  const pw = fx.tier || 0;
+  if (pw <= 0) return;
+  const col = ELEM_COL[fx.kind] || '#ffffff';
+  const cx = W / 2;
+  ctx.save();
+  if (pw >= 3 && b > 0.6) {
+    ctx.globalAlpha = (b - 0.6) / 0.4 * (0.12 + 0.05 * pw);
+    ctx.fillStyle = col; ctx.fillRect(a.x, a.y, a.w, a.h);
+    ctx.globalAlpha = 1;
+  }
+  ctx.globalCompositeOperation = 'lighter';
+  if (pw >= 2) {
+    const n = 6 + pw * 3, rot = p * 0.6;
+    const len = (60 + pw * 26) * Math.min(1, p * 3);
+    ctx.globalAlpha = Math.min(1, b * 1.6) * 0.55;
+    ctx.strokeStyle = col; ctx.lineCap = 'round';
+    for (let i = 0; i < n; i++) {
+      const ang = rot + i * Math.PI * 2 / n;
+      const l = len * (i % 2 ? 0.62 : 1);
+      ctx.lineWidth = (i % 2 ? 2 : 3.5);
+      ctx.beginPath();
+      ctx.moveTo(cx + Math.cos(ang) * 18, ty + Math.sin(ang) * 18);
+      ctx.lineTo(cx + Math.cos(ang) * l, ty + Math.sin(ang) * l);
+      ctx.stroke();
+    }
+  }
+  const rings = Math.min(3, pw);
+  for (let i = 0; i < rings; i++) {
+    const q = Math.max(0, Math.min(1, (p - i * 0.1) * 1.8));
+    if (q <= 0 || q >= 1) continue;
+    ctx.globalAlpha = (1 - q) * 0.9;
+    ctx.strokeStyle = col; ctx.lineWidth = 3 + pw;
+    ctx.beginPath(); ctx.arc(cx, ty, 20 + q * (70 + pw * 22), 0, Math.PI * 2); ctx.stroke();
+  }
+  if (pw >= 4) {
+    const q = Math.min(1, p * 2.5);
+    const r = 18 + 30 * q;
+    const g = ctx.createRadialGradient(cx, ty, 0, cx, ty, r * 2);
+    g.addColorStop(0, 'rgba(255,255,255,' + (0.55 * (1 - q * 0.6)) + ')');
+    g.addColorStop(1, 'rgba(255,255,255,0)');
+    ctx.globalAlpha = Math.min(1, b * 1.8);
+    ctx.fillStyle = g; ctx.fillRect(cx - r * 2, ty - r * 2, r * 4, r * 4);
+  }
+  if (pw >= 5) {
+    const q = Math.max(0, Math.min(1, (p - 0.15) * 1.6));
+    if (q > 0 && q < 1) {
+      ctx.globalAlpha = (1 - q);
+      ctx.strokeStyle = '#ffd162'; ctx.lineWidth = 5;
+      ctx.beginPath(); ctx.arc(cx, ty, 30 + q * 150, 0, Math.PI * 2); ctx.stroke();
+    }
+  }
+  ctx.restore();
 }
 
 function drawDmgPops(){
@@ -10848,7 +10922,10 @@ function drawDmgPops(){
     ctx.save();
     ctx.globalAlpha = al;
     ctx.translate(p.x, y); ctx.scale(sc, sc);
-    ctx.font = '800 ' + (p.crit ? 24 : 19) + 'px ' + FONT;
+    
+    const tr = p.tier || 0;
+    ctx.font = '800 ' + ((p.crit ? 24 : 19) + tr * 2) + 'px ' + FONT;   
+    if (tr >= 3 && S.boss) { ctx.shadowColor = ELEM_COL[DRAGONS[S.boss.gi].breath] || '#fff'; ctx.shadowBlur = 8 + tr * 3; }
     ctx.textAlign = 'center'; ctx.textBaseline = 'middle'; ctx.lineJoin = 'round';
     ctx.strokeStyle = 'rgba(30,16,50,0.92)'; ctx.lineWidth = 5;
     ctx.strokeText(String(p.v), 0, 0);
@@ -11203,6 +11280,111 @@ function drawGoldAura(box){
   const g = ctx.createRadialGradient(cx, cy, box.w * 0.36, cx, cy, box.w * 0.92);
   g.addColorStop(0, 'rgba(255,200,90,0.42)'); g.addColorStop(1, 'rgba(255,200,90,0)');
   ctx.fillStyle = g; ctx.fillRect(box.x - box.w, box.y - box.h * 0.6, box.w * 3, box.h * 2.2);
+  ctx.restore();
+}
+
+const LOOKS = [
+  { lv: 3,  name: 'きらめき' },
+  { lv: 6,  name: 'オーラ' },
+  { lv: 10, name: 'まほうじん' },
+  { lv: 15, name: 'ひかりの わく' },
+  { lv: 20, name: 'こうりん' },
+];
+function lookNext(lv){ return LOOKS.find(L => L.lv > lv) || null; }
+function lookGained(lv0, lv1){ let g = null; for (const L of LOOKS) if (L.lv > lv0 && L.lv <= lv1) g = L; return g; }
+function lookCol(gi){ return ELEM_COL[DRAGONS[gi].breath] || '#ffffff'; }
+function hexA(hex, al){
+  const n = parseInt(hex.slice(1), 16);
+  return 'rgba(' + ((n >> 16) & 255) + ',' + ((n >> 8) & 255) + ',' + (n & 255) + ',' + al + ')';
+}
+
+function drawLookBack(box, gi, lv, small){
+  if (lv < 6) return;
+  
+  const col = lookCol(gi), t = S.t;
+  const cx = box.x + box.w / 2, cy = box.y + box.h / 2;
+  ctx.save();
+  if (lv >= 20 && !small) {
+    ctx.globalCompositeOperation = 'lighter';
+    const n = 12, R = box.h * 0.78;
+    for (let i = 0; i < n; i++) {
+      const a0 = t * 0.25 + i * Math.PI * 2 / n;
+      ctx.globalAlpha = 0.16 + 0.06 * Math.sin(t * 2 + i);
+      ctx.fillStyle = col;
+      ctx.beginPath(); ctx.moveTo(cx, cy);
+      ctx.arc(cx, cy, R, a0 - 0.07, a0 + 0.07); ctx.closePath(); ctx.fill();
+    }
+    ctx.globalCompositeOperation = 'source-over';
+  }
+  const pl = 0.75 + 0.25 * Math.sin(t * 1.8);
+  const g = ctx.createRadialGradient(cx, cy, box.w * 0.3, cx, cy, box.w * (small ? 0.72 : 0.95));
+  g.addColorStop(0, hexA(col, 0.5 * pl)); g.addColorStop(1, hexA(col, 0));
+  ctx.globalAlpha = 1;
+  ctx.fillStyle = g; ctx.fillRect(box.x - box.w, box.y - box.h * 0.6, box.w * 3, box.h * 2.2);
+  if (lv >= 10 && !small) {
+    ctx.strokeStyle = hexA(col, 0.7); ctx.lineWidth = 2;
+    const r1 = box.w * 0.74, r2 = box.w * 0.62;
+    ctx.save(); ctx.translate(cx, cy);
+    ctx.rotate(t * 0.35);
+    ctx.setLineDash([10, 6]); ctx.beginPath(); ctx.arc(0, 0, r1, 0, Math.PI * 2); ctx.stroke();
+    ctx.rotate(-t * 0.8);
+    ctx.setLineDash([3, 7]); ctx.lineWidth = 3; ctx.beginPath(); ctx.arc(0, 0, r2, 0, Math.PI * 2); ctx.stroke();
+    ctx.setLineDash([]);
+    ctx.restore();
+  }
+  ctx.restore();
+}
+
+function drawLookFront(box, gi, lv){
+  if (lv < 3) return;
+  const col = lookCol(gi), kind = DRAGONS[gi].breath, t = S.t;
+  const cx = box.x + box.w / 2, cy = box.y + box.h / 2;
+  ctx.save();
+  if (lv >= 15) {
+    ctx.shadowColor = col; ctx.shadowBlur = 16 + 6 * Math.sin(t * 2.4);
+    rrect(box.x, box.y, box.w, box.h, 10);
+    ctx.strokeStyle = col; ctx.lineWidth = 3; ctx.stroke();
+    ctx.shadowBlur = 0;
+  }
+  const n = lv >= 20 ? 18 : (lv >= 15 ? 12 : 6);
+  for (let i = 0; i < n; i++) {
+    const ph = ((i / n) + t * (0.07 + (i % 3) * 0.02)) % 1;
+    const side = (i % 2) ? 1 : -1;
+    let x, y, al = Math.sin(ph * Math.PI);
+    if (kind === 'flame' || kind === 'ice' || kind === 'forest') {
+      const down = (kind !== 'flame');
+      x = cx + side * (box.w * 0.46 + 6 + 12 * Math.sin(i * 2.7 + t * 1.5)) + (i % 4 < 2 ? 0 : side * -box.w * 0.3);
+      y = box.y - box.h * 0.06 + box.h * 1.12 * (down ? ph : 1 - ph);
+    } else {
+      const a = ph * Math.PI * 2 + i;
+      x = cx + Math.cos(a) * box.w * 0.62; y = cy + Math.sin(a) * box.h * 0.56;
+    }
+    const sz = 3 + (i % 3);
+    ctx.globalAlpha = al;
+    if (kind === 'ice') {
+      ctx.strokeStyle = col; ctx.lineWidth = 1.6;
+      ctx.save(); ctx.translate(x, y); ctx.rotate(t * 0.8 + i);
+      for (let k = 0; k < 3; k++) { ctx.rotate(Math.PI / 3); ctx.beginPath(); ctx.moveTo(-sz * 1.5, 0); ctx.lineTo(sz * 1.5, 0); ctx.stroke(); }
+      ctx.restore();
+    } else if (kind === 'forest') {
+      breathLeaf(x, y, sz * 1.4, t * 1.2 + i, col, al);
+    } else if (kind === 'thunder') {
+      ctx.strokeStyle = col; ctx.lineWidth = 2;
+      ctx.beginPath(); ctx.moveTo(x - sz, y - sz * 1.6); ctx.lineTo(x + sz * 0.4, y - sz * 0.2);
+      ctx.lineTo(x - sz * 0.4, y + sz * 0.2); ctx.lineTo(x + sz, y + sz * 1.6); ctx.stroke();
+    } else if (kind === 'shine') {
+      ctx.fillStyle = col;
+      ctx.beginPath();
+      for (let k = 0; k < 8; k++) { const r = (k % 2) ? sz * 0.45 : sz * 1.8, a = k * Math.PI / 4 + t; ctx.lineTo(x + Math.cos(a) * r, y + Math.sin(a) * r); }
+      ctx.closePath(); ctx.fill();
+    } else {
+      ctx.shadowColor = col; ctx.shadowBlur = 10;
+      ctx.fillStyle = (kind === 'dark') ? '#3a1f55' : col;
+      ctx.beginPath(); ctx.arc(x, y, sz, 0, Math.PI * 2); ctx.fill();
+      ctx.strokeStyle = col; ctx.lineWidth = 1.2; ctx.stroke();
+      ctx.shadowBlur = 0;
+    }
+  }
   ctx.restore();
 }
 function drawKeyArt(box, d, al, gold){
@@ -11648,11 +11830,13 @@ function drawBossWin(){
   const rows = [];
   if (w.killed) rows.push({ t: 'ボスに ' + w.dmg + ' ダメージを あたえた！', s: 14, c: '#f3ecff' });
   if (w.crits)  rows.push({ t: '（クリティカル ' + w.crits + '回）', s: 12, c: '#ffe9a0' });
+  if (w.hit) rows.push(w.newRec ? { t: 'しんきろく！ いちばん大きい ダメージ ' + w.hit, s: 13, c: '#ffd162' }
+                                : { t: 'いちばん大きい ダメージ ' + w.hit, s: 12, c: '#e7d6ff' });
   rows.push({ t: w.n + '問中 ' + w.ok + '問 正解', s: 15, c: '#f3ecff' });
   if (!w.killed) rows.push({ t: 'ぜんぶ正解で BOSS を たおせる', s: 11, c: 'rgba(255,255,255,0.62)' });
 
   const barH = 12, gap = 21;
-  const panelH = 16 + rows.length * gap + 10 + barH + 26 + (w.up > 0 ? 42 : 20) + 8;
+  const panelH = 16 + rows.length * gap + 10 + barH + 26 + (w.up > 0 ? (w.look ? 62 : 42) : 20) + 8;
   const py = y + 6;
   ctx.save();
   rrect(24, py, W - 48, panelH, 16);
@@ -11683,6 +11867,7 @@ function drawBossWin(){
     text('レベルアップ！　Lv.' + w.lv0 + ' → Lv.' + w.lv1, W/2, by + 50, 15, '#ffd162', 'center', '800');
     ctx.restore();
     text('こうげき ' + w.atk0 + ' → ' + w.atk1, W/2, by + 70, 12, '#ffe9a0', 'center', '700');
+    if (w.look) text('あたらしい すがた「' + w.look.name + '」！', W/2, by + 90, 13, hexA(lookCol(w.gi), 1), 'center', '800');
   } else {
     text('こうげき ' + w.atk1 + '　つぎまで あと ' + (w.need - w.cur), W/2, by + 50, 12, '#e7d6ff', 'center', '700');
   }
@@ -11695,8 +11880,10 @@ function drawBossWin(){
     const box2 = { x: W/2 - aw2/2, y: artTop + (artH - aw2 * 4 / 3) / 2, w: aw2, h: aw2 * 4 / 3 };
     const fy2 = Math.sin(S.t * 1.1) * 3;
     ctx.save(); ctx.translate(0, fy2);
+    drawLookBack(box2, w.gi, w.lv1);
     if (dragonGold(w.gi)) drawGoldAura(box2);
     drawKeyArt(box2, w.dragon, 1, dragonGold(w.gi));
+    drawLookFront(box2, w.gi, w.lv1);
     ctx.restore();
   }
 
@@ -11932,6 +12119,8 @@ function drawBook(){
     const k = box.k, d = DRAGONS[k], n = groupSize(k), sl = clearedSlots(k), done = dragonDone(k);
     const isG = dragonGold(k);
     if (done) {
+      const tlv = bossLv(k);
+      drawLookBack(box, k, tlv, true);                
       if (isG) drawGoldAura(box);
       ctx.save(); ctx.shadowColor = isG ? 'rgba(255,200,90,0.85)' : 'rgba(255,170,80,0.6)'; ctx.shadowBlur = isG ? 20 : 14;
       rrect(box.x - 3, box.y - 3, box.w + 6, box.h + 6, 8);
@@ -11944,7 +12133,7 @@ function drawBook(){
       drawDragonPuzzle(box, d, sl, { n, dark: true, gold: perfectSlots(k) });
     }
     text(done ? dragonName(k, true) : '？？？', box.x + box.w/2, box.y + box.h + 16, 11, done ? CONFIG.C_GOLD : 'rgba(243,236,255,0.5)', 'center', done ? '800' : '700');
-    text((done ? n : sl.length) + '/' + n + '　★' + perfectSlots(k).length, box.x + box.w/2, box.y + box.h + 30, 10, isG ? '#ffd162' : (done ? CONFIG.C_GOLD : 'rgba(255,255,255,0.55)'), 'center', '600');
+    text((done ? 'Lv.' + bossLv(k) : sl.length + '/' + n) + '　★' + perfectSlots(k).length, box.x + box.w/2, box.y + box.h + 30, 10, isG ? '#ffd162' : (done ? CONFIG.C_GOLD : 'rgba(255,255,255,0.55)'), 'center', '600');
   }
 
   drawBackLight(30, 44, 13);
@@ -11967,7 +12156,8 @@ function drawBookView(){
   const box = { x: W/2 - aw/2, y: 78, w: aw, h: ah };
   const fy = Math.sin(S.t * 1.1) * 3;
   ctx.save(); ctx.translate(0, fy);
-  if (done) { if (dragonGold(gi)) drawGoldAura(box); drawKeyArt(box, d, 1, dragonGold(gi)); }
+  const vlv = done ? bossLv(gi) : 1;
+  if (done) { drawLookBack(box, gi, vlv); if (dragonGold(gi)) drawGoldAura(box); drawKeyArt(box, d, 1, dragonGold(gi)); drawLookFront(box, gi, vlv); }
   else {
     ctx.save();
     const gg = ctx.createRadialGradient(W/2, box.y + box.h/2, 10, W/2, box.y + box.h/2, box.w * 0.7);
@@ -11985,13 +12175,19 @@ function drawBookView(){
     const bs = bossState(gi);
     const line = 'Lv.' + bs.lv + '　こうげき ' + bs.atk + (bs.awake ? '（2ばい）' : '');
     text(line, W/2, box.y + ah + 46, 13, bs.awake ? '#ffd162' : '#e7d6ff', 'center', '800');
-    if (!bs.awake) text('★を ぜんぶ 集めると こうげきが 2ばい', W/2, box.y + ah + 64, 10, 'rgba(255,255,255,0.55)', 'center', '700');
+    
+    const best = (save.maxHit && save.maxHit['d' + gi]) || 0;
+    const nx = lookNext(bs.lv);
+    const sub = (best ? 'いちばん大きい ダメージ ' + best : '') + (best && nx ? '　' : '')
+              + (nx ? 'Lv.' + nx.lv + ' で「' + nx.name + '」' : (best ? '' : 'すがたは ぜんぶ そろった'));
+    if (sub) text(sub, W/2, box.y + ah + 64, 10, hexA(lookCol(gi), 0.9), 'center', '800');
+    if (!bs.awake) text('★を ぜんぶ 集めると こうげきが 2ばい', W/2, box.y + ah + 80, 10, 'rgba(255,255,255,0.55)', 'center', '700');
   } else {
     text('かけら ' + sl.length + '/' + n + '　★' + gl2.length + '/' + n,
          W/2, box.y + ah + 46, 12, 'rgba(255,255,255,0.6)', 'center', '700');
   }
   
-  let ly = box.y + ah + (done ? 88 : 74);
+  let ly = box.y + ah + (done ? 102 : 74);
   for (let i = 0; i < list.length; i++) {
     const st = list[i], on = sl.indexOf(st.slot) >= 0;
     ctx.save(); ctx.globalAlpha = st.unlocked ? 1 : 0.5;
