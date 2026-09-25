@@ -92,7 +92,7 @@
 
 
 const CONFIG = {
-  VERSION: 'v79',
+  VERSION: 'v80',
 
   
   
@@ -254,7 +254,8 @@ const AREA = {
 
 
 const cv = document.getElementById('c');
-const ctx = cv.getContext('2d');
+
+let ctx = cv.getContext('2d');
 let scale = 1, offX = 0, offY = 0, dpr = 1;
 
 function resize(){
@@ -9534,6 +9535,7 @@ function update(dt){
   
   if (S.freeze > 0) { S.freeze = Math.max(0, S.freeze - dt); return; }
   S.t += dt;
+  if (S.mode === 'bookView') updateCard(dt);
   if (S.flash > 0) S.flash = Math.max(0, S.flash - dt * 2.2);
   if (S.kindPop > 0) S.kindPop = Math.max(0, S.kindPop - dt * 2.0);
   if (S.comboPop > 0) S.comboPop = Math.max(0, S.comboPop - dt * 1.8);
@@ -11274,6 +11276,13 @@ function drawLogoSword(cx, cy, sc, len){
 }
 
 
+function drawKeyGlow(box){
+  const cx = box.x + box.w/2, cy = box.y + box.h/2;
+  const gg = ctx.createRadialGradient(cx, cy, 10, cx, cy, box.w * 0.62);
+  gg.addColorStop(0, 'rgba(255,150,70,0.32)');
+  gg.addColorStop(1, 'rgba(255,150,70,0)');
+  ctx.fillStyle = gg; ctx.fillRect(box.x - 44, box.y - 44, box.w + 88, box.h + 88);
+}
 function drawGoldAura(box){
   ctx.save();
   const cx = box.x + box.w/2, cy = box.y + box.h/2;
@@ -11318,7 +11327,7 @@ function drawLookBack(box, gi, lv, small){
   }
   const pl = 0.75 + 0.25 * Math.sin(t * 1.8);
   const g = ctx.createRadialGradient(cx, cy, box.w * 0.3, cx, cy, box.w * (small ? 0.72 : 0.95));
-  g.addColorStop(0, hexA(col, 0.5 * pl)); g.addColorStop(1, hexA(col, 0));
+  g.addColorStop(0, hexA(col, (small ? 0.5 : 0.75) * pl)); g.addColorStop(1, hexA(col, 0));   
   ctx.globalAlpha = 1;
   ctx.fillStyle = g; ctx.fillRect(box.x - box.w, box.y - box.h * 0.6, box.w * 3, box.h * 2.2);
   if (lv >= 10 && !small) {
@@ -11335,18 +11344,22 @@ function drawLookBack(box, gi, lv, small){
   ctx.restore();
 }
 
-function drawLookFront(box, gi, lv){
+
+function drawLookFront(box, gi, lv, part){
   if (lv < 3) return;
   const col = lookCol(gi), kind = DRAGONS[gi].breath, t = S.t;
   const cx = box.x + box.w / 2, cy = box.y + box.h / 2;
   ctx.save();
-  if (lv >= 15) {
+  if (lv >= 15 && part !== 'parts') {
     ctx.shadowColor = col; ctx.shadowBlur = 16 + 6 * Math.sin(t * 2.4);
     rrect(box.x, box.y, box.w, box.h, 10);
     ctx.strokeStyle = col; ctx.lineWidth = 3; ctx.stroke();
     ctx.shadowBlur = 0;
   }
-  const n = lv >= 20 ? 18 : (lv >= 15 ? 12 : 6);
+  if (part === 'frame') { ctx.restore(); return; }
+  
+  const n = lv >= 20 ? 18 : (lv >= 15 ? 12 : 8);
+  ctx.shadowColor = col; ctx.shadowBlur = 10;
   for (let i = 0; i < n; i++) {
     const ph = ((i / n) + t * (0.07 + (i % 3) * 0.02)) % 1;
     const side = (i % 2) ? 1 : -1;
@@ -11359,10 +11372,10 @@ function drawLookFront(box, gi, lv){
       const a = ph * Math.PI * 2 + i;
       x = cx + Math.cos(a) * box.w * 0.62; y = cy + Math.sin(a) * box.h * 0.56;
     }
-    const sz = 3 + (i % 3);
+    const sz = 4.5 + (i % 3) * 1.2;
     ctx.globalAlpha = al;
     if (kind === 'ice') {
-      ctx.strokeStyle = col; ctx.lineWidth = 1.6;
+      ctx.strokeStyle = col; ctx.lineWidth = 2.2;
       ctx.save(); ctx.translate(x, y); ctx.rotate(t * 0.8 + i);
       for (let k = 0; k < 3; k++) { ctx.rotate(Math.PI / 3); ctx.beginPath(); ctx.moveTo(-sz * 1.5, 0); ctx.lineTo(sz * 1.5, 0); ctx.stroke(); }
       ctx.restore();
@@ -11382,20 +11395,17 @@ function drawLookFront(box, gi, lv){
       ctx.fillStyle = (kind === 'dark') ? '#3a1f55' : col;
       ctx.beginPath(); ctx.arc(x, y, sz, 0, Math.PI * 2); ctx.fill();
       ctx.strokeStyle = col; ctx.lineWidth = 1.2; ctx.stroke();
-      ctx.shadowBlur = 0;
     }
   }
   ctx.restore();
 }
-function drawKeyArt(box, d, al, gold){
+function drawKeyArt(box, d, al, gold, noGlow){
   const im = dragonImage(d);
   ctx.save();
   ctx.globalAlpha = (al == null) ? 1 : al;
   const cx = box.x + box.w/2, cy = box.y + box.h/2;
-  const gg = ctx.createRadialGradient(cx, cy, 10, cx, cy, box.w * 0.62);
-  gg.addColorStop(0, 'rgba(255,150,70,0.32)');
-  gg.addColorStop(1, 'rgba(255,150,70,0)');
-  ctx.fillStyle = gg; ctx.fillRect(box.x - 44, box.y - 44, box.w + 88, box.h + 88);
+  
+  if (!noGlow) drawKeyGlow(box);
 
   ctx.save();
   rrect(box.x, box.y, box.w, box.h, 10); ctx.clip();
@@ -11423,6 +11433,7 @@ function drawKeyArt(box, d, al, gold){
 }
 
 const HOLO_HUES = ['#ff5fa2', '#ffd84d', '#5dff9b', '#4fd8ff', '#9d7bff', '#ff5fa2'];
+let HOLO_SHIFT = 0;          
 function drawSparkle(box){
   const t = S.t;
   ctx.save();
@@ -11431,7 +11442,7 @@ function drawSparkle(box){
 
   
   for (let k = 0; k < 2; k++) {
-    const ph = ((t * (0.13 + k * 0.05) + k * 0.5) % 1);
+    const ph = (((t * (0.13 + k * 0.05) + k * 0.5 + HOLO_SHIFT) % 1) + 1) % 1;
     const off = -diag + diag * 2 * ph;
     const g = ctx.createLinearGradient(box.x + off, box.y, box.x + off + diag * 0.9, box.y + box.h);
     for (let i = 0; i < HOLO_HUES.length; i++) {
@@ -12148,16 +12159,187 @@ function drawBook(){
   text(CONFIG.VERSION, 12, H - 12, 11, 'rgba(255,255,255,0.35)', 'left', '600');
 }
 
+const CARD = { ry: 0, rx: 0, vy: 0, target: 0, drag: null };
+const CARD_M = 18;                       
+let cardTex = null;
+function cardReset(){ CARD.ry = 0; CARD.rx = 0; CARD.vy = 0; CARD.target = 0; CARD.drag = null; }
+function bookViewBox(){
+  const aw = Math.min(232, Math.max(160, (H - 300) * 0.7)), ah = aw * 4 / 3;
+  return { x: W/2 - aw/2, y: 78, w: aw, h: ah };
+}
+function cardDeg(a){ return ((a % 360) + 540) % 360 - 180; }       
+function cardBack(){ return Math.cos(CARD.ry * Math.PI / 180) < 0; }
+function cardDown(lx, ly){
+  const b = bookViewBox();
+  if (lx < b.x - 10 || lx > b.x + b.w + 10 || ly < b.y - 10 || ly > b.y + b.h + 10) return false;
+  CARD.drag = { x: lx, y: ly, sx: lx, sy: ly, t: performance.now(), moved: false, v: 0 };
+  return true;
+}
+function cardMove(lx, ly){
+  const D = CARD.drag; if (!D) return;
+  const now = performance.now(), dt = Math.max(1, now - D.t) / 1000;
+  const dx = lx - D.x, dy = ly - D.y;
+  if (Math.hypot(lx - D.sx, ly - D.sy) > 8) D.moved = true;
+  CARD.ry += dx * 0.6;
+  CARD.rx = Math.max(-28, Math.min(28, CARD.rx - dy * 0.35));
+  D.v = D.v * 0.5 + (dx * 0.6 / dt) * 0.5;                          
+  D.x = lx; D.y = ly; D.t = now;
+}
+function cardUp(){
+  const D = CARD.drag; if (!D) return;
+  CARD.drag = null;
+  if (!D.moved) { CARD.target = Math.round(CARD.ry / 180) * 180 + 180; CARD.vy = 0; sfxTap(); return; }
+  CARD.vy = (performance.now() - D.t > 120) ? 0 : Math.max(-1800, Math.min(1800, D.v));
+  CARD.target = Math.round(CARD.ry / 180) * 180;
+}
+function updateCard(dt){
+  if (CARD.drag) return;
+  if (Math.abs(CARD.vy) > 140 && Math.abs(CARD.ry - CARD.target) > 1 || Math.abs(CARD.vy) > 500) {
+    CARD.ry += CARD.vy * dt;                                         
+    CARD.vy *= Math.pow(0.18, dt);
+    CARD.target = Math.round(CARD.ry / 180) * 180;
+  } else {
+    const wob = 6 * Math.sin(S.t * 0.9);                             
+    CARD.vy += ((CARD.target + wob - CARD.ry) * 60 - CARD.vy * 9) * dt;
+    CARD.ry += CARD.vy * dt;
+  }
+  CARD.rx += ((4 * Math.sin(S.t * 1.3 + 1)) - CARD.rx) * Math.min(1, 5 * dt);
+}
+
+function renderCardSide(box, gi, lv, back, k){
+  const tw = box.w + CARD_M * 2, th = box.h + CARD_M * 2;
+  const w = Math.ceil(tw * k), h = Math.ceil(th * k);
+  if (!cardTex) cardTex = document.createElement('canvas');
+  if (cardTex.width !== w || cardTex.height !== h) { cardTex.width = w; cardTex.height = h; }
+  const g = cardTex.getContext('2d'), main = ctx;
+  g.setTransform(1, 0, 0, 1, 0, 0); g.clearRect(0, 0, w, h);
+  g.setTransform(w / tw, 0, 0, h / th, 0, 0);
+  const b = { x: CARD_M, y: CARD_M, w: box.w, h: box.h };
+  const rel = back ? cardDeg(CARD.ry - 180) : cardDeg(CARD.ry);
+  ctx = g;
+  try {
+    if (back) drawCardBack(b, gi, lv);
+    else {
+      HOLO_SHIFT = rel / 90;
+      drawKeyArt(b, DRAGONS[gi], 1, dragonGold(gi), true);
+      drawLookFront(b, gi, lv, 'frame');
+    }
+    
+    const gx = b.x + b.w * (0.5 - rel / 70), gy = b.y + b.h * (0.5 + CARD.rx / 56);
+    ctx.save(); rrect(b.x, b.y, b.w, b.h, 10); ctx.clip();
+    const gr = ctx.createRadialGradient(gx, gy, 0, gx, gy, b.w * 0.8);
+    gr.addColorStop(0, 'rgba(255,255,255,0.30)'); gr.addColorStop(0.45, 'rgba(255,255,255,0.07)'); gr.addColorStop(1, 'rgba(255,255,255,0)');
+    ctx.globalCompositeOperation = 'lighter'; ctx.fillStyle = gr; ctx.fillRect(b.x, b.y, b.w, b.h);
+    
+    const c = Math.abs(Math.cos(CARD.ry * Math.PI / 180) * Math.cos(CARD.rx * Math.PI / 180));
+    ctx.globalCompositeOperation = 'source-over';
+    ctx.fillStyle = 'rgba(8,4,18,' + (0.45 * (1 - c)) + ')'; ctx.fillRect(b.x, b.y, b.w, b.h);
+    ctx.restore();
+  } finally { ctx = main; HOLO_SHIFT = 0; }
+  return cardTex;
+}
+
+function drawCardBack(b, gi, lv){
+  const d = DRAGONS[gi], col = lookCol(gi), cx = b.x + b.w / 2, cy = b.y + b.h / 2;
+  ctx.save();
+  rrect(b.x, b.y, b.w, b.h, 10); ctx.clip();
+  const bg = ctx.createLinearGradient(b.x, b.y, b.x + b.w, b.y + b.h);
+  bg.addColorStop(0, '#231a3e'); bg.addColorStop(0.5, '#15102a'); bg.addColorStop(1, '#2a1d48');
+  ctx.fillStyle = bg; ctx.fillRect(b.x, b.y, b.w, b.h);
+  const gl = ctx.createRadialGradient(cx, cy, 4, cx, cy, b.w * 0.6);
+  gl.addColorStop(0, hexA(col, 0.55)); gl.addColorStop(1, hexA(col, 0));
+  ctx.fillStyle = gl; ctx.fillRect(b.x, b.y, b.w, b.h);
+  ctx.strokeStyle = hexA(col, 0.55); ctx.lineWidth = 1.4;
+  for (let r = 18; r < b.w * 0.8; r += 16) { ctx.beginPath(); ctx.arc(cx, cy, r, 0, Math.PI * 2); ctx.stroke(); }
+  ctx.strokeStyle = hexA(col, 0.35);
+  for (let i = 0; i < 16; i++) {
+    const a = i * Math.PI / 8;
+    ctx.beginPath(); ctx.moveTo(cx + Math.cos(a) * 20, cy + Math.sin(a) * 20); ctx.lineTo(cx + Math.cos(a) * b.w, cy + Math.sin(a) * b.w); ctx.stroke();
+  }
+  
+  ctx.save(); ctx.translate(cx, cy);
+  ctx.shadowColor = col; ctx.shadowBlur = 18;
+  ctx.beginPath(); ctx.moveTo(0, -38); ctx.lineTo(28, 0); ctx.lineTo(0, 38); ctx.lineTo(-28, 0); ctx.closePath();
+  ctx.fillStyle = '#1a1430'; ctx.fill(); ctx.strokeStyle = col; ctx.lineWidth = 3; ctx.stroke();
+  ctx.beginPath(); ctx.ellipse(0, 0, 13, 7, 0, 0, Math.PI * 2); ctx.fillStyle = col; ctx.fill();
+  ctx.beginPath(); ctx.ellipse(0, 0, 2.6, 6.5, 0, 0, Math.PI * 2); ctx.fillStyle = '#1a1430'; ctx.fill();
+  ctx.restore();
+  ctx.restore();
+  text('DRAGON TEST', cx, b.y + 26, 13, hexA(col, 0.95), 'center', '800');
+  text(d.sname + '　Lv.' + lv, cx, b.y + b.h - 24, 13, '#f3ecff', 'center', '800');
+  rrect(b.x, b.y, b.w, b.h, 10);
+  ctx.strokeStyle = dragonGold(gi) ? '#ffd162' : '#e9b45c'; ctx.lineWidth = dragonGold(gi) ? 4 : 2.5; ctx.stroke();
+}
+
+function drawCard3D(box, gi, lv){
+  const back = cardBack();
+  const k = Math.min(3, dpr * scale);
+  const tex = renderCardSide(box, gi, lv, back, k);
+  const cx = box.x + box.w / 2, cy = box.y + box.h / 2;
+  const tw = box.w + CARD_M * 2, th = box.h + CARD_M * 2;
+  const ry = CARD.ry * Math.PI / 180, rx = CARD.rx * Math.PI / 180, DIST = 760;
+  const cY = Math.cos(ry), sY = Math.sin(ry), cX = Math.cos(rx), sX = Math.sin(rx);
+  const proj = (x, y) => {
+    const x1 = x * cY, z1 = x * sY;
+    const y2 = y * cX - z1 * sX, z2 = y * sX + z1 * cX;
+    const f = DIST / (DIST + z2);
+    return [cx + x1 * f, cy + y2 * f];
+  };
+  
+  ctx.save();
+  ctx.globalAlpha = 0.35; ctx.fillStyle = '#05020c';
+  ctx.shadowColor = '#05020c'; ctx.shadowBlur = 16;
+  ctx.beginPath(); ctx.ellipse(cx, box.y + box.h + 14, box.w * 0.42 * Math.max(0.15, Math.abs(cY)) + 8, 8, 0, 0, Math.PI * 2); ctx.fill();
+  ctx.restore();
+  const NX = 6, NY = 8, P = [];
+  for (let j = 0; j <= NY; j++) for (let i = 0; i <= NX; i++) {
+    const u = i / NX, v = j / NY;
+    P.push({ s: [(back ? 1 - u : u) * tex.width, v * tex.height], d: proj((u - 0.5) * tw, (v - 0.5) * th) });
+  }
+  for (let j = 0; j < NY; j++) for (let i = 0; i < NX; i++) {
+    const a = P[j * (NX + 1) + i], b = P[j * (NX + 1) + i + 1], c = P[(j + 1) * (NX + 1) + i], d = P[(j + 1) * (NX + 1) + i + 1];
+    texTri(tex, a, b, d); texTri(tex, a, d, c);
+  }
+}
+function texTri(img, p0, p1, p2){
+  const [x0, y0] = p0.d, [x1, y1] = p1.d, [x2, y2] = p2.d;
+  const [u0, v0] = p0.s, [u1, v1] = p1.s, [u2, v2] = p2.s;
+  const den = u0 * (v1 - v2) + u1 * (v2 - v0) + u2 * (v0 - v1);
+  if (Math.abs(den) < 1e-6) return;
+  
+  const mx = (x0 + x1 + x2) / 3, my = (y0 + y1 + y2) / 3;
+  const ex = (x, y) => { const dx = x - mx, dy = y - my, l = Math.hypot(dx, dy) || 1; return [x + dx / l * 0.7, y + dy / l * 0.7]; };
+  ctx.save();
+  ctx.beginPath();
+  let q = ex(x0, y0); ctx.moveTo(q[0], q[1]);
+  q = ex(x1, y1); ctx.lineTo(q[0], q[1]);
+  q = ex(x2, y2); ctx.lineTo(q[0], q[1]);
+  ctx.closePath(); ctx.clip();
+  ctx.transform(
+    (x0 * (v1 - v2) + x1 * (v2 - v0) + x2 * (v0 - v1)) / den,
+    (y0 * (v1 - v2) + y1 * (v2 - v0) + y2 * (v0 - v1)) / den,
+    (x0 * (u2 - u1) + x1 * (u0 - u2) + x2 * (u1 - u0)) / den,
+    (y0 * (u2 - u1) + y1 * (u0 - u2) + y2 * (u1 - u0)) / den,
+    (x0 * (u1 * v2 - u2 * v1) + x1 * (u2 * v0 - u0 * v2) + x2 * (u0 * v1 - u1 * v0)) / den,
+    (y0 * (u1 * v2 - u2 * v1) + y1 * (u2 * v0 - u0 * v2) + y2 * (u0 * v1 - u1 * v0)) / den);
+  ctx.drawImage(img, 0, 0);
+  ctx.restore();
+}
+
 function drawBookView(){
   drawArena({ x: 0, y: 0, w: W, h: H }, { moonY: H * 0.42, moonR: 130, still: true });
   const gi = S.bookSel, d = DRAGONS[gi], n = groupSize(gi), sl = clearedSlots(gi), done = dragonDone(gi);
   const list = pageStages(gi);
-  const aw = Math.min(232, Math.max(160, (H - 300) * 0.7)), ah = aw * 4 / 3;
-  const box = { x: W/2 - aw/2, y: 78, w: aw, h: ah };
+  const box = bookViewBox(), aw = box.w, ah = box.h;
   const fy = Math.sin(S.t * 1.1) * 3;
   ctx.save(); ctx.translate(0, fy);
   const vlv = done ? bossLv(gi) : 1;
-  if (done) { drawLookBack(box, gi, vlv); if (dragonGold(gi)) drawGoldAura(box); drawKeyArt(box, d, 1, dragonGold(gi)); drawLookFront(box, gi, vlv); }
+  if (done) {
+    drawLookBack(box, gi, vlv); if (dragonGold(gi)) drawGoldAura(box);
+    drawKeyGlow(box);
+    drawCard3D(box, gi, vlv);                       
+    drawLookFront(box, gi, vlv, 'parts');
+  }
   else {
     ctx.save();
     const gg = ctx.createRadialGradient(W/2, box.y + box.h/2, 10, W/2, box.y + box.h/2, box.w * 0.7);
@@ -12378,7 +12560,7 @@ function onDown(lx, ly){
     {
       const tb = mapTabletRect();
       if (lx >= tb.x - 10 && lx <= tb.x + tb.w + 10 && ly >= tb.y - 10 && ly <= tb.y + tb.h + 10) {
-        S.bookSel = curPage(); S.bookFrom = 'map'; S.mode = 'bookView'; S.t = 0; sfxTap(); return;
+        S.bookSel = curPage(); S.bookFrom = 'map'; S.mode = 'bookView'; S.t = 0; cardReset(); sfxTap(); return;
       }
     }
     
@@ -12413,12 +12595,14 @@ function onDown(lx, ly){
     if (lx < 76 && ly < 84) { S.mode = 'map'; S.t = 0; sfxTap(); return; }
     for (const b of bookTiles()) {
       if (lx >= b.x - 6 && lx <= b.x + b.w + 6 && ly >= b.y - 6 && ly <= b.y + b.h + 36) {
-        S.bookSel = b.k; S.bookFrom = 'book'; S.mode = 'bookView'; S.t = 0; sfxTap(); return;
+        S.bookSel = b.k; S.bookFrom = 'book'; S.mode = 'bookView'; S.t = 0; cardReset(); sfxTap(); return;
       }
     }
     return;
   }
   if (S.mode === 'bookView') {
+    
+    if (dragonDone(S.bookSel) && cardDown(lx, ly)) return;
     
     S.mode = (S.bookFrom === 'map') ? 'map' : 'book'; S.t = 0; sfxTap();
     return;
@@ -12499,6 +12683,12 @@ cv.addEventListener('pointerdown', (e) => {
   const p = toLocal(e.clientX, e.clientY);
   onDown(p.x, p.y);
 }, { passive: true });
+
+cv.addEventListener('pointermove', (e) => {
+  if (!CARD.drag) return;
+  const p = toLocal(e.clientX, e.clientY); cardMove(p.x, p.y);
+}, { passive: true });
+['pointerup', 'pointercancel', 'pointerleave'].forEach(t => cv.addEventListener(t, () => cardUp(), { passive: true }));
 cv.addEventListener('touchstart', (e) => {
   if (Date.now() - lastTouch < 600) return;
   lastTouch = Date.now();
@@ -12610,7 +12800,7 @@ resize();
 requestAnimationFrame(frame);
 
 
-window.__cube = { CONFIG, S, startTeach, startBreath, genShape, shapeTotal, allTopsVisible, noInvisibleAddition, playBasis, basisIso, basisOblique, STAGES, mapRect, onDown, submit, visibleCubeCount, columnCount, cubeList, cubeFaces, visibleFlags, pointInPoly, figArea, choiceRect, get H(){ return H; }, visiblePerColumn, teachStep, introList, introTabRects, teachArea, toLocal, get offX(){ return offX; }, get offY(){ return offY; }, get scale(){ return scale; }, QUIT_BTN, quitPanel, bossBarRect, mapTabletRect, enemyFor, ENEMY_ART, ENEMY_STAGE_ART, ENEMY_GROUP, isPerfect, perfectSlots, dragonGold, lineGen, balGen, pairGen, weekGen, WEEK, weekName, sfxHit, sfxSlash, sfxCritical, sfxHurt, sfxPiece, sfxCorrect, sfxWrong, sfxDefeat, sfxIntro, audioCtl: { set(a){ audio = a; master = null; }, get(){ return audio; } }, bgmRender, bgmStart, bgmStop, BGM, clearedSlots, groupSize, dragonDone, curPage, setPage, pageStages, DRAGONS, dragonName, startBoss, bossState, bossOpen, bossBag, finishBoss, bossWinButtons, PIECE_SHAPES, makeKindBag, nextQuestion, newQuestion, newBattle, enterStage, startIntro, teachNext, magicGen, magicLines, magicHas, stageLv, save, makeCode, makeKidCode, applyKidCode, applyCode, openCode, BTN_EXPORT, BTN_IMPORT };
+window.__cube = { CONFIG, S, CARD, cardDown, cardMove, cardUp, bookViewBox, startTeach, startBreath, genShape, shapeTotal, allTopsVisible, noInvisibleAddition, playBasis, basisIso, basisOblique, STAGES, mapRect, onDown, submit, visibleCubeCount, columnCount, cubeList, cubeFaces, visibleFlags, pointInPoly, figArea, choiceRect, get H(){ return H; }, visiblePerColumn, teachStep, introList, introTabRects, teachArea, toLocal, get offX(){ return offX; }, get offY(){ return offY; }, get scale(){ return scale; }, QUIT_BTN, quitPanel, bossBarRect, mapTabletRect, enemyFor, ENEMY_ART, ENEMY_STAGE_ART, ENEMY_GROUP, isPerfect, perfectSlots, dragonGold, lineGen, balGen, pairGen, weekGen, WEEK, weekName, sfxHit, sfxSlash, sfxCritical, sfxHurt, sfxPiece, sfxCorrect, sfxWrong, sfxDefeat, sfxIntro, audioCtl: { set(a){ audio = a; master = null; }, get(){ return audio; } }, bgmRender, bgmStart, bgmStop, BGM, clearedSlots, groupSize, dragonDone, curPage, setPage, pageStages, DRAGONS, dragonName, startBoss, bossState, bossOpen, bossBag, finishBoss, bossWinButtons, PIECE_SHAPES, makeKindBag, nextQuestion, newQuestion, newBattle, enterStage, startIntro, teachNext, magicGen, magicLines, magicHas, stageLv, save, makeCode, makeKidCode, applyKidCode, applyCode, openCode, BTN_EXPORT, BTN_IMPORT };
 </script>
 </body>
 </html>
