@@ -92,7 +92,7 @@
 
 
 const CONFIG = {
-  VERSION: 'v73',
+  VERSION: 'v82',
 
   
   
@@ -254,7 +254,8 @@ const AREA = {
 
 
 const cv = document.getElementById('c');
-const ctx = cv.getContext('2d');
+
+let ctx = cv.getContext('2d');
 let scale = 1, offX = 0, offY = 0, dpr = 1;
 
 function resize(){
@@ -1388,7 +1389,7 @@ function magicDrawGrid(area, g, opt){
 }
 
 function magicRuleText(area, g){
-  text('同じ数を ' + (g.op === 'add' ? 'たしても' : 'かけても') + ' 3方陣の まま',
+  if (!qAsked()) text('同じ数を' + (g.op === 'add' ? 'たしても' : 'かけても') + '、どの1列も同じ数のまま',
        W / 2, area.y + 18, 14, CONFIG.C_INK_SOFT, 'center', '700');
 }
 
@@ -1465,25 +1466,25 @@ function magicKindIcon(kind, x, y, s){
 
 function magicAddTeachBegin(){
   const g = S.g;
-  const opWord = g.op === 'add' ? 'たす' : 'かける';
   const opSign = g.op === 'add' ? '＋' : '×';
   const r = g.ask.r;
-  const msgs = ['同じ数を ' + (g.op === 'add' ? 'たしても' : 'かけても') + ' 3方陣の まま'];
+  
+  const msgs = ['左の表は、たて・横・ななめ、どの1列をたしても同じ数です。\n全部のマスに同じ数を' + (g.op === 'add' ? 'たして' : 'かけて') + 'も、そうなるかをたしかめます。'];
   const labels = [''];
   for (let c = 0; c < 3; c++) {
-    msgs.push(g.base[r][c] + ' ' + opSign + ' ' + g.k + ' ＝ ' + g.m[r][c]);
+    msgs.push(g.base[r][c] + opSign + g.k + '＝' + g.m[r][c] + 'なので、' + g.m[r][c] + 'を書きます。');
     labels.push(String(g.m[r][c]));
   }
-  msgs.push('のこりの マスも 同じように ' + opWord);
+  msgs.push('のこりのマスにも、同じように' + g.k + 'を' + (g.op === 'add' ? 'たして' : 'かけて') + 'いきます。');
   labels.push('のこりも');
   const sumB = g.base[0][0] + g.base[0][1] + g.base[0][2];
   
-  msgs.push('よこ 3本は ぜんぶ ' + g.sum + '。\nもとは ' + sumB
-            + (g.op === 'add' ? ('。' + g.k + ' が 3つぶん ふえた') : ('。ぜんぶ ' + g.k + ' ばい')));
+  msgs.push('横の3本は、どれも' + g.sum + 'です。\nもとは' + sumB
+            + (g.op === 'add' ? ('でした。' + g.k + 'が3つぶんふえました。') : ('でした。' + g.k + 'ばいになりました。')));
   labels.push('よこ 3本');
-  msgs.push('たて 3本も ぜんぶ ' + g.sum);
+  msgs.push('たての3本も、どれも' + g.sum + 'です。');
   labels.push('たて 3本');
-  msgs.push('ななめ 2本も ' + g.sum + '。\n8本 ぜんぶ ' + g.sum + '。だから 3方陣の まま');
+  msgs.push('ななめの2本も' + g.sum + 'です。\n8本全部が同じ数なので、右の表も、どの1列をたしても同じ数です。');
   labels.push('8本 ぜんぶ ' + g.sum);
   return makeTeach(msgs.length - 1, msgs, labels, { g, mk: 'add', row: r });
 }
@@ -1570,17 +1571,20 @@ function magicTeachBegin(){
     onReset(){ this.lit = {}; this.label = ''; this.reveal = null; this.revealT = 0; },
     msgFn(){
       const k = this.shown - 1, g2 = S.g, st = k >= 0 ? this.steps[k] : null;
-      if (!st) return S.intro ? '？に入る数を\nもとめる考え方' : 'そろっている一列から\n？をもとめる';
-      if (st.t === 'rule') return 'たて・よこ・ななめ、どの一列をたしても\nおなじ数になる。これが魔方陣';
+      
+      if (!st) return S.intro ? '？に入る数をもとめる考え方です。'
+        : (S.kind === 'sum' ? 'この表は、どの1列をたしても同じ数になります。\nどれか1列をたせば、答えが出ます。'
+                            : 'この表は、どの1列をたしても同じ数になります。\nまず、その数をもとめます。');
+      if (st.t === 'rule') return 'たて・横・ななめ、どの1列をたしても、\n同じ数になります。これが魔方陣です。';
       if (st.t === 'line') {
         const kindName = st.L.kind === 'row' ? 'よこ' : (st.L.kind === 'col' ? 'たて' : 'ななめ');
-        return (st.i === 0 ? ('まず ' + kindName + 'の一列。たすと ' + g2.sum) : ('これも ' + g2.sum + '（' + kindName + '）')) + '\n' + (st.i + 1) + '本目 ／ ' + st.n + '本';
+        return (st.i === 0 ? ('まず、' + kindName + 'の1列をたすと' + g2.sum + 'です。') : (kindName + 'の列も、たすと' + g2.sum + 'です。')) + '\n（' + st.n + '本のうち' + (st.i + 1) + '本目）';
       }
-      if (st.t === 'alldone') return '？のない列は ぜんぶ ' + g2.sum + '！\nこれが魔方陣のひみつ';
-      if (st.t === 'lit1') { const n = L1.cells.slice(0, k).map(p => g2.m[p.r][p.c]); return 'まず ？のない一列を見つけて、たす\n' + (n.length ? n.join('＋') : '') ; }
-      if (st.t === 'sum1') return '一列たすと ' + g2.sum + '。\nたて・よこ・ななめ、どの列も ' + g2.sum + ' になる';
-      if (st.t === 'lit2') return '？のある列も ' + g2.sum + ' のはず。\nわかっている数を ' + g2.sum + ' から ひく';
-      if (st.t === 'reveal') return 'のこりは ' + this.reveal + '。\n？は ' + this.reveal;
+      if (st.t === 'alldone') return '？のない列は、どれもたすと' + g2.sum + 'です。\nこれが魔方陣のひみつです。';
+      if (st.t === 'lit1') { const n = L1.cells.slice(0, k).map(p => g2.m[p.r][p.c]); return '？がない列を1つえらんで、左からたします。\n' + (n.length ? n.join('＋') : '') ; }
+      if (st.t === 'sum1') return '1列たすと' + g2.sum + 'です。\nたて・横・ななめ、どの列も' + g2.sum + 'です。';
+      if (st.t === 'lit2') return '？が1つだけある列も、たすと' + g2.sum + 'です。\nだから、' + g2.sum + 'から、わかっている数をひきます。';
+      if (st.t === 'reveal') return 'のこりは' + this.reveal + 'です。\nだから、？は' + this.reveal + 'です。';
       return '';
     },
     onStep(k){
@@ -1744,7 +1748,7 @@ function lineDraw(area, opt){
   }
   
   if (opt.count) {
-    for (let i = 1; i <= g.mark; i++) text(String(i), px(i), y + 26, 11, '#3f7a52', 'center', '700');
+    for (let i = 1; i <= g.mark; i++) text(String(i), px(i), y + 48, 11, '#3f7a52', 'center', '700');   
   }
   
   text('0', px(0), y + 28, 15, CONFIG.C_INK, 'center', '700');
@@ -1774,12 +1778,14 @@ function lineDraw(area, opt){
 }
 function lineTeachBegin(){
   const g = S.g, ans = g.mark * g.step;
+
+  
   const msgs = [
-    '★の 数を もとめる',
-    '0から ' + g.label + ' までに\nめもりが ' + g.n + 'こ ある',
-    g.label + ' を ' + g.n + 'こに 分けると\n1めもりは ' + g.step,
-    '★は 0から ' + g.mark + 'こ目',
-    g.step + 'ずつ ' + g.mark + 'こで ' + ans,
+    '数の線の1めもりは、どこも同じ大きさです。\nまず、1めもりがいくつかを考えます。',
+    '0から' + g.label + 'までは、\n同じ大きさの' + g.n + 'つに分かれています。',
+    g.n + 'つ分で' + g.label + 'なので、1つ分は' + g.step + 'です。',
+    '★は、0からめもり' + g.mark + 'つ分のところにあります。',
+    '1めもりは' + g.step + 'なので、' + g.step + 'が' + g.mark + 'つ分で\n' + g.step + '×' + g.mark + '＝' + ans + 'です。★は' + ans + 'です。',
   ];
   const labels = ['', '0〜' + g.label, '1めもり=' + g.step, g.step + '×' + g.mark, g.step + '×' + g.mark + '=' + ans];
   return makeTeach(4, msgs, labels);
@@ -1805,11 +1811,15 @@ function lineKindIcon(kind, x, y, s){
 
 
 const BAL_K = [[2, 3], [2, 3, 4], [3, 4, 5], [4, 5, 6], [4, 5, 6, 7]];
-function balGen(lv){
+
+function balGen(lv){ return uPick('bal', 5, () => balGen1(lv)); }
+function balGen1(lv){
   const K = BAL_K[Math.min(lv, BAL_K.length - 1)];
   const k = K[randInt(0, K.length - 1)];
   const a = randInt(1, Math.max(1, Math.min(3, Math.floor(12 / k))));
-  const b = randInt(1, Math.min(5, 2 + lv));
+  
+  const bs = []; for (let v = 1; v <= Math.min(5, 2 + lv); v++) if (v !== a) bs.push(v);
+  const b = bs[randInt(0, bs.length - 1)];
   const g = { k, a, b, right: a * k };
   const answer = b * k;
   return { g, answer, kind: 'bal',
@@ -1885,14 +1895,16 @@ function balDraw(area, opt){
 }
 function balTeachBegin(){
   const g = S.g, ans = g.b * g.k;
+
+  
   const msgs = [
-    'つりあっている＝\nおなじ 重さ',
-    '● ' + g.a + 'こ と ▲ ' + g.right + 'こが\nつりあっている',
-    '● 1つ分に 分けると\n● 1つは ▲ ' + g.k + 'こ',
-    '● ' + g.b + 'こ なら\n' + g.k + 'ずつ ' + g.b + 'つ分',
-    g.k + '×' + g.b + ' で ' + ans,
+    'てんびんがつり合っているとき、\n左と右の重さは同じです。',
+    '●' + g.a + 'こと▲' + g.right + 'こが、同じ重さです。',
+    (g.a > 1 ? ('▲' + g.right + 'こを、●の数と同じ' + g.a + 'つに分けると、' + g.k + 'こずつです。\n') : '') + '●1こは、▲' + g.k + 'こと同じ重さです。',
+    '●' + g.b + 'こは、▲' + g.k + 'こが' + g.b + 'つ分です。',
+    g.k + '×' + g.b + '＝' + ans + 'なので、\n●' + g.b + 'こは▲' + ans + 'こ分の重さです。',
   ];
-  const labels = ['', '●' + g.a + '=▲' + g.right, '●1=▲' + g.k, g.k + '×' + g.b, g.k + '×' + g.b + '=' + ans];
+  const labels = ['', '●' + g.a + 'こ＝▲' + g.right + 'こ', '●1こ＝▲' + g.k + 'こ', g.k + '×' + g.b, g.k + '×' + g.b + '=' + ans];
   return makeTeach(4, msgs, labels);
 }
 function balTeachDraw(area, T){
@@ -1957,15 +1969,16 @@ function fieldDraw(area, opt){
   const g = opt.g || S.g;
   const hi = (opt.hi == null) ? -1 : opt.hi;
   ctx.save();
-  text('いちばん 多いものは いちばん 少ないものより', W / 2, area.y + 18, 12, CONFIG.C_INK_SOFT, 'center', '700');
-  text('何こ 多い？', W / 2, area.y + 38, 13, CONFIG.C_INK_SOFT, 'center', '800');
+  if (!qAsked()) text('いちばん 多いものは いちばん 少ないものより', W / 2, area.y + 18, 12, CONFIG.C_INK_SOFT, 'center', '700');
+  if (!qAsked()) text('何こ 多い？', W / 2, area.y + 38, 13, CONFIG.C_INK_SOFT, 'center', '800');
   const tallyH = opt.tally ? 74 : 0;
+  const headH = qAsked() ? 14 : 62;            
   const cw = Math.min(54, (area.w - 20) / g.cols);
-  const ch = Math.min(48, Math.max(26, (area.h - 76 - tallyH) / g.rows));
+  const ch = Math.min(48, Math.max(18, (area.h - headH - 14 - tallyH) / g.rows));
   const sz = Math.min(cw, ch) * 0.32;
   const ox = W / 2 - (g.cols - 1) * cw / 2;
   
-  const topY = area.y + 62, botY = area.y + area.h - (tallyH + (hi >= 0 ? 34 : 12) + 18);
+  const topY = area.y + headH, botY = area.y + area.h - (tallyH + (hi >= 0 ? 34 : 12) + 18);
   const oy = topY + Math.max(0, (botY - topY - g.rows * ch) / 2) + ch / 2;
   for (const p of g.pts) {
     const x = ox + (p.cx + p.jx) * cw, y = oy + (p.cy + p.jy) * ch;
@@ -1987,8 +2000,8 @@ function fieldDraw(area, opt){
       fieldShape(k, x - 26, ty, 9, FIELD_COL[k], CONFIG.C_EDGE, 1.4);
       const big = g.c[k] === g.mx, small = g.c[k] === g.mn;
       text(g.c[k] + 'こ', x + 6, ty, 17, big ? CONFIG.C_GOLD : (small ? '#4a8fd6' : CONFIG.C_INK), 'center', '800');
-      if (big) text('おおい', x + 6, ty + 18, 10, CONFIG.C_GOLD, 'center', '800');
-      else if (small) text('すくない', x + 6, ty + 18, 10, '#4a8fd6', 'center', '800');
+      if (big) text('多い', x + 6, ty + 18, 10, CONFIG.C_GOLD, 'center', '800');
+      else if (small) text('少ない', x + 6, ty + 18, 10, '#4a8fd6', 'center', '800');
     }
   }
   if (opt.reveal != null) text(g.mx + ' － ' + g.mn + ' ＝ ' + opt.reveal, W / 2, area.y + area.h - 16, 19, CONFIG.C_OK);
@@ -1996,13 +2009,15 @@ function fieldDraw(area, opt){
 }
 function fieldTeachBegin(){
   const g = S.g, d = g.mx - g.mn;
+
+  const NM = ['○', '□', '△'], iMx = g.c.indexOf(g.mx), iMn = g.c.indexOf(g.mn);
   const msgs = [
-    'ちらばって いるので、**種類ごと** に かぞえる',
-    '○を かぞえる … ' + g.c[0] + 'こ',
-    '□を かぞえる … ' + g.c[1] + 'こ',
-    '△を かぞえる … ' + g.c[2] + 'こ',
-    'いちばん多いのは **' + g.mx + 'こ**、いちばん少ないのは **' + g.mn + 'こ**',
-    g.mx + ' － ' + g.mn + ' ＝ **' + d + '**',
+    '形がちらばっているので、○、□、△に分けて、\n1つずつ数えます。',
+    '○を1こずつ数えます。○は' + g.c[0] + 'こです。',
+    '□を1こずつ数えます。□は' + g.c[1] + 'こです。',
+    '△を1こずつ数えます。△は' + g.c[2] + 'こです。',
+    'いちばん多い形は' + NM[iMx] + 'で' + g.mx + 'こ、\nいちばん少ない形は' + NM[iMn] + 'で' + g.mn + 'こです。',
+    g.mx + '−' + g.mn + '＝' + d + 'なので、\n' + NM[iMx] + 'は' + NM[iMn] + 'より' + d + 'こ多いです。',
   ];
   const labels = ['', '○' + g.c[0], '□' + g.c[1], '△' + g.c[2], g.mx + ' と ' + g.mn, String(d)];
   return makeTeach(5, msgs, labels, { g, k: 'field' });
@@ -2081,20 +2096,23 @@ function pairDraw(area, opt){
 function pairTeachBegin(){
   if (S.kind === 'field') return fieldTeachBegin();
   const g = S.g, d = g.n1 - g.n2;
+
+  
   const msgs = [
-    '上と下を 1つずつ\nペアに する',
-    'ペアに できたのは ' + g.n2 + 'こ',
-    'ペアに なれずに\nのこったのは ' + d + 'こ',
-    '○は △より ' + d + 'こ 多い\n△は ○より ' + d + 'こ 少ない',
+    '○は' + g.n1 + 'こ、△は' + g.n2 + 'こあります。',
+    '○と△を、1つずつ線でつないで組にします。\n組にすると、どちらが多いかが分かります。',
+    '組になったのは' + g.n2 + '組です。',
+    '組になれなかった○が、' + d + 'こあります。\nこれが、○と△の数のちがいです。',
+    g.n1 + '−' + g.n2 + '＝' + d + 'なので、○は△より' + d + 'こ多いです。\n△は○より' + d + 'こ少ないです。',
   ];
-  const labels = ['', g.n2 + 'ペア', g.n1 + '−' + g.n2 + '=' + d, g.n1 + '−' + g.n2 + '=' + d];
-  return makeTeach(3, msgs, labels);
+  const labels = ['', '線でつなぐ', g.n2 + '組', 'のこり' + d + 'こ', g.n1 + '−' + g.n2 + '=' + d];
+  return makeTeach(4, msgs, labels);
 }
 function pairTeachDraw(area, T){
   if (T.k === 'field') return fieldTeachDraw(area, T);
   pairDraw(teachFigArea(area), {
-    pair: T.shown >= 1, rest: T.shown >= 2,
-    reveal: T.shown >= 2 ? (S.g.n1 - S.g.n2) : null,
+    pair: T.shown >= 1, rest: T.shown >= 3,
+    reveal: T.shown >= 3 ? (S.g.n1 - S.g.n2) : null,
   });
 }
 function pairKindIcon(kind, x, y, s){
@@ -2116,24 +2134,29 @@ function pairKindIcon(kind, x, y, s){
 
 const WEEK = ['日', '月', '火', '水', '木', '金', '土'];
 function weekName(i){ return WEEK[((i % 7) + 7) % 7] + 'よう日'; }
-function weekGen(lv, kind){
+
+function weekGen(lv, kind){ return uPick('week', 5, () => weekGen1(lv, kind)); }
+function weekGen1(lv, kind){
   
   
   const start = randInt(0, 6);
   const k = (kind === 'after' && lv >= 2) ? 'after' : 'date';
+  
   const R = (k === 'after')
-    ? [[9, 20], [9, 28], [9, 40], [8, 52], [8, 60]][Math.min(lv, 4)]
-    : [[9, 20], [9, 25], [9, 30], [9, 30], [9, 30]][Math.min(lv, 4)];
+    ? [[8, 20], [8, 20], [8, 20], [8, 31], [15, 45]][Math.min(lv, 4)]
+    : [[9, 14], [9, 21], [9, 28], [15, 30], [22, 30]][Math.min(lv, 4)];
   let day = randInt(R[0], R[1]);
   const diff = (k === 'after') ? day : day - 1;
   if (diff < 8) day += 8;                       
   if (k === 'date' && day > 30) day = 30;       
   const g = { start, day, k };
   const idx = (start + ((k === 'after') ? g.day : g.day - 1)) % 7;
-  return { g, answer: weekName(idx), kind: k, choices: weekChoices(idx) };
+  return { g, answer: weekName(idx), kind: k, choices: weekChoices(idx, start) };
 }
-function weekChoices(idx){
+
+function weekChoices(idx, start){
   const out = [weekName(idx), weekName(idx + 1), weekName(idx - 1)];
+  if (start != null && out.indexOf(weekName(start)) < 0) out.push(weekName(start));
   const rest = shuffleArr([0, 1, 2, 3, 4, 5, 6].map(weekName).filter(w => out.indexOf(w) < 0));
   while (out.length < CONFIG.CHOICES) out.push(rest.pop());
   return shuffleArr(out);
@@ -2168,15 +2191,19 @@ function weekDraw(area, opt){
   const info = weekInfo(g);
   const list = weekRows(g, !!opt.expand);
   const rows = list.length;
-  const cs = Math.min((area.w - 16) / 7, (area.h - 104) / (rows + 0.5), 44);
-  const blockH = 14 + cs * rows + 34 + 44;
+  const cs = Math.min((area.w - 16) / 7, (area.h - 124) / (rows + 0.5), 44);
+  const head = opt.expand ? 0 : 20;              
+  const blockH = 14 + head + cs * rows + 34 + 44;
   const top = area.y + Math.max(8, (area.h - blockH) / 2);
-  const ox = W / 2 - cs * 3.5, oy = top + 16;
+  const ox = W / 2 - cs * 3.5, oy = top + 16 + head;
+  
+  
   const target = info.diff + (g.k === 'after' ? 0 : 1);   
   const first0 = (g.k === 'after') ? 0 : 1;
   
   const showNum = (n, c) => {
     if (opt.nums === 'all') return true;
+    if (opt.fill != null && n >= first0 && n <= opt.fill) return true;
     if (c === g.start) return opt.colMax != null && n <= opt.colMax;
     return !!opt.walk && n >= info.base && n <= target;
   };
@@ -2254,7 +2281,10 @@ function weekDraw(area, opt){
     by += 20;
   }
   
+  
   const label = (g.k === 'after') ? (g.day + '日後 は ？') : (g.day + '日 は ？');
+  
+  if (!opt.expand && !opt.reveal) { ctx.restore(); return; }
   if (opt.reveal) {
     const sc = 0.6 + 0.4 * Math.min(1, Math.max(0, S.t) / 0.2);
     ctx.save(); ctx.translate(W / 2, by + 40); ctx.scale(sc, sc);
@@ -2280,51 +2310,60 @@ function weekTeachBegin(){
   const folded = i.q > hops;                     
   
   const wshort = (k) => WEEK[((g.start + k) % 7 + 7) % 7];
-  const walkTxt = (i.r <= 4)
-    ? Array.from({ length: i.r + 1 }, (_, k) => wshort(k)).join(' → ')
-    : (wshort(0) + ' → ' + wshort(1) + ' → … → ' + wshort(i.r));
+  
+  
+  const walkTxt = ((i.r <= 4)
+    ? Array.from({ length: i.r }, (_, k) => (k + 1) + '日すすむと' + wshort(k + 1)).join('、')
+    : ('1日すすむと' + wshort(1) + '、…、' + i.r + '日すすむと' + wshort(i.r))) + 'です。';
 
-  const msgs = ['1しゅうかんは 7日。\n日・月・火・水・木・金・土 で 7つ'];
-  const labels = ['1しゅうかん'];
-  const colMax = [first0];                       
+  
+  const msgs = [after
+    ? ('きょうは' + startName + 'です。きょうは数えません。あしたが1日後です。\n1しゅうかんは、日・月・火・水・木・金・土の7日です。')
+    : ('1日は' + startName + 'です。\n1しゅうかんは、日・月・火・水・木・金・土の7日です。'),
+    'カレンダーでは、土のつぎの日を、下のだんの左はしに書きます。\nだから、' + d(first0 + 7) + 'は' + d(first0) + 'のすぐ下です。'];
+  const labels = ['1しゅうかん', 'すぐ下'];                 
+  const colMax = [first0, first0];               
   for (let k = 1; k <= hops; k++) {
-    const head = (k === 1) ? ('7日 たつと また ' + startName + '。') : 'もう 7日。';
+    const head = (k === 1) ? ('7日たつと、また' + startName + 'になります。') : 'もう7日すすみます。';
     const lastHop = (k === hops) && !folded;
     if (!lastHop) {
-      msgs.push(head + '\n' + d(nth(k - 1)) + ' → ' + d(nth(k)));
+      msgs.push(head + '\n' + d(nth(k - 1)) + 'から7日すすむと、' + d(nth(k)) + 'です。');
       labels.push('＋7');
     } else if (i.r === 0) {
-      msgs.push(head + '\n' + dayTxt + ' に ぴったり とどいた');
+      msgs.push(head + '\n' + dayTxt + 'に、ぴったりとどきました。');
       labels.push('ぴったり');
     } else {
-      msgs.push(head.replace('。', 'で ') + d(nth(k)) + '。\nつぎの ' + d(nth(k + 1)) + ' は ' + dayTxt + ' を こえる');
+      msgs.push(head + d(nth(k)) + 'です。\nつぎの' + d(nth(k + 1)) + 'は' + dayTxt + 'をこえるので、ここでとめます。');
       labels.push(d(nth(k)) + ' で とめる');
     }
     colMax.push(nth(k));
   }
   if (folded) {
     msgs.push((i.r === 0)
-      ? ('同じように 7ずつ。\n' + dayTxt + ' に ぴったり とどいた')
-      : ('同じように 7ずつ。\n' + d(i.base) + ' まで。つぎは ' + dayTxt + ' を こえる'));
+      ? ('同じように、7日ずつすすみます。\n' + dayTxt + 'に、ぴったりとどきました。')
+      : ('同じように、7日ずつすすみます。\n' + d(i.base) + 'でとめます。つぎの' + d(i.base + 7) + 'は' + dayTxt + 'をこえるからです。'));
     labels.push((i.r === 0) ? 'ぴったり' : (d(i.base) + ' で とめる'));
     colMax.push(i.base);
   }
+  
   msgs.push((i.r === 0)
-    ? ('すすまないので ' + startName + ' のまま')
-    : (d(i.base) + ' から ' + i.r + 'つ 数える。\n' + walkTxt));
-  labels.push((i.r === 0) ? 'そのまま' : (i.r + 'つ 数える'));
+    ? (dayTxt + 'は、' + d(first0) + 'と同じたてのれつにあります。\n同じれつは、同じよう日です。')
+    : (d(i.base) + 'から' + dayTxt + 'までは、あと' + i.r + '日です。\n' + walkTxt));
+  labels.push((i.r === 0) ? 'おなじ れつ' : (i.r + '日 すすむ'));
   colMax.push(i.base);
-  msgs.push('こたえは ' + weekName(i.idx));
+  msgs.push('だから、答えは' + weekName(i.idx) + 'です。');
   labels.push(weekName(i.idx));
   colMax.push(i.base);
-  return makeTeach(msgs.length - 1, msgs, labels, { info: i, colMax: colMax });
+  return makeTeach(msgs.length - 1, msgs, labels, { info: i, colMax: colMax, first0 });
 }
 function weekTeachDraw(area, T){
   const i = T.info, n = T.shown, tot = T.total;
   
   
+  
+  const fill = (n === 1) ? T.first0 + Math.min(7, Math.floor(teachProg(T, 1.4) * 8)) : (n > 1 ? T.first0 + 7 : null);
   weekDraw(teachFigArea(area), {
-    expand: true,
+    expand: true, fill,
     colMax: T.colMax[Math.min(n, T.colMax.length - 1)],
     col: n >= 1,
     base: n >= tot - 2,
@@ -2353,9 +2392,10 @@ function weekKindIcon(kind, x, y, s){
 function dotGrid(area, rows, cols, opt){
   opt = opt || {};
   const labelPad = (opt.rowLabel != null) ? 26 : 0;
-  const s = Math.min(20, (area.w - 40 - labelPad) / Math.max(cols, 1), (area.h - 40) / Math.max(rows, 1) / 1.15);
+  
+  const s = Math.min(20, (area.w - 40 - labelPad) / Math.max(cols - 1, 1) / 1.9, (area.h - 44 - (opt.colLabel != null ? 40 : 0)) / Math.max(rows - 1, 1) / 2.1);
   const gx = s * 1.9, gy = s * 2.1;
-  const ox = W / 2 - (cols - 1) * gx / 2 + labelPad / 2, oy = area.y + area.h / 2 - (rows - 1) * gy / 2;
+  const ox = W / 2 - (cols - 1) * gx / 2 + labelPad / 2, oy = area.y + area.h / 2 - (rows - 1) * gy / 2 - (opt.colLabel != null ? 14 : 0);   
   ctx.save();
   for (let r = 0; r < rows; r++) for (let c = 0; c < cols; c++) {
     const x = ox + c * gx, y = oy + r * gy;
@@ -2402,13 +2442,18 @@ function lineSegs(area, segs, opt){
 const ORD_FRUIT = [0, 1, 2, 3];      
 const ORD_MARK  = [10, 11, 12, 13];  
 
+
 const U06_LV = [
-  { mark: 0.0, ns: [3, 3, 3] },
-  { mark: 0.0, ns: [3, 3, 3] },
-  { mark: 0.4, ns: [3, 3, 3] },
-  { mark: 0.5, ns: [3, 3, 4] },
-  { mark: 0.6, ns: [3, 4, 4] },
+  { mark: 0.0, ns: [3, 3, 3], sorted: true,  counts: ['fix3', 'free3'] },
+  { mark: 0.0, ns: [3, 3, 3], sorted: false, counts: ['fix3', 'free3'] },
+  { mark: 0.4, ns: [3, 3, 3], sorted: false, counts: ['fix3', 'free3', 'fix4'] },
+  { mark: 0.5, ns: [3, 3, 4], sorted: false, counts: ['free3', 'fix4', 'two4'] },
+  { mark: 0.6, ns: [3, 4, 4], sorted: false, counts: ['fix4', 'two4', 'free4'] },
 ];
+function ordFact(n){ return n <= 1 ? 1 : n * ordFact(n - 1); }
+
+const ITEM_NAME = { 0: 'りんご', 1: 'みかん', 2: 'ぶどう', 3: 'バナナ', 4: 'いちご', 5: 'レモン',
+  10: 'まる', 11: 'さんかく', 12: 'ばつ', 13: 'しかく', 14: 'ほし', 15: 'ひしがた', 16: 'ハート' };
 function ordItem(id, x, y, s){
   ctx.save();
   ctx.lineWidth = 1.3; ctx.strokeStyle = CONFIG.C_EDGE;
@@ -2460,6 +2505,12 @@ function ordItem(id, x, y, s){
       i === 0 ? ctx.moveTo(px, py) : ctx.lineTo(px, py);
     }
     ctx.closePath(); ctx.fillStyle = '#e8c23f'; ctx.fill(); ctx.stroke();
+  } else if (id === 16) {                           
+    ctx.beginPath();
+    ctx.moveTo(x, y + s * 0.86);
+    ctx.bezierCurveTo(x - s * 1.2, y + s * 0.02, x - s * 0.72, y - s * 0.98, x, y - s * 0.38);
+    ctx.bezierCurveTo(x + s * 0.72, y - s * 0.98, x + s * 1.2, y + s * 0.02, x, y + s * 0.86);
+    ctx.closePath(); ctx.fillStyle = '#ee8fa6'; ctx.fill(); ctx.stroke();
   } else if (id === 15) {                           
     ctx.beginPath(); ctx.moveTo(x, y - s * 0.94); ctx.lineTo(x + s * 0.72, y);
     ctx.lineTo(x, y + s * 0.94); ctx.lineTo(x - s * 0.72, y); ctx.closePath();
@@ -2508,37 +2559,60 @@ function ordPerms(arr){
   });
   return out;
 }
-function ordMake(ids, n){
+function ordMake(ids, n, sorted){
   const pool = shuffleArr(ids.slice()).slice(0, n);
   
   const fixed = (n === 4) ? pool[0] : null;
   const arr = (n === 4) ? pool.slice(1) : pool;
   const perms = ordPerms(arr);
-  const missIdx = randInt(0, perms.length - 1);
+  
+  const missIdx = randInt(1, perms.length - 1);
   const full = (pm) => (fixed == null ? pm : [fixed].concat(pm));
-  const shown = shuffleArr(perms.filter((_, i) => i !== missIdx).map(full));
+  const left = perms.filter((_, i) => i !== missIdx).map(full);
+  const shown = sorted ? left : shuffleArr(left);
   const miss = full(perms[missIdx]);
   return { fixed, arr, n, shown, miss, all: perms.map(full) };
 }
+
+function ordMakeCount(ids, mode){
+  const n = (mode === 'fix3' || mode === 'free3') ? 3 : 4;
+  const pool = shuffleArr(ids.slice()).slice(0, n);
+  const firsts = (mode === 'fix3' || mode === 'fix4') ? [pool[0]]
+    : (mode === 'two4' ? [pool[0], pool[1]] : null);
+  return { count: true, mode, pool, firsts, n };
+}
+function ordCountAns(g){ return (g.firsts ? g.firsts.length : g.n) * ordFact(g.n - 1); }
 
 const ORD_INTRO = (function(){
   const arr = [0, 1, 2], perms = ordPerms(arr);
   return { fixed: null, arr, n: 3, shown: perms.filter((_, i) => i !== 2), miss: perms[2], all: perms };
 })();
+
+const ORD_INTRO_COUNT = { count: true, mode: 'free4', pool: [0, 1, 2, 3], firsts: null, n: 4 };
 function ordGen(lv, kind){
   const cfg = U06_LV[Math.min(lv, U06_LV.length - 1)];
   const ids = (Math.random() < cfg.mark) ? ORD_MARK : ORD_FRUIT;
-  const n = cfg.ns[randInt(0, cfg.ns.length - 1)];
-  const g = ordMake(ids, n);
   
   if (kind === 'count') {
-    g.count = true;
-    const ans = g.all.length;
+    
+    const modes = cfg.counts.filter(m => m !== ordGen.lastMode);
+    const mode = modes[randInt(0, modes.length - 1)];
+    ordGen.lastMode = mode;
+    const g = ordMakeCount(ids, mode);
+    const ans = ordCountAns(g), n = g.n;
+    
+    const noRule = g.firsts ? ordFact(n) : ordFact(n - 1);
     return { g, answer: ans, kind: 'count',
-      choices: numChoices(ans, [n, n * (n - 1), ans + 2, Math.max(2, ans - 2), ans + 6, n + 1]) };
+      
+      choices: numChoices(ans, [noRule, n, ans + 2, Math.max(1, ans - 2), ans * 2, n + 1]) };
   }
-  const choices = shuffleArr(g.all.map(o => ({ v: o.join(','), draw: (q, ink) => ordChoiceDraw(q, o) })));
-  return { g, answer: g.miss.join(','), kind: 'miss', choices };
+  
+  return uPick('u06miss', 3, () => {
+    const n = cfg.ns[randInt(0, cfg.ns.length - 1)];
+    const g = ordMake(ids, n, cfg.sorted);
+    const choices = shuffleArr(g.all.map(o => ({ v: o.join(','), draw: (q, ink) => ordChoiceDraw(q, o) })));
+    return { g, answer: g.miss.join(','), kind: 'miss', choices };
+  });
 }
 function ordChoiceDraw(q, list){
   
@@ -2546,37 +2620,38 @@ function ordChoiceDraw(q, list){
   const s = Math.min((q.w - 10) / ((list.length - 1) * gapK + 2), q.h * 0.34);
   ordRow(list, q.x + q.w / 2, q.y + q.h / 2, s, null, gapK);
 }
+
+
+
+function ordOneLine(list, cy){
+  text('れい：', W / 2 - 92, cy, 12, CONFIG.C_INK_SOFT, 'right', '700');
+  ordRow(list, W / 2 - 34, cy, 8, null, 3.0);
+  text('で 1とおり', W / 2 + 22, cy, 12, CONFIG.C_INK_SOFT, 'left', '700');
+}
 function ordDraw(area, opt){
   opt = opt || {};
   const g = opt.g || S.g;
   ctx.save();
   if (g.count) {
     
-    const all = (g.fixed == null ? g.arr : [g.fixed].concat(g.arr));
-    text('この ' + all.length + 'つを ならべる', W / 2, area.y + 20, 14, CONFIG.C_INK_SOFT, 'center', '800');
-    const s = Math.min(22, (area.w - 60) / all.length / 2.6);
-    const gap = s * 2.9, w0 = (all.length - 1) * gap;
-    all.forEach((id, i) => ordItem(id, W / 2 - w0 / 2 + i * gap, area.y + 74, s));
-    if (g.fixed != null) {
-      text('1ばんめは', W / 2 - 70, area.y + 116, 12, CONFIG.C_INK_SOFT, 'right', '700');
-      ordItem(g.fixed, W / 2 - 56, area.y + 116, 11);
-      text('に きめる', W / 2 - 40, area.y + 116, 12, CONFIG.C_INK_SOFT, 'left', '700');
-    }
     
+    const s = Math.min(22, (area.w - 60) / g.n / 2.6);
+    const gap = s * 2.9, w0 = (g.n - 1) * gap;
+    const iy = area.y + 44;
+    g.pool.forEach((id, i) => ordItem(id, W / 2 - w0 / 2 + i * gap, iy, s));
+    
+    const one = g.firsts ? [g.firsts[0]].concat(g.pool.filter(v => v !== g.firsts[0])) : g.pool.slice();
+    ordOneLine(one, iy + s + 30);
     if (opt.reveal != null) text(opt.reveal + 'とおり', W / 2, area.y + 170, 20, CONFIG.C_OK, 'center', '800');
     ctx.restore();
     return;
   }
   
   const all = (g.fixed == null ? g.arr : [g.fixed].concat(g.arr));
-  text('この ' + all.length + 'つを ならべる', W / 2, area.y + 16, 12, CONFIG.C_INK_SOFT, 'center', '700');
   const ts = 13, tgap = ts * 2.9, tw0 = (all.length - 1) * tgap;
-  all.forEach((id, i) => ordItem(id, W / 2 - tw0 / 2 + i * tgap, area.y + 42, ts));
-  if (g.fixed != null) {
-    text('1ばんめは ずっと おなじ', W / 2, area.y + 66, 11, CONFIG.C_INK_SOFT, 'center', '700');
-  }
+  all.forEach((id, i) => ordItem(id, W / 2 - tw0 / 2 + i * tgap, area.y + 22, ts));
   const rows = g.shown.length;
-  const top = area.y + (g.fixed != null ? 80 : 62);
+  const top = area.y + 40;
   
   const reserve = 34;                                    
   const availH = Math.max(80, (area.y + area.h) - top - reserve);
@@ -2589,81 +2664,146 @@ function ordDraw(area, opt){
   ctx.fillStyle = 'rgba(255,255,255,0.55)'; ctx.fill();
   ctx.strokeStyle = CONFIG.C_GRID; ctx.lineWidth = 1.4; ctx.stroke();
   g.shown.forEach((o, i) => ordRow(o, W / 2, top + 6 + rowH / 2 + i * rowH, s, null));
-  text('↑ もう 出ている', W / 2, top + listH + 14, 11, CONFIG.C_INK_SOFT, 'center', '700');
+  text('↑ 書き出した ならべ方（' + rows + 'つ）', W / 2, top + listH + 14, 12, CONFIG.C_INK_SOFT, 'center', '800');
   if (opt.reveal) ordRow(g.miss, W / 2, top + listH + 46, s, null);
   if (opt.reveal) text('これが ぬけていた', W / 2, top + listH + 46 + rowH * 0.7, 13, CONFIG.C_OK, 'center', '800');
   ctx.restore();
 }
 
-const ORD_TEACH = [0, 1, 2];          
-const ORD_NAME  = ['りんご', 'みかん', 'ぶどう', 'バナナ'];
+
+
 
 function ordTeachBegin(){
-  const g = S.g, a = g.arr;
-  const msgs = [
-    (g.fixed != null ? '1ばんめは いつも おなじに する。のこり3つの' : 'この3つの') +
-      ' じゅんばんを\n**ぜんぶ** しらべる',
-    'まず 1ばんめを これに する',
-    '2ばんめは のこりの 2つ。3ばんめは のこりの 1つ\n→ **2とおり**',
-    '1ばんめを かえても **2とおり**',
-    '1ばんめを かえても **2とおり**',
-    '2 ＋ 2 ＋ 2 ＝ **6とおり**',
-  ];
-  const labels = ['', 'まず', '2とおり', '4とおり', '6とおり', '6とおり'];
-  if (!g.count) {
-    msgs.push('この もんだいで まだ 出ていなかったのは\nこれ');
-    labels.push('これ！');
+  const g = S.g;
+  if (g.count && (g.mode === 'two4' || g.mode === 'free4')) {
+    const cands = g.firsts || g.pool, first = cands[0];
+    const a = g.pool.filter(v => v !== first), ans = ordCountAns(g);
+    const msgs = [
+      
+      'この4つのならべ方を、しらべます。' + (g.firsts ? '\n1ばんめになれるのは、2つだけです。' : ''),
+      '1ばんめを、これにきめます。のこりの3つのならべ方は、\n3つのときと同じ **6通り**です。',
+      '1ばんめをかえても、のこりは3つです。\nだから、また **6通り**あります。',
+      '1ばんめが' + cands.length + 'つなので、' + cands.map(() => '6').join('＋') + '＝' + ans + 'です。\nだから、答えは **' + ans + '通り**です。',
+    ];
+    return makeTeach(3, msgs, ['', '6通り', '1ばんめを かえる', ans + '通り'],
+      { g, k: 'ord', plan: 'sum', root: first, a, cands, ans });
   }
-  return makeTeach(msgs.length - 1, msgs, labels, { g, a, k: 'ord' });
+  if (g.count && g.mode === 'fix3') {
+    const root = g.firsts[0], a = g.pool.filter(v => v !== root);
+    const msgs = [
+      'これは、かならず1ばんめです。\nのこりの2つのならべ方を、しらべます。',
+      '2ばんめは、のこりの2つのどちらかです。',
+      '3ばんめは、のこった1つです。',
+      '線を1本なぞると、1つのならべ方になります。\n線が2本なので、答えは **2通り**です。',
+    ];
+    return makeTeach(3, msgs, ['', '2ばんめ', '3ばんめ', '2通り'],
+      { g, k: 'ord', plan: 'fix3', root, a,
+        steps: [{ depth: [0, 0] }, { depth: [1, 1] }, { depth: [2, 2] }, { depth: [2, 2], seq: true }] });
+  }
+  
+  const root = g.count ? (g.firsts ? g.firsts[0] : null) : g.fixed;
+  const a = g.count ? g.pool.filter(v => v !== root) : g.arr;
+  const nm = (root != null) ? ['2ばんめ', '3ばんめ', '4ばんめ'] : ['1ばんめ', '2ばんめ', '3ばんめ'];
+  const msgs = [
+    (root != null ? 'これは、かならず1ばんめです。\nのこりの3つの' : 'この3つの') + 'ならべ方を、**ぜんぶ**しらべます。',
+    nm[0] + 'を、これにします。',
+    'これは、もうならべました。\n' + nm[1] + 'は、のこりの2つのどちらかです。',
+    nm[2] + 'は、のこった1つです。\n線を1本なぞると1つのならべ方なので、**2通り**です。',
+    nm[0] + 'をかえても、**2通り**です。\nあわせて4通りです。',
+    nm[0] + 'をかえても、**2通り**です。\nあわせて6通りです。',
+    '2＋2＋2＝6なので、答えは **6通り**です。',
+  ];
+  const labels = ['', nm[0], nm[1], '2通り', '4通り', '6通り', '6通り'];
+  const steps = [{ depth: [0, 0, 0] }, { depth: [1, 0, 0] }, { depth: [2, 0, 0] }, { depth: [3, 0, 0] },
+    { depth: [3, 3, 0] }, { depth: [3, 3, 3] }, { depth: [3, 3, 3], sums: true }];
+  if (!g.count) {
+    
+    const pre = !!S.intro;
+    msgs[6] = 'ならべ方は、ぜんぶで **6通り**です。\n' + (pre ? 'もし、' + g.shown.length + 'つしか出ていなかったら、どれがぬけているでしょう。'
+      : 'さっきの問題には、' + g.shown.length + 'つしかありませんでした。');
+    msgs.push((pre ? 'その' : 'さっきの問題に出ていた') + g.shown.length + 'つに、✓をつけます。');
+    msgs.push('✓がつかなかった1本が、出ていないならべ方です。');
+    labels.push('✓', 'これ！');
+    steps.push({ depth: [3, 3, 3], checks: true }, { depth: [3, 3, 3], checks: true, miss: true });
+  }
+  return makeTeach(msgs.length - 1, msgs, labels, { g, k: 'ord', plan: 'tree', root, a, steps });
 }
-function ordTeachDraw(area, T){
-  const a = T.a || ORD_TEACH, n = T.shown, g = T.g;
-  const ar = teachFigArea(area);
-  const full = (n <= 1) ? 0 : (n === 2 ? 1 : n === 3 ? 2 : 3);
-  const hi1 = (n === 1) ? 0 : -1;
+
+function ordTree(ar, root, a, st, g){
+  const L = a.length, perms = ordPerms(a), leaves = perms.length, grp = ordFact(L - 1);
+  const rowH = Math.min(38, (ar.h - 50) / leaves);
+  const top = ar.y + 30 + Math.min(24, Math.max(0, (ar.h - 50 - rowH * leaves) / 2));   
+  const dx = Math.min(66, 250 / L), x0 = W / 2 - (L * dx) / 2 - 20;
+  const s = Math.min(12, rowH * 0.34);
+  const colX = (c) => x0 + c * dx;
+  const yOf = (j, c) => { const m = ordFact(L - c); return top + (Math.floor(j / m) * m + m / 2) * rowH; };
+  const full = (p) => (root == null ? p : [root].concat(p));
+  const missKey = (st.miss && g) ? g.miss.join(',') : null;
+  const shownKeys = (st.checks && g && g.shown) ? g.shown.map(o => o.join(',')) : [];
   
-  const showMiss = n >= 6 && g && !g.count;
-  const missTail = showMiss ? (g.fixed != null ? g.miss.slice(1) : g.miss) : null;
-  const missTopIdx = showMiss ? a.indexOf(missTail[0]) : -1;
-  const rows = 6;
-  const s = Math.min(12, (ar.h - 30) / rows / 2.6);
-  const rowH = Math.min(38, (ar.h - 30) / rows);
-  const top = ar.y + (ar.h - rowH * rows) / 2 + rowH / 2;
-  const x0 = W / 2 - 128, x1 = W / 2 - 62, x2 = W / 2 + 10, x3 = W / 2 + 82;
+  const onMiss = (p, c) => !missKey
+    || missKey.split(',').slice(0, (root == null ? 0 : 1) + c).join(',') === full(p.slice(0, c)).join(',');
+  const heads = (root != null) ? ['1ばんめ', '2ばんめ', '3ばんめ', '4ばんめ'] : ['', '1ばんめ', '2ばんめ', '3ばんめ'];
   ctx.save();
-  text('1ばんめ', x1, ar.y + 12, 10, CONFIG.C_INK_SOFT, 'center', '700');
-  text('2ばんめ', x2, ar.y + 12, 10, CONFIG.C_INK_SOFT, 'center', '700');
-  text('3ばんめ', x3, ar.y + 12, 10, CONFIG.C_INK_SOFT, 'center', '700');
-  ctx.beginPath(); ctx.arc(x0, top + rowH * 2.5, s * 0.5, 0, Math.PI * 2);
-  ctx.fillStyle = CONFIG.C_INK_SOFT; ctx.fill();
-  
-  for (let i = 0; i < 3; i++) {
-    const rest = a.filter(v => v !== a[i]);
-    const y1 = top + (i * 2 + 0.5) * rowH;
-    const on = (i < full) || (i === hi1);
-    const topOn = showMiss ? (i === missTopIdx) : on;
-    ctx.save(); ctx.globalAlpha = topOn ? 1 : 0.2;
-    ctx.strokeStyle = topOn ? CONFIG.C_GOLD : CONFIG.C_GRID; ctx.lineWidth = 1.6;
-    ctx.beginPath(); ctx.moveTo(x0 + s * 0.6, top + rowH * 2.5); ctx.lineTo(x1 - s, y1); ctx.stroke();
-    ordItem(a[i], x1, y1, s);
-    ctx.restore();
-    if (!showMiss && i >= full) continue;
-    for (let j = 0; j < 2; j++) {
-      const y2 = top + (i * 2 + j) * rowH;
-      const isMiss = showMiss && missTail[0] === a[i] && missTail[1] === rest[j] && missTail[2] === rest[1 - j];
-      ctx.save(); ctx.globalAlpha = showMiss ? (isMiss ? 1 : 0.2) : 1;
-      ctx.strokeStyle = (showMiss ? (isMiss ? CONFIG.C_GOLD : CONFIG.C_GRID) : CONFIG.C_GOLD);
-      ctx.lineWidth = isMiss ? 2.4 : 1.5;
-      ctx.beginPath(); ctx.moveTo(x1 + s, y1); ctx.lineTo(x2 - s, y2); ctx.stroke();
-      ordItem(rest[j], x2, y2, isMiss ? s * 1.15 : s);
-      ctx.beginPath(); ctx.moveTo(x2 + s, y2); ctx.lineTo(x3 - s, y2); ctx.stroke();
-      ordItem(rest[1 - j], x3, y2, isMiss ? s * 1.15 : s);
+  for (let c = (root != null ? 0 : 1); c <= L; c++) text(heads[c], colX(c), ar.y + 12, 10, CONFIG.C_INK_SOFT, 'center', '700');
+  const ry = top + rowH * leaves / 2;
+  if (root == null) { ctx.beginPath(); ctx.arc(colX(0), ry, s * 0.5, 0, Math.PI * 2); ctx.fillStyle = CONFIG.C_INK_SOFT; ctx.fill(); }
+  else ordItem(root, colX(0), ry, s);
+  perms.forEach((p, j) => {
+    const b = Math.floor(j / grp);
+    for (let c = 1; c <= L; c++) {
+      if ((st.depth[b] || 0) < c) break;
+      const m = ordFact(L - c);
+      const y = yOf(j, c), py = (c === 1) ? ry : yOf(j, c - 1);
+      const on = onMiss(p, c);
+      ctx.save(); ctx.globalAlpha = on ? 1 : 0.2;
+      ctx.strokeStyle = CONFIG.C_GOLD; ctx.lineWidth = (missKey && on) ? 2.4 : 1.5;
+      ctx.beginPath(); ctx.moveTo(colX(c - 1) + s, py); ctx.lineTo(colX(c) - s, y); ctx.stroke();
+      if (j % m === 0) ordItem(p[c - 1], colX(c), y, s);
       ctx.restore();
     }
-  }
-  if (n >= 5 && !showMiss) text(g.count ? 'ぜんぶで 6とおり' : 'まず ぜんぶで 6とおり', W / 2, top + rowH * 5.9, 14, CONFIG.C_OK, 'center', '800');
-  if (showMiss) text('これが ぬけていた', W / 2, top + rowH * 5.9, 15, CONFIG.C_GOLD, 'center', '800');
+    const yl = yOf(j, L), xr = colX(L) + s + 12;
+    if ((st.depth[b] || 0) >= L && shownKeys.indexOf(full(p).join(',')) >= 0)
+      text('✓', xr, yl, 15, CONFIG.C_OK, 'center', '800');
+    if (st.seq && (st.depth[b] || 0) >= L) ordRow(full(p), xr + 44, yl, s * 0.62, null, 3.0);
+  });
+  if (st.sums && L === 3) for (let b = 0; b < 3; b++)
+    text('2', colX(L) + s + 16, top + (b * 2 + 1) * rowH, 16, CONFIG.C_GOLD, 'center', '800');
   ctx.restore();
+  return top + rowH * leaves;
+}
+
+function ordSum(ar, cands, n, sofar){
+  const gap = Math.min(78, (ar.w - 20) / cands.length), x0 = W / 2 - gap * (cands.length - 1) / 2;
+  const y = ar.y + ar.h * 0.42;
+  ctx.save();
+  cands.forEach((id, i) => {
+    const x = x0 + i * gap, on = i < sofar;
+    ctx.save(); ctx.globalAlpha = on ? 1 : 0.25;
+    text('1ばんめ', x, y - 34, 10, CONFIG.C_INK_SOFT, 'center', '700');
+    ordItem(id, x, y - 10, 13);
+    rrect(x - 28, y + 12, 56, 28, 8); ctx.fillStyle = CONFIG.C_HI_T; ctx.fill();
+    ctx.strokeStyle = CONFIG.C_GOLD; ctx.lineWidth = 1.6; ctx.stroke();
+    text('6とおり', x, y + 26, 12, CONFIG.C_INK, 'center', '800');
+    ctx.restore();
+    if (i > 0) text('＋', x - gap / 2, y + 26, 14, CONFIG.C_INK_SOFT, 'center', '800');
+  });
+  ctx.restore();
+}
+function ordTeachDraw(area, T){
+  const n = T.shown, g = T.g;
+  const ar = teachFigArea(area);
+  
+  if (T.plan === 'sum') {
+    if (n <= 1) { if (n === 1) ordTree(ar, T.root, T.a, { depth: [3, 3, 3] }, null);
+      else ordDraw(ar, { g }); return; }
+    const k = (n === 2) ? Math.min(T.cands.length, 1 + Math.floor(teachProg(T, 1.6) * T.cands.length)) : T.cands.length;
+    ordSum(ar, T.cands, n, k);
+    return;
+  }
+  const st = T.steps[Math.min(n, T.steps.length - 1)];
+  const bottom = ordTree(ar, T.root, T.a, st, g);
+  
 }
 function ordKindIcon(kind, x, y, s){
   ctx.save();
@@ -2678,14 +2818,17 @@ function ordKindIcon(kind, x, y, s){
 
 
 const CHOOSE_SET_F = [0, 1, 2, 3, 4, 5];      
-const CHOOSE_SET_M = [10, 11, 12, 13, 14, 15]; 
+
+const CHOOSE_SET_M = [10, 11, 16, 13, 14, 15]; 
+
+
 
 const CHOOSE_LV = [
-  { mark: 0.0, nk: [[4, 1], [4, 2], [4, 3]] },
-  { mark: 0.0, nk: [[4, 1], [4, 2], [4, 3], [3, 2]] },
-  { mark: 0.4, nk: [[4, 2], [4, 3], [5, 1], [5, 4], [3, 2]] },
-  { mark: 0.5, nk: [[5, 2], [5, 3], [4, 2], [5, 4], [5, 1]] },
-  { mark: 0.6, nk: [[5, 2], [5, 3], [6, 1], [6, 5], [4, 2], [5, 4]] },
+  { mark: 0.0, nk: [[3, 2], [4, 3], [4, 2], [5, 2]] },
+  { mark: 0.0, nk: [[3, 2], [4, 2], [4, 3], [5, 4], [5, 2]] },
+  { mark: 0.4, nk: [[4, 2], [4, 3], [5, 4], [5, 2], [3, 2]] },
+  { mark: 0.5, nk: [[5, 2], [4, 2], [5, 4], [5, 3], [6, 5]] },
+  { mark: 0.6, nk: [[5, 2], [5, 3], [6, 2], [4, 2], [6, 5]] },
 ];
 function combos(n, k){
   const out = [];
@@ -2696,14 +2839,25 @@ function combos(n, k){
   rec(0, []);
   return out;
 }
+function choosePermCount(n, k){ let v = 1; for (let i = 0; i < k; i++) v *= (n - i); return v; }
 function chooseGen(lv){
   const cfg = CHOOSE_LV[Math.min(lv, CHOOSE_LV.length - 1)];
-  const [n, k] = cfg.nk[randInt(0, cfg.nk.length - 1)];
+  
+  const hist = chooseGen.hist || (chooseGen.hist = []);
+  const eqN = hist.filter(h => h.eq).length;
+  let n, k;
+  for (let t = 0; t < 40; t++) {
+    [n, k] = cfg.nk[randInt(0, cfg.nk.length - 1)];
+    const a = combos(n, k).length;
+    if ((a === n && eqN >= 2) || hist.filter(h => h.a === a).length >= 2) continue;
+    break;
+  }
   const ids = shuffleArr(((Math.random() < cfg.mark) ? CHOOSE_SET_M : CHOOSE_SET_F).slice()).slice(0, n);
   const ans = combos(n, k).length;
+  hist.push({ eq: ans === n, a: ans }); if (hist.length > 5) hist.shift();
   
   return { g: { ids, n, k }, answer: ans, kind: 'choose',
-    choices: numChoices(ans, [n, k, n * k, ans + 1, Math.max(1, ans - 1), n + k]) };
+    choices: numChoices(ans, [n, k, choosePermCount(n, k), ans + 1, Math.max(1, ans - 1), n + k]) };
 }
 
 function chooseRow(ids, pick, cx, cy, s){
@@ -2722,6 +2876,16 @@ function chooseRow(ids, pick, cx, cy, s){
     }
   });
 }
+
+function chooseSame(ids, k, cy, es){
+  if (k < 2) return;
+  const egap = es * 2.5, w = (k - 1) * egap;
+  const row = (cx, rev) => { for (let i = 0; i < k; i++) ordItem(ids[rev ? k - 1 - i : i], cx - w / 2 + i * egap, cy, es); };
+  const off = w / 2 + 34;
+  row(W / 2 - off, false);
+  text('＝', W / 2, cy, 15, CONFIG.C_INK_SOFT, 'center', '800');
+  row(W / 2 + off, true);
+}
 function chooseDraw(area, opt){
   opt = opt || {};
   const g = opt.g || S.g;
@@ -2729,67 +2893,99 @@ function chooseDraw(area, opt){
   const s = Math.min(20, (area.w - 50) / g.n / 2.6);
   chooseRow(g.ids, g.ids.map((_, i) => i), W / 2, area.y + 44, s);
   
-  rrect(W / 2 - 62, area.y + 74, 124, 28, 9);
-  ctx.fillStyle = CONFIG.C_HI_T; ctx.fill();
-  ctx.strokeStyle = CONFIG.C_GOLD; ctx.lineWidth = 2; ctx.stroke();
-  text('この うち ' + g.k + 'こ', W / 2, area.y + 88, 15, CONFIG.C_INK, 'center', '800');
   
-  text('じゅんばんは 関係ない', W / 2, area.y + 118, 12, CONFIG.C_INK_SOFT, 'center', '800');
-  const es = 11, ey = area.y + 148, egap = es * 2.5;
-  const rowX = (cx, rev) => {
-    ordItem(g.ids[rev ? 1 : 0], cx - egap / 2, ey, es);
-    ordItem(g.ids[rev ? 0 : 1], cx + egap / 2, ey, es);
-  };
-  rowX(W / 2 - 58, false);
-  text('＝', W / 2, ey, 15, CONFIG.C_INK_SOFT, 'center', '800');
-  rowX(W / 2 + 58, true);
+  if (g.k >= 2) {
+    text('ならぶじゅん番がちがっても、同じえらび方です。', W / 2, area.y + 92, 13, CONFIG.C_INK, 'center', '800');
+    chooseSame(g.ids, g.k, area.y + 122, 11);
+  }
   ctx.restore();
 }
-
 const CHOOSE_TEACH = [0, 1, 2, 3];    
-function chooseList(ids, k, cx, top, s, rowH, label){
-  const list = combos(ids.length, k);
-  text(label, cx, top - 12, 12, CONFIG.C_GOLD, 'center', '800');
-  list.forEach((pick, i) => chooseRow(ids, pick, cx, top + rowH / 2 + i * rowH, s));
-  text(list.length + 'とおり', cx, top + list.length * rowH + 12, 14, CONFIG.C_OK, 'center', '800');
-  return list.length;
-}
-
 
 function chooseTeachBegin(){
   const g = S.g, n = g.n, k = g.k, k2 = n - k, ans = S.answer;
-  const useReframe = k > k2;
-  const listK = useReframe ? k2 : k;
-  let msgs, labels;
-  if (useReframe) {
-    msgs = [
-      'この ' + n + 'つ の うち から ' + k + 'こ えらぶ',
-      k + 'こ えらぶ ＝ **' + k2 + 'こ えらばない** を きめる ほうが\n書く 数が すくない',
-      k2 + 'こ の 書き方を 書き出すと **' + ans + 'とおり**',
-      'だから ' + k + 'こ えらぶも **' + ans + 'とおり**',
-    ];
-    labels = ['', '言いかえ', String(ans), String(ans)];
+  const reframe = k > k2;
+  const listK = reframe ? k2 : k;
+  
+  const msgs = ['この' + n + 'つから、' + k + 'こをえらびます。\n' + k + 'このくみは、何通りあるでしょう。'];
+  const labels = [''];
+  const steps = [{ rows: 0 }];
+  if (reframe) {
+    
+    msgs.push(k + 'こをえらぶことは、' + k2 + 'こをえらばないことと同じです。'); labels.push('えらばない ' + k2 + 'こ'); steps.push({ one: true });
+    msgs.push('✕がほかへうつると、えらぶ' + k + 'こもかわります。\nだから、えらばない' + k2 + 'こをきめれば、くみが1つきまります。'); labels.push('✕ が うごくと'); steps.push({ one: true, move: true });
   } else {
-    msgs = [
-      'この ' + n + 'つ の うち から ' + k + 'こ えらぶ',
-      k + 'こ の えらび方を そのまま 書き出す',
-      '書き出すと **' + ans + 'とおり**',
-    ];
-    labels = ['', '書き出す', String(ans)];
+    msgs.push('じゅんばんがちがっても、同じくみです。\n同じくみは、2回数えません。'); labels.push('おなじ くみ'); steps.push({ same: true });
   }
-  return makeTeach(msgs.length - 1, msgs, labels, { g, listK, mk: 'choose' });
+  const head = reframe ? ('えらばない ' + k2 + 'こ') : ('えらぶ ' + k + 'こ');
+  if (listK === 1) {
+    msgs.push('えらばない1こは、' + n + 'つのどれかなので、**' + ans + '通り**です。'); labels.push(ans + '通り');
+    steps.push({ rows: n, groups: 0 });
+  } else {
+    
+    let done = 0;
+    const parts = [];
+    for (let a = 0; a < n - 1; a++) {
+      const c = n - 1 - a;
+      done += c; parts.push(c);
+      msgs.push(a === 0
+        ? (head + 'を、よこ1れつずつならべます。\nいちばん左のものとくむのは、右にある' + c + 'つなので、' + c + '通りです。')
+        : ('左から' + (a + 1) + 'ばんめのものは、右にあるものとだけくみます。' + c + '通りです。\n左のものとのくみは、もう上にあるからです。'));
+      labels.push(c + '通り'); steps.push({ rows: done, groups: a + 1 });
+    }
+    msgs.push(parts.join('＋') + '＝' + ans + 'なので、' + (reframe ? '**' + ans + '通り**です。' : '答えは **' + ans + '通り**です。')); labels.push(ans + '通り');
+    steps.push({ rows: done, groups: n - 1, sum: true });
+  }
+  if (reframe) {
+    msgs.push('よこ1れつが、1通りです。\nだから、' + k + 'このくみも、答えは **' + ans + '通り**です。'); labels.push(ans + '通り');
+    const last = steps[steps.length - 1];
+    steps.push(Object.assign({}, last, { box: true }));
+  }
+  return makeTeach(msgs.length - 1, msgs, labels, { g, listK, reframe, steps, mk: 'choose' });
 }
 function chooseTeachDraw(area, T){
-  const g = T.g, n = T.shown;
+  const g = T.g, n = T.shown, st = T.steps[Math.min(n, T.steps.length - 1)];
   const ar = teachFigArea(area);
+  const all = g.ids.map((_, i) => i);
+  const comp = (c) => all.filter(i => c.indexOf(i) < 0);          
   ctx.save();
-  chooseRow(g.ids, g.ids.map((_, i) => i), W / 2, ar.y + 18, 12);
-  if (n >= T.total - 1) {
-    const rowsCount = combos(g.n, T.listK).length;
-    const top = ar.y + 58;
-    const rowH = Math.max(14, Math.min(26, (ar.h - top + ar.y - 34) / rowsCount));
-    const sSize = Math.max(6, Math.min(10, rowH * 0.35));
-    chooseList(g.ids, T.listK, W / 2, top, sSize, rowH, T.listK + 'こ の えらび方');
+  chooseRow(g.ids, all, W / 2, ar.y + 18, 12);
+  
+  if (T.listK === 2 && st.groups && !st.sum && !st.box) {
+    const a = st.groups - 1, gap = 12 * 2.5, x = W / 2 - (g.n - 1) * gap / 2 + a * gap;
+    ctx.save(); ctx.strokeStyle = CONFIG.C_GOLD; ctx.lineWidth = 2.2;
+    ctx.beginPath(); ctx.arc(x, ar.y + 18, 17, 0, Math.PI * 2); ctx.stroke(); ctx.restore();
+  }
+  text('この ' + g.n + 'つから ' + g.k + 'こ えらぶ', W / 2, ar.y + 44, 12, CONFIG.C_GOLD, 'center', '800');
+  const list = combos(g.n, T.listK);
+  if (st.same) {
+    chooseSame(g.ids, g.k, ar.y + 90, 16);
+    text('おなじ くみ', W / 2, ar.y + 124, 14, CONFIG.C_OK, 'center', '800');
+  } else if (st.one) {
+    
+    const idx = st.move ? Math.min(list.length - 1, Math.floor(teachProg(T, 2.2) * Math.min(list.length, 4))) : 0;
+    chooseRow(g.ids, comp(list[idx]), W / 2, ar.y + 96, 16);
+    text('✕ ＝ えらばない ' + T.listK + 'こ', W / 2, ar.y + 128, 12, '#c15c4e', 'center', '800');
+  } else if (st.rows) {
+    const rows = st.rows;
+    const top = ar.y + 64;
+    const rowH = Math.max(14, Math.min(26, (ar.h - 64 - 40) / list.length));
+    const sz = Math.max(6, Math.min(10, rowH * 0.36));
+    for (let r = 0; r < rows; r++) {
+      const c = list[r];
+      chooseRow(g.ids, T.reframe ? comp(c) : c, W / 2, top + rowH / 2 + r * rowH, sz);
+    }
+    
+    if (T.listK === 2) {
+      let r0 = 0;
+      for (let a = 0; a < (st.groups || 0); a++) {
+        const c = g.n - 1 - a;
+        text(String(c), W / 2 + g.n * sz * 1.25 + 22, top + (r0 + c / 2) * rowH, 14, CONFIG.C_GOLD, 'center', '800');
+        r0 += c;
+      }
+    }
+    if (st.sum || st.box || T.listK === 1)
+      text('ぜんぶで ' + list.length + 'とおり', W / 2, Math.min(ar.y + ar.h - 8, top + rows * rowH + 16), 14, CONFIG.C_OK, 'center', '800');
   }
   ctx.restore();
 }
@@ -2927,22 +3123,25 @@ function codeTeachBegin(){
   };
   if (g.add) {
     const onA = namesFor(g.a, g.digits), onB = namesFor(g.b, g.digits);
+
     const msgs = [
-      '○ は 0、｜ は 1',
-      '1つ目：｜の ところを ひろう\n' + (onA.length ? onA.join(' ＋ ') : '0') + ' ＝ ' + g.a,
-      '2つ目：｜の ところを ひろう\n' + (onB.length ? onB.join(' ＋ ') : '0') + ' ＝ ' + g.b,
-      g.a + ' ＋ ' + g.b + ' ＝ **' + (g.a + g.b) + '**',
+      '○はおった指、｜はのばした指です。\n｜のところのねうちだけを、数に入れます。',
+      '＋の左のあんごうは、｜のところのねうちをたして\n' + (onA.length ? onA.join('＋') : '0') + '＝' + g.a + 'です。',
+      '＋の右のあんごうも、同じようにたして\n' + (onB.length ? onB.join('＋') : '0') + '＝' + g.b + 'です。',
+      g.a + '＋' + g.b + '＝**' + (g.a + g.b) + '**です。',
     ];
     const labels = ['', String(g.a), String(g.b), String(g.a + g.b)];
     return makeTeach(3, msgs, labels, { g, k: 'code' });
   }
   const on = namesFor(g.v, g.digits);
-  const vals = CODE_VALS.slice(CODE_VALS.length - g.digits).join('・');
+
+  
+  const valsR = CODE_VALS.slice(CODE_VALS.length - g.digits).reverse().join('、');
   const msgs = [
-    '○ は 0、｜ は 1',
-    '右から **' + vals + '** の **ねうち** を 書く',
-    '｜ の ところ だけ ひろう → **' + (on.length ? on.join('・') : '0') + '**',
-    (on.length ? on.join(' ＋ ') : '0') + ' ＝ **' + g.v + '**',
+    '○はおった指、｜はのばした指です。\n｜のところだけを、数に入れます。',
+    'しるしの上に「ねうち」を書きます。右から' + valsR + '。\n左へ1つ進むたびに、2ばいになります。',
+    '｜のところのねうちは、' + (on.length ? on.join('と') : 'ありません') + 'です。\n○のところは数えません。',
+    (on.length ? on.join('＋') : '0') + '＝**' + g.v + '**です。',
   ];
   const labels = ['', 'ねうち', on.join('+') || '0', String(g.v)];
   return makeTeach(3, msgs, labels, { g, k: 'code' });
@@ -2984,7 +3183,8 @@ function triGen(lv){
 
 function triStack(area, n, opt){
   opt = opt || {};
-  const cs = Math.min(15, (area.w - 20) / n / 1.4, (area.h - 16) / n / 1.55);
+  
+  const cs = Math.min(15, (area.w - 20) / n / 1.4, (area.h - 28) / Math.max(1, n - 1) / 2.15);
   const gy = cs * 2.15, gx = cs * 2.15;
   const oy = area.y + (area.h - (n - 1) * gy) / 2;
   ctx.save();
@@ -3015,15 +3215,18 @@ function triTeachBegin(){
   while (a < b) { pairs.push([a, b]); a++; b--; }
   const mid = (a === b) ? a : null;
   const pairSum = n + 1;
-  const msgs = [n + 'だんの せきを かぞえる'];
+
+  
+  const msgs = [n + 'だんならんだ点を、ぜんぶ数えます。\n上から1こ、2こ、3こ…とふえています。'];
   const labels = [''];
   pairs.forEach(([x, y]) => {
-    msgs.push(x + 'だんめ と ' + y + 'だんめ を ペアに\n' + x + ' ＋ ' + y + ' ＝ ' + pairSum);
+    msgs.push(x + 'だんめと' + y + 'だんめを組にします。\n' + x + '＋' + y + '＝' + pairSum + 'で、' + (x === 1 ? '' : 'これも') + pairSum + 'こです。');
     labels.push(String(pairSum));
   });
   let total = pairs.length * pairSum;
-  if (mid) { msgs.push(mid + 'だんめだけ のこる（' + mid + 'こ）'); labels.push(String(mid)); total += mid; }
-  msgs.push(pairs.length + '組 × ' + pairSum + (mid ? ' ＋ ' + mid : '') + ' ＝ **' + total + '**');
+  if (mid) { msgs.push('まん中の' + mid + 'だんめは、組にするあいてがいません。\n' + mid + 'こです。'); labels.push(String(mid)); total += mid; }
+  
+  msgs.push(pairSum + 'こずつの組が' + pairs.length + 'つ' + (mid ? 'と、のこりが' + mid + 'こ' : '') + 'なので、\n' + pairSum + '×' + pairs.length + (mid ? '＋' + mid : '') + '＝**' + total + '**です。');
   labels.push(String(total));
   return makeTeach(msgs.length - 1, msgs, labels, { g, pairs, mid, mk: 'tri' });
 }
@@ -3088,12 +3291,12 @@ function mixrowDraw(area, opt){
 function mixrowTeachBegin(){
   const g = S.g, n = g.n, rowW = g.rowW;
   const msgs = [
-    '黒は 1だんめ 1こ、2だんめ 2こ…と ふえる。\n白は へっていく',
-    'よこ 1だんの 合計を かぞえる\n（黒＋白）',
-    'どの だんも いつも **' + rowW + 'こ**（かわらない）',
-    n + 'だん ある から\n' + rowW + ' × ' + n + ' ＝ **' + (rowW * n) + '**',
+    '黒い点は、上から1こ、2こ…とふえます。\n白い点は、' + (rowW - 1) + 'こ、' + (rowW - 2) + 'こ…とへります。',
+    'いちばん上のだんは、黒が1こ、白が' + (rowW - 1) + 'こで、\nあわせて' + rowW + 'こです。',
+    '下のだんへ行くと、黒が1こふえて、白が1こへります。\nだから、どのだんも**' + rowW + 'こ**です。',
+    rowW + 'このだんが' + n + 'だんあるので、\n' + rowW + '×' + n + '＝**' + (rowW * n) + '**です。',
   ];
-  const labels = ['', '1だん', rowW + 'こ', String(rowW * n)];
+  const labels = ['', '1だんめ', rowW + 'こ', String(rowW * n)];
   return makeTeach(3, msgs, labels, { g, mk: 'mixrow' });
 }
 function mixrowTeachDraw(area, T){
@@ -3295,7 +3498,7 @@ function perDraw(area, opt){
   opt = opt || {};
   const g = opt.g || S.g;
   ctx.save();
-  text(g.total + 'こを ' + g.groups + '人で 同じ数ずつ 分けると？',
+  if (!qAsked()) text(g.total + 'こを ' + g.groups + '人で 同じ数ずつ 分けます',
        W / 2, area.y + 14, 13, CONFIG.C_INK_SOFT, 'center', '700');
   const inner = { x: area.x, y: area.y + 26, w: area.w, h: area.h - 46 };
   if (opt.rows != null) u14Split(inner, { groups: opt.rows, q: g.per, rem: 0 }, {});
@@ -3305,10 +3508,14 @@ function perDraw(area, opt){
 }
 function perTeachBegin(){
   const g = S.g;
-  const msgs = [g.total + 'こを ' + g.groups + '人に 同じ数ずつ 配る'];
+
+  const msgs = [g.total + 'こを' + g.groups + '人で同じ数ずつ分けます。\n1人ずつ、じゅんに配ってみます。'];
   const labels = [''];
-  for (let i = 0; i < g.groups; i++) { msgs.push((i + 1) + '人めに 配ると のこりが へる'); labels.push((i + 1) + '人め'); }
-  msgs.push(g.total + '÷' + g.groups + '＝' + g.per + '（1人ぶん）');
+  for (let i = 0; i < g.groups; i++) {
+    msgs.push((i + 1) + '人めに' + g.per + 'こ配ります。\nのこりは' + (g.total - g.per * (i + 1)) + 'こです。');
+    labels.push((i + 1) + '人め');
+  }
+  msgs.push('1人分は' + g.per + 'こです。\n式は' + g.total + '÷' + g.groups + '＝' + g.per + 'です。');
   labels.push(g.total + '÷' + g.groups);
   return makeTeach(msgs.length - 1, msgs, labels, { g });
 }
@@ -3395,7 +3602,7 @@ function u14RemDraw(area, opt){
   opt = opt || {};
   const g = opt.g || S.g;
   ctx.save();
-  text(g.total + 'こを ' + g.groups + '人で 同じ数ずつ 分けると？',
+  if (!qAsked()) text(g.total + 'こを ' + g.groups + '人で 同じ数ずつ 分けます',
        W / 2, area.y + 14, 13, CONFIG.C_INK_SOFT, 'center', '700');
   const inner = { x: area.x, y: area.y + 26, w: area.w, h: area.h - 46 };
   if (opt.split) u14Split(inner, g, { showRem: opt.showRem });
@@ -3406,10 +3613,10 @@ function u14RemDraw(area, opt){
 function u14RemTeachBegin(){
   const g = S.g;
   const msgs = [
-    g.total + 'こを ' + g.groups + '人で 同じ数ずつ 分ける',
-    g.groups + '人に ' + g.q + 'こずつ 配れる',
-    'のこりは ' + g.rem + 'こ。' + g.groups + '人には もう 配れない＝あまり',
-    g.total + '÷' + g.groups + '＝' + g.q + ' あまり ' + g.rem,
+    g.total + 'こを' + g.groups + '人で同じ数ずつ分けます。',
+    g.groups + '人に' + g.q + 'こずつ配れます。',
+    'のこりは' + g.rem + 'こです。' + g.groups + '人に配るには' + g.groups + 'こいるので、\nもう配れません。この' + g.rem + 'こを、あまりといいます。',
+    '1人' + g.q + 'こまで分けられます。\n式は' + g.total + '÷' + g.groups + '＝' + g.q + 'あまり' + g.rem + 'です。',
   ];
   return makeTeach(3, msgs, ['', g.q + 'こずつ', 'あまり' + g.rem, String(g.q)], { g, mk: 'rem' });
 }
@@ -3549,10 +3756,13 @@ function u16TeachBegin(){
   const g = S.g;
   const [i, j] = g.niceIdx;
   const nice = g.arr[i] * g.arr[j];
+
+  
+  const rest = g.arr[3 - i - j];
   const msgs = [
-    'さきに 計算すると 楽な 2つを さがす',
-    g.arr[i] + 'と' + g.arr[j] + 'で ちょうど ' + nice,
-    nice + ' × ' + g.arr[3 - i - j] + ' ＝ ' + g.total,
+    'かける じゅん番をかえても、答えは同じです。\n先にかけると、10や100のようなきりのいい数になる2つをさがします。',
+    g.arr[i] + '×' + g.arr[j] + '＝' + nice + 'です。\nきりのいい数になりました。',
+    'のこりの' + rest + 'をかけます。\n' + nice + '×' + rest + '＝' + g.total + 'です。',
   ];
   return makeTeach(2, msgs, ['', g.arr[i] + '×' + g.arr[j], String(g.total)], { g, mk: 'u16' });
 }
@@ -3795,21 +4005,23 @@ function u22MushiPlan(g){
       if (which === 't') {
         const sm = P[j] + Q[j] + carry;
         eq = P[j] + '＋' + Q[j] + (carry ? '＋1' : '') + '＝' + sm;
-        msg = place + 'の位は ' + eq + '。だから □ は ' + (sm % 10);
+        msg = place + 'のくらいを見ます。' + eq + 'なので、□は' + (sm % 10) + 'です。';
       } else {
         const known = (which === 'p') ? Q[j] : P[j];
         const need = Tt[j];
         const ans = ((need - known - carry) % 10 + 10) % 10;
-        eq = '□＋' + known + (carry ? '＋1' : '') + ' の 一の位が ' + need;
-        msg = place + 'の位：' + eq + '。あてはまるのは ' + ans + ' だけ';
+        eq = '□＋' + known + (carry ? '＋1' : '') + ' の 答えの 一のくらいが ' + need;
+        
+        msg = place + 'のくらいを見ます。□＋' + known + (carry ? '＋1（くり上がり）' : '') + 'の答えの一のくらいが' + need + 'になる数をさがします。\n'
+          + ans + '＋' + known + (carry ? '＋1' : '') + '＝' + (ans + known + carry) + 'なので、□は' + ans + 'です。';
       }
       steps.push({ j, place, eq, msg, hidden: true });
       break;
     }
     const sm = P[j] + Q[j] + carry;
     const eq = P[j] + '＋' + Q[j] + (carry ? '＋1' : '') + '＝' + sm;
-    const msg = place + 'の位：' + eq + '。' +
-      (sm >= 10 ? ('だから ' + Tt[j] + ' で、1 くり上がる') : ('だから ' + Tt[j]));
+    const msg = place + 'のくらいは' + eq + 'です。' +
+      (sm >= 10 ? ('答えの' + place + 'のくらいは' + Tt[j] + 'で、1くり上がります。') : ('答えの' + Tt[j] + 'と合います。'));
     steps.push({ j, place, eq, msg, hidden: false });
     carry = (sm >= 10) ? 1 : 0;
   }
@@ -3859,7 +4071,7 @@ function u22KomachiDraw(area, opt){
   opt = opt || {};
   const g = opt.g || S.g;
   ctx.save();
-  text('この 4つの 数を ぜんぶ つかう', W / 2, area.y + 20, 13, CONFIG.C_INK_SOFT, 'center', '700');
+  if (!qAsked()) text('この 4つの 数を ぜんぶ つかう', W / 2, area.y + 20, 13, CONFIG.C_INK_SOFT, 'center', '700');
   const cs = Math.max(30, Math.min(52, (area.w - 60) / 4.4));
   const ox = W / 2 - 1.5 * cs * 1.16;
   const y = area.y + area.h * 0.42;
@@ -3870,7 +4082,7 @@ function u22KomachiDraw(area, opt){
     ctx.strokeStyle = CONFIG.C_GRID; ctx.lineWidth = 1.6; ctx.stroke();
     text(String(n), x, y + 1, Math.round(cs * 0.56), CONFIG.C_INK, 'center', '800');
   });
-  text('＋ − × を つかって 10 を つくる', W / 2, y + cs * 0.86, 14, CONFIG.C_GOLD, 'center', '800');
+  if (!qAsked()) text('＋ − × を つかって 10 を つくる', W / 2, y + cs * 0.86, 14, CONFIG.C_GOLD, 'center', '800');
   
   (opt.lines || []).forEach((ln, i) => {
     const lastLine = (i === opt.lines.length - 1) && opt.done;
@@ -3894,8 +4106,18 @@ function u22KomachiSteps(expr){
   if (hasMul) {
     const shown = parts.map((x, i) => (sg[i] < 0 ? '−' : (i ? '＋' : '')) + x).join('');
     const done = terms.map((v, i) => (sg[i] < 0 ? '−' : (i ? '＋' : '')) + v).join('');
-    out.push({ msg: '×が あるので そこを さきに 計算する：' + shown + ' → ' + done,
+    out.push({ msg: '×は、＋や−より先に計算するきまりです。\n' + shown + 'は、' + done + 'になります。',
       lab: 'かける', line: done });
+  }
+  
+  let pre = 0, neg = false;
+  terms.forEach((v, i) => { pre += sg[i] * v; if (pre < 0) neg = true; });
+  if (neg) {
+    const idx = terms.map((_, i) => i);
+    const order = idx.filter(i => sg[i] > 0).concat(idx.filter(i => sg[i] < 0));
+    terms = order.map(i => terms[i]); sg = order.map(i => sg[i]);
+    out.push({ msg: 'このままでは、左から計算すると ひけない所があります。\n先に、たし算をまとめてから ひきます。',
+      lab: 'たし算を先に', line: terms.map((v, i) => (sg[i] < 0 ? '−' : (i ? '＋' : '')) + v).join('') });
   }
   
   let acc = terms[0] * sg[0], line = String(acc);
@@ -3903,9 +4125,9 @@ function u22KomachiSteps(expr){
     const before = acc;
     acc += sg[i] * terms[i];
     line = before + (sg[i] < 0 ? '−' : '＋') + terms[i] + '＝' + acc;
-    out.push({ msg: '左から 計算する：' + line, lab: (sg[i] < 0 ? '−' : '＋') + terms[i], line });
+    out.push({ msg: '左から、じゅんに計算します。' + line + 'です。', lab: (sg[i] < 0 ? '−' : '＋') + terms[i], line });
   }
-  out.push({ msg: 'ちょうど 10 に なった。だから この 式', lab: '10', line: expr + '＝10', done: true });
+  out.push({ msg: 'ちょうど10になりました。だから、この式が答えです。', lab: '10', line: expr + '＝10', done: true });
   return out;
 }
 
@@ -3957,11 +4179,11 @@ function u22FukuDraw(area, opt){
   base.forEach((r, ri) => r.forEach((ch, ci) => { if (ch === L) hots.push({ ri, ci }); }));
   fudeDraw(area, rows, '＋', { hots });
   
-  text('おなじ 文字には おなじ 数字が 入る', W / 2, area.y + 18, 13, CONFIG.C_INK_SOFT, 'center', '700');
+  if (!qAsked()) text('おなじ 文字には おなじ 数字が 入る', W / 2, area.y + 18, 13, CONFIG.C_INK_SOFT, 'center', '700');
   if (opt.check) {
     const okk = opt.check.ok;
     text(opt.check.line, W / 2, area.y + area.h - 38, 15, okk ? CONFIG.C_OK : CONFIG.C_NG, 'center', '800');
-    text(okk ? '✓ ぴったり 合う' : '✗ 答えの 行と ちがう',
+    text(okk ? '✓ ぴったり 合う' : '✗ 合わない',
       W / 2, area.y + area.h - 16, 15, okk ? CONFIG.C_OK : CONFIG.C_NG, 'center', '800');
   }
   else if (opt.show) text(L + ' ＝ ' + opt.show, W / 2, area.y + area.h - 14, 18, CONFIG.C_OK, 'center', '800');
@@ -4011,7 +4233,7 @@ function u22TeachBegin(){
   const g = S.g, k = S.kind;
   if (k === 'komachi') {
     const plan = u22KomachiSteps(S.answer);
-    const msgs = ['4つの 数を ならべかえて いい。＋ − × も つかえる。この 式で ためす'];
+    const msgs = [S.answer + 'を計算して、10になるかたしかめます。'];
     const labels = [''];
     plan.forEach(st2 => { msgs.push(st2.msg); labels.push(st2.lab); });
     return makeTeach(msgs.length - 1, msgs, labels, { g, kind: k, plan });
@@ -4019,25 +4241,25 @@ function u22TeachBegin(){
   if (k === 'fuku') {
     const L = U22_LET[g.qi];
     const plan = u22FukuTrials(g);
-    const msgs = ['おなじ 文字には おなじ 数字。' + L + ' に 数字を あてはめて たしかめる'];
+    const msgs = ['同じ文字には、同じ数字が入ります。\n' + L + 'に数字を入れて、式が合うかたしかめます。'];
     const labels = [''];
     plan.forEach(tr => {
-      msgs.push(L + '＝' + tr.v + ' なら ' + tr.line + '。' +
-        (tr.ok ? '答えの 行と ぴったり 合う' : '答えの 行（' + tr.want + '）と ちがう'));
+      msgs.push(L + 'が' + tr.v + 'だと、' + tr.line + '。\n' +
+        (tr.ok ? '線の下の数とぴったり合います。' : '線の下の数は' + tr.want + 'なので、合いません。'));
       labels.push(L + '＝' + tr.v);
     });
-    msgs.push('合うのは ' + L + '＝' + S.answer + ' だけ');
+    msgs.push('合うのは、' + L + 'が' + S.answer + 'のときです。');
     labels.push(S.answer);
     return makeTeach(msgs.length - 1, msgs, labels, { g, kind: k, plan });
   }
   const plan = u22MushiPlan(g);
   const head = g.sub
-    ? 'ひき算は「引く数 ＋ 答え ＝ もとの数」。下の2つを たすと 上に なる'
-    : '一の位から 位ごとに たしかめる';
+    ? 'ひき算は、ひく数と答えをたすと、ひかれる数になります。\nだから、下の2つの数をたして、上の数と合うかを見ます。'
+    : '一のくらいから、じゅんに見ていきます。';
   const msgs = [head];
   const labels = [''];
-  plan.steps.forEach(st2 => { msgs.push(st2.msg); labels.push(st2.place + 'の位'); });
-  msgs.push('だから □ は ' + S.answer + '。ほかの 数では 合わない');
+  plan.steps.forEach(st2 => { msgs.push(st2.msg); labels.push(st2.place + 'のくらい'); });
+  msgs.push('だから、□は' + S.answer + 'です。');
   labels.push(String(S.answer));
   return makeTeach(msgs.length - 1, msgs, labels, { g, kind: k, plan });
 }
@@ -4083,19 +4305,23 @@ function u22KindIcon(kind, x, y, s){
 
 
 
-const U23_LV = [[5, 6, 4, 4], [5, 7, 4, 4], [5, 7, 4, 5], [6, 8, 4, 5], [6, 8, 4, 6]];
+const U23_LV = [[5, 8, 4, 4], [5, 8, 4, 4], [5, 8, 4, 4], [5, 8, 4, 4], [5, 8, 4, 4]];
+
+
+const U23_RULE = ['ちょうど「上がり」につくとゴールです。', '目があまったら、あまった分だけ「上がり」からもどります。'];   
 function u23Label(i, n){ return (i === 0) ? 'ふりだし' : (i === n ? '上がり' : String(i)); }
 function u23Move(p, d, n){
   const q = p + d;
   return (q > n) ? (n - (q - n)) : q;
 }
 function u23Gen(lv, kind){
-  return uPick('u23' + kind, (kind === 'pair') ? 1 : 3, () => u23Gen1(lv, kind));
+  return uPick('u23' + kind, 3, () => u23Gen1(lv, kind));
 }
 function u23Gen1(lv, kind){
   const P = U23_LV[Math.min(lv, U23_LV.length - 1)];
-  const n = randInt(P[0], P[1]), D = randInt(P[2], P[3]);
+  const D = randInt(P[2], P[3]);
   if (kind === 'pair') {
+    const n = randInt(P[0], P[1]);
     let cnt = 0;
     for (let a = 1; a <= D; a++) for (let b = 1; b <= D; b++) {
       const p1 = u23Move(0, a, n);
@@ -4106,6 +4332,8 @@ function u23Gen1(lv, kind){
       choices: numChoices(cnt, [cnt + 1, cnt - 1, cnt + 2, D, D * D - cnt]) };
   }
   
+  const n = randInt(P[0], Math.min(P[1], 7));
+  
   const wantBack = Math.random() < 0.55;
   for (let t = 0; t < 300; t++) {
     const a = randInt(1, D), b = randInt(1, D);
@@ -4114,28 +4342,43 @@ function u23Gen1(lv, kind){
     const p2 = u23Move(p1, b, n);
     const back = (p1 + b > n);                      
     if (t < 200 && wantBack !== back) continue;
-    const wrong = [p1 + b, p1, a + b, n];
+    
+    const cand = [p1 + b, p1, a + b, n, p2 + 1, p2 - 1, p2 - 2, p1 + 1, n - 1, p2 + 2];
     const out = [{ v: p2, txt: u23Label(p2, n) }];
-    shuffleArr(wrong.concat([p2 + 1, p2 - 1, n - 1])).forEach(v => {
-      if (out.length >= CONFIG.CHOICES) return;
-      if (v < 0 || v > n) return;
+    shuffleArr(cand).forEach(v => {
+      if (out.length >= Math.min(CONFIG.CHOICES, n)) return;
+      if (v < 1 || v > n) return;
       if (out.some(o => o.v === v)) return;
+      out.push({ v, txt: u23Label(v, n) });
+    });
+    
+    for (let d = 1; out.length < Math.min(4, n) && d <= n; d++) [p2 - d, p2 + d].forEach(v => {
+      if (out.length >= Math.min(4, n) || v < 1 || v > n || out.some(o => o.v === v)) return;
       out.push({ v, txt: u23Label(v, n) });
     });
     return { g: { n, D, a, b, p1, p2, back }, answer: p2, kind: 'land', choices: shuffleArr(out) };
   }
   return u23Gen1(0, 'land');
 }
+
 function u23Board(area, g, opt){
   opt = opt || {};
-  const n = g.n, cells = n + 1;
-  const cw = Math.max(opt.small ? 18 : 26, Math.min(opt.small ? 30 : 46, (area.w - 20) / cells - 5));
+  const n = g.n, ghost = opt.ghost || 0, cells = n + 1 + ghost;
+  const cw = Math.max(opt.small ? 18 : 24, Math.min(opt.small ? 30 : 46, (area.w - 20) / cells - 5));
   const s = cw + 5;
   const ox = W / 2 - (cells - 1) * s / 2;
   const y = area.y + (opt.y != null ? opt.y : area.h * 0.42);
   ctx.save();
-  for (let i = 0; i <= n; i++) {
+  for (let i = 0; i <= n + ghost; i++) {
     const x = ox + i * s;
+    if (i > n) {                                    
+      ctx.save(); ctx.setLineDash([4, 3]);
+      rrect(x - cw / 2, y - cw / 2, cw, cw, 8);
+      ctx.strokeStyle = CONFIG.C_NG; ctx.lineWidth = 1.4; ctx.stroke();
+      ctx.restore();
+      text('のこり', x, y + 1, Math.max(8, Math.round(cw * 0.27)), CONFIG.C_NG, 'center', '800');
+      continue;
+    }
     const on = (opt.hi != null && opt.hi === i);
     rrect(x - cw / 2, y - cw / 2, cw, cw, 8);
     ctx.fillStyle = on ? CONFIG.C_HI_T : '#ffffff'; ctx.fill();
@@ -4143,8 +4386,20 @@ function u23Board(area, g, opt){
     const lab = u23Label(i, n);
     const fs = (lab.length > 1) ? Math.max(8, Math.round(cw * 0.27)) : Math.round(cw * 0.5);
     text(lab, x, y + 1, fs, CONFIG.C_INK, 'center', '800');
+    if (i === n && opt.goalNum) text('（' + n + '）', x, y + cw * 0.5 + 10, Math.max(9, Math.round(cw * 0.3)), CONFIG.C_INK, 'center', '800');
     if (i < n) { ctx.strokeStyle = CONFIG.C_GRID; ctx.lineWidth = 1.3;
       ctx.beginPath(); ctx.moveTo(x + cw / 2, y); ctx.lineTo(x + s - cw / 2, y); ctx.stroke(); }
+  }
+  (opt.trail || []).forEach(t => {
+    const x = ox + t.at * s;
+    text(t.label, x, y + cw * 0.5 + 11, Math.max(10, Math.round(cw * 0.3)), CONFIG.C_GOLD, 'center', '800');
+  });
+  if (opt.back) {
+    const x1 = ox + opt.back.from * s, x2 = ox + opt.back.to * s, yy = y + cw * 0.5 + 24;
+    ctx.strokeStyle = CONFIG.C_NG; ctx.lineWidth = 2; ctx.lineCap = 'round';
+    ctx.beginPath(); ctx.moveTo(x1, yy); ctx.lineTo(x2, yy); ctx.stroke();
+    ctx.beginPath(); ctx.moveTo(x2, yy); ctx.lineTo(x2 + 7, yy - 5); ctx.moveTo(x2, yy); ctx.lineTo(x2 + 7, yy + 5); ctx.stroke();
+    if (opt.back.label) text(opt.back.label, (x1 + x2) / 2, yy + 13, 11, CONFIG.C_NG, 'center', '800');
   }
   if (opt.piece != null) {
     
@@ -4157,6 +4412,7 @@ function u23Board(area, g, opt){
   ctx.restore();
   return { ox, s, y, cw };
 }
+
 function u23Dice(x, y, s, d, on){
   ctx.save();
   rrect(x - s / 2, y - s / 2, s, s, 6);
@@ -4164,56 +4420,69 @@ function u23Dice(x, y, s, d, on){
   ctx.strokeStyle = on ? CONFIG.C_GOLD : CONFIG.C_EDGE; ctx.lineWidth = on ? 2 : 1.4; ctx.stroke();
   const r = s * 0.09, q = s * 0.22;
   const pos = { 1: [[0, 0]], 2: [[-q, -q], [q, q]], 3: [[-q, -q], [0, 0], [q, q]],
-    4: [[-q, -q], [q, -q], [-q, q], [q, q]] }[d] || [[0, 0]];
+    4: [[-q, -q], [q, -q], [-q, q], [q, q]],
+    5: [[-q, -q], [q, -q], [0, 0], [-q, q], [q, q]],
+    6: [[-q, -q], [q, -q], [-q, 0], [q, 0], [-q, q], [q, q]] }[d];
   ctx.fillStyle = CONFIG.C_INK;
-  pos.forEach(([dx, dy]) => { ctx.beginPath(); ctx.arc(x + dx, y + dy, r, 0, Math.PI * 2); ctx.fill(); });
+  if (pos) pos.forEach(([dx, dy]) => { ctx.beginPath(); ctx.arc(x + dx, y + dy, r, 0, Math.PI * 2); ctx.fill(); });
+  else text(String(d), x, y + 1, Math.round(s * 0.5), CONFIG.C_INK, 'center', '800');
   ctx.restore();
+}
+
+
+function u23Rules(area, y0, fs, one){
+  text(U23_RULE[0], W / 2, area.y + y0, fs, CONFIG.C_INK, 'center', '700');
+  if (!one) text(U23_RULE[1], W / 2, area.y + y0 + fs + 5, fs, CONFIG.C_INK, 'center', '700');
 }
 function u23Draw(area, opt){
   opt = opt || {};
   const g = opt.g || S.g;
   const k = opt.kind || S.kind;
   ctx.save();
-  
-  if (!(k === 'pair' && opt.table != null)) {
-    text('ちょうど 上がりに つくと ゴール。こえたぶんは もどる',
-      W / 2, area.y + 16, 12, CONFIG.C_INK_SOFT, 'center', '700');
-  }
   if (k === 'pair') {
     
     if (opt.table != null) {
-      text('ちょうど 上がりに つくと ゴール。こえたぶんは もどる',
-        W / 2, area.y + 10, 11, CONFIG.C_INK_SOFT, 'center', '700');
-      u23Board(area, g, { y: 38, small: true });
-      text('さいころの 目は 1〜' + g.D, W / 2, area.y + 66, 11, CONFIG.C_INK_SOFT, 'center', '700');
-      u23Table(area, g, opt.table, area.y + 82);
+      u23Rules(area, 8, 10, true);
+      u23Board(area, g, { y: 42, small: true, goalNum: true });
+      text('この さいころは 1から ' + g.D + 'までの 目しか ない', W / 2, area.y + 82, 11, CONFIG.C_INK_SOFT, 'center', '700');
+      u23Table(area, g, opt.table, area.y + 90, opt.count);
       ctx.restore(); return;
     }
-    u23Board(area, g, { y: area.h * 0.38, piece: 0 });
-    text('さいころの 目は 1〜' + g.D, W / 2, area.y + area.h * 0.66, 14, CONFIG.C_INK, 'center', '800');
-    text('2回 ふって ちょうど 上がりに つく 出方は？', W / 2, area.y + area.h * 0.66 + 24, 13, CONFIG.C_GOLD, 'center', '800');
+    u23Rules(area, 12, 12, true);
+    u23Board(area, g, { y: area.h * 0.36, piece: 0, goalNum: true });
+    
+    const ty = area.y + area.h * 0.60 - 24;
+    
+    text('「1回目が1、2回目が2」と「1回目が2、2回目が1」は', W / 2, ty + 48, 12, CONFIG.C_GOLD, 'center', '800');
+    text('ちがう出方として数えます。', W / 2, ty + 68, 12, CONFIG.C_GOLD, 'center', '800');
     ctx.restore(); return;
   }
+  u23Rules(area, 12, 12);
   const piece = (opt.piece != null) ? opt.piece : 0;
-  u23Board(area, g, { y: area.h * 0.36, piece, hop: opt.hop, hi: opt.hi });
+  u23Board(area, g, { y: area.h * 0.36, piece, hop: opt.hop, hi: opt.hi,
+    ghost: opt.ghost, trail: opt.trail, back: opt.back });
+  
+  
+  
   const ds = Math.min(40, area.w * 0.13);
   const by = area.y + area.h * 0.72;
-  u23Dice(W / 2 - ds * 0.85, by, ds, g.a, opt.step >= 1);
-  u23Dice(W / 2 + ds * 0.85, by, ds, g.b, opt.step >= 2);
-  text('1回め', W / 2 - ds * 0.85, by + ds * 0.78, 11, CONFIG.C_INK_SOFT, 'center', '700');
-  text('2回め', W / 2 + ds * 0.85, by + ds * 0.78, 11, CONFIG.C_INK_SOFT, 'center', '700');
+  u23Dice(W / 2 - ds * 0.9, by, ds, g.a, opt.step == null || opt.step >= 1);
+  u23Dice(W / 2 + ds * 0.9, by, ds, g.b, opt.step == null || opt.step >= 2);
+  text('1回め　' + g.a, W / 2 - ds * 0.9, by + ds * 0.78, 11, CONFIG.C_INK_SOFT, 'center', '800');
+  text('2回め　' + g.b, W / 2 + ds * 0.9, by + ds * 0.78, 11, CONFIG.C_INK_SOFT, 'center', '800');
   if (opt.note) text(opt.note, W / 2, area.y + area.h - 12, 14, CONFIG.C_GOLD, 'center', '800');
   ctx.restore();
 }
 
-function u23Table(area, g, upto, top){
+function u23Table(area, g, upto, top, count){
   const D = g.D, n = g.n;
   const t0 = (top != null) ? top : (area.y + 26);
   const avail = area.y + area.h - t0 - 16;
   
   const cw = Math.max(14, Math.min(30, (area.w - 96) / (D + 1), avail / (D + 1)));
   const ox = W / 2 - (D + 1) * cw / 2 + 10;
-  const oy = t0 + Math.max(0, (avail - (D + 1) * cw) / 2);
+  const oy = t0 + Math.min(24, Math.max(0, (avail - (D + 1) * cw) / 2));   
+  let k = 0;
   ctx.save();
   for (let r = 0; r <= D; r++) for (let c = 0; c <= D; c++) {
     const x = ox + c * cw, y = oy + r * cw;
@@ -4222,11 +4491,11 @@ function u23Table(area, g, upto, top){
     else if (c === 0 && r > 0) text(String(r), x + cw / 2, y + cw / 2, 13, CONFIG.C_INK, 'center', '800');
     else if (r > 0 && c > 0 && (upto == null || r <= upto)) {
       const p1 = u23Move(0, r, n);
-      const v = (p1 === n) ? null : u23Move(p1, c, n);
-      if (v == null) { text('—', x + cw / 2, y + cw / 2, 11, CONFIG.C_INK_SOFT); continue; }
-      const goal = (v === n);
-      if (goal) { rrect(x + 1.5, y + 1.5, cw - 3, cw - 3, 4); ctx.fillStyle = 'rgba(74,157,95,0.18)'; ctx.fill(); }
-      text(goal ? '上' : String(v), x + cw / 2, y + cw / 2, goal ? 12 : 11,
+      if (p1 === n) { text('—', x + cw / 2, y + cw / 2, 11, CONFIG.C_INK_SOFT); continue; }
+      if (p1 + c > n) { text('×', x + cw / 2, y + cw / 2, 12, '#b9b1a1', 'center', '800'); continue; }
+      const v = p1 + c, goal = (v === n);
+      if (goal) { rrect(x + 1.5, y + 1.5, cw - 3, cw - 3, 4); ctx.fillStyle = 'rgba(74,157,95,0.18)'; ctx.fill(); k++; }
+      text(goal ? (count ? '①②③④⑤⑥⑦⑧'[k - 1] : '上') : String(v), x + cw / 2, y + cw / 2, goal ? 12 : 11,
         goal ? CONFIG.C_OK : CONFIG.C_INK_SOFT, 'center', '800');
     }
   }
@@ -4235,45 +4504,91 @@ function u23Table(area, g, upto, top){
   ctx.restore();
 }
 
-function u23Anim(from, d, n, prog){
-  const total = Math.abs(d);
+function u23Walk(from, to, prog){
+  const total = Math.abs(to - from), dir = (to >= from) ? 1 : -1;
+  if (!total) return { pos: from, hop: 0 };
   const f = Math.max(0, Math.min(total, prog * total));
   const k = Math.floor(f);
   const frac = Math.min(1, (f - k) * 2.0);
-  const cellAt = (i) => { const q = from + i; return (q > n) ? (n - (q - n)) : q; };
-  const a = cellAt(Math.min(k, total)), b = cellAt(Math.min(k + 1, total));
+  const a = from + dir * Math.min(k, total), b = from + dir * Math.min(k + 1, total);
   return { pos: a + (b - a) * frac, hop: (k < total) ? frac : 0 };
 }
+const U23_MARU = ['①', '②', '③', '④', '⑤', '⑥', '⑦', '⑧'];
 function u23TeachBegin(){
   const g = S.g, k = S.kind;
   if (k === 'pair') {
-    const msgs = ['この すごろくを 2回で ちょうど 上がりに したい'];
-    const labels = [''];
-    for (let r = 1; r <= g.D; r++) { msgs.push('1回目が ' + r + ' のとき'); labels.push(r + 'のだん'); }
-    msgs.push('「上」と 書けた ますを 数える'); labels.push('数える');
-    return makeTeach(msgs.length - 1, msgs, labels, { g, kind: k });
+    const n = g.n, D = g.D;
+    
+    const msgs = ['2回目で、上がり（' + n + '）にぴったりとまる出方を、表でしらべます。',
+      'たてが1回目、よこが2回目です。ますには、こまがとまるところを書きます。上がりをこえるところは×です。'];
+    const labels = ['', '表の 見かた'];
+    let firstGoal = true, cnt = 0;
+    for (let r = 1; r <= D; r++) {
+      const need = n - r;
+      let m;
+      if (need >= 1 && need <= D) {
+        cnt++;
+        m = '1回目が' + r + 'のときは、' + r + '＋' + need + '＝' + n + 'で上がりです。「上」と書きます'
+          + (firstGoal ? '（「上」は上がりのことです）' : '') + '。'
+          + (need < D ? '2回目がそれより大きいと、上がりをこえます。' : '');
+        firstGoal = false;
+      } else if (need > D) {
+        m = '1回目が' + r + 'のときは、いちばん大きい' + D + 'が出ても、' + r + '＋' + D + '＝' + (r + D) + 'です。上がりにとどきません。';
+      } else {
+        m = '1回目が' + r + 'のときは、どの目が出ても、上がりをこえます。';
+      }
+      msgs.push(m); labels.push('1回めが ' + r);
+    }
+    msgs.push('「上」のますは' + cnt + 'こです。\nだから、答えは' + cnt + '通りです。');
+    labels.push(cnt + '通り');
+    const pairs = [];
+    for (let r = 1; r <= D; r++) { const c = n - r; if (c >= 1 && c <= D) pairs.push(r + 'と' + c); }
+    msgs.push('表がなくても、たして' + n + 'になる2つの目をさがせば、同じ数が出ます（' + pairs.join('、') + '）。じゅんばんがちがうものは、べつに数えます。');
+    labels.push('たし算で');
+    return makeTeach(msgs.length - 1, msgs, labels, { g, kind: k, cnt });
   }
   const over = (g.p1 + g.b > g.n);
-  const msgs = ['ふりだしに こまを 置く',
-    '1回目は ' + g.a + '。' + g.a + 'マス すすむ → ' + u23Label(g.p1, g.n),
-    over ? ('2回目は ' + g.b + '。' + (g.p1 + g.b) + 'マスめは 上がりを ' + (g.p1 + g.b - g.n) + ' こえる')
-         : ('2回目は ' + g.b + '。' + g.b + 'マス すすむ'),
-    over ? ('こえたぶん ' + (g.p1 + g.b - g.n) + ' だけ もどる → ' + u23Label(g.p2, g.n))
-         : ('ついたのは ' + u23Label(g.p2, g.n))];
+  const walk = (from, d) => Array.from({ length: d }, (_, i) => String(from + i + 1)).join('、');
+  const msgs = ['1回目に' + g.a + '、2回目に' + g.b + 'が出ました。こまは、どこにとまるでしょう。',
+    '1回目は' + g.a + 'です。' + walk(0, g.a) + 'とすすんで、' + u23Label(g.p1, g.n) + 'にとまります。',
+    over ? ('2回目は' + g.b + 'です。' + g.p1 + 'から' + g.b + 'つすすむと、上がりについても、まだ' + (g.p1 + g.b - g.n) + 'つのこります。')
+         : ('2回目は' + g.b + 'です。' + g.p1 + 'から' + g.b + 'つすすみます。'),
+    over ? ('のこりの' + (g.p1 + g.b - g.n) + 'つは、上がりからもどります。\nだから、答えは' + u23Label(g.p2, g.n) + 'です。')
+         : ('だから、答えは' + u23Label(g.p2, g.n) + 'です。')];
   return makeTeach(3, msgs, ['', '1回め', '2回め', u23Label(g.p2, g.n)], { g, kind: k, over });
 }
 function u23TeachDraw(area, T){
   const g = T.g, n = T.shown, k = T.kind;
   const fa = teachFigArea(area);
-  if (k === 'pair') { u23Draw(fa, { g, kind: k, table: Math.min(n, g.D) }); return; }
+  if (k === 'pair') {
+    
+    const rows = Math.max(0, Math.min(g.D, n - 1));
+    u23Draw(fa, { g, kind: k, table: rows, count: n >= g.D + 2 });
+    return;
+  }
   
-  let piece = 0, hop = 0;
-  if (n === 1) { const a = u23Anim(0, g.a, g.n, teachProg(T, 0.28 * g.a + 0.2)); piece = a.pos; hop = a.hop; }
-  else if (n === 2) { const a = u23Anim(g.p1, g.b, g.n, teachProg(T, 0.28 * g.b + 0.2)); piece = a.pos; hop = a.hop; }
-  else if (n >= 3) { piece = g.p2; }
-  u23Draw(fa, { g, kind: 'land', piece, hop, step: n, hi: n >= 3 ? g.p2 : null,
+  const over = T.over;
+  const end2 = g.p1 + g.b;                           
+  let piece = 0, hop = 0, trail = [], back = null;
+  const ghost = over ? (end2 - g.n) : 0;
+  if (n === 1) {
+    const a = u23Walk(0, g.a, teachProg(T, 0.3 * g.a + 0.2)); piece = a.pos; hop = a.hop;
+    trail = Array.from({ length: g.a }, (_, i) => ({ at: i + 1, label: U23_MARU[i] }));
+  } else if (n === 2) {
+    const a = u23Walk(g.p1, end2, teachProg(T, 0.3 * g.b + 0.2)); piece = a.pos; hop = a.hop;
+    trail = Array.from({ length: g.b }, (_, i) => ({ at: g.p1 + i + 1, label: U23_MARU[i] }));
+  } else if (n >= 3) {
+    if (over) {
+      const a = u23Walk(end2, g.p2, teachProg(T, 0.35 * (end2 - g.p2) + 0.2)); piece = a.pos; hop = a.hop;
+      back = { from: end2, to: g.p2, label: 'もどる' };
+    } else piece = g.p2;
+  }
+  u23Draw(fa, { g, kind: 'land', teach: true, piece, hop, step: n, trail, back,
+    ghost: (n >= 2) ? ghost : 0,
+    hi: n >= 3 ? g.p2 : null,
     note: n >= 3 ? ('こたえは ' + u23Label(g.p2, g.n)) : null });
 }
+
 function u23KindIcon(kind, x, y, s){
   ctx.save();
   if (kind === 'pair') {
@@ -4419,7 +4734,7 @@ function u24DivDraw(area, opt){
   opt = opt || {};
   const g = opt.g || S.g;
   ctx.save();
-  text(g.what + 'を 2つに 分けるのは？', W / 2, area.y + 18, 14, CONFIG.C_INK, 'center', '800');
+  if (!qAsked()) text(g.what + 'を 2つに 分けるのは？', W / 2, area.y + 18, 14, CONFIG.C_INK, 'center', '800');
   const all = opt.all;                            
   const list = all ? ['直線', '平面', '空間'] : [g.what];
   const top = area.y + 44, bot = area.y + area.h - (opt.show ? 34 : 12);
@@ -4466,10 +4781,11 @@ function u24Draw(area, opt){
   if (k === 'divide') return u24DivDraw(area, opt);
   const f = U24_FACES.find(x => x.n === g.f);
   ctx.save();
+  const nm = u24FaceName(f).replace(/^.*の/, '');
   const head = (k === 'face')
-    ? (u24FaceName(f) + ' と 平行な 面は？')
-    : (u24FaceName(f) + ' に ' + U24_REL_TXT[g.rel] + ' 辺は？');
-  text(head, W / 2, area.y + 16, 13, CONFIG.C_INK, 'center', '800');
+    ? (nm + ' と 平行な 面は？')
+    : (nm + (g.rel === 'in' ? ' に ' : ' と ') + U24_REL_TXT[g.rel] + ' へんは？');
+  if (!qAsked()) text(head, W / 2, area.y + 16, 13, CONFIG.C_INK, 'center', '800');
   u24Box(area, { face: f, hiEdge: opt.hiEdge, mark: opt.mark,
     face2: opt.showFace2 ? U24_FACES.find(x => x.n === opt.showFace2) : null });
   if (opt.show) text(opt.show, W / 2, area.y + area.h - 14, 16, CONFIG.C_OK, 'center', '800');
@@ -4478,26 +4794,32 @@ function u24Draw(area, opt){
 function u24TeachBegin(){
   const g = S.g, k = S.kind;
   if (k === 'divide') {
-    const msgs = ['直線・平面・空間を、上から 順に 2つに 分けてみる',
-      '**直線**の 上に **点**を うつと、線は 2つに 分かれた',
-      '**平面**は **直線**を 1本 引くと 2つに 分かれた',
-      '**空間**（あつみの あるもの）は **平面**で 切ると 2つに 分かれた',
-      'だから ' + g.what + 'を 分けるのは ' + S.answer];
+
+    const msgs = ['直線、平面、空間を、1つずつ2つに分けてみます。',
+      '**直線**の上に**点**を1つうつと、直線は2つに分かれます。',
+      '**平面**に**直線**を1本引くと、平面は2つに分かれます。',
+      '**空間**（箱のように、あつみのあるところ）は、\n**平面**で切ると2つに分かれます。',
+      'だから、' + g.what + 'を2つに分けるのは' + S.answer + 'です。'];
     return makeTeach(4, msgs, ['', '点', '直線', '平面', S.answer], { g, kind: k });
   }
   const f = U24_FACES.find(x => x.n === g.f);
   if (k === 'face') {
-    const msgs = ['灰色の 面を 見る：' + u24FaceName(f),
-      'この 面と 同じ 頂点を もつ 面は、ぶつかる（すい直）',
-      '頂点を 1つも 分けあわない 面が、平行な 面',
-      '平行なのは ' + S.answer];
-    return makeTeach(3, msgs, ['', 'ぶつかる', 'はなれている', S.answer], { g, kind: k });
+
+    
+    const nm = u24FaceName(f).replace(/^.*の/, '');
+    const msgs = ['色をぬった' + nm + 'を見ます。',
+      nm + 'と同じ文字（ちょう点）が1つでもある面は、\nくっついているので、平行ではありません。',
+      '同じ文字が1つもない面が、平行な面です。',
+      'だから、平行な面は' + S.answer + 'です。'];
+    return makeTeach(3, msgs, ['', 'くっつく', 'はなれている', S.answer], { g, kind: k });
   }
-  const msgs = ['灰色の 面を 見る：' + u24FaceName(f),
-    '両はしとも 面の 上に ある 辺 → ふくまれる',
-    'かた方だけ 面に ついて いる 辺 → 交わる',
-    'どちらも 面に ついて いない 辺 → 平行',
-    U24_REL_TXT[g.rel] + ' 辺は ' + S.answer];
+
+  const nm = u24FaceName(f).replace(/^.*の/, '');
+  const msgs = ['色をぬった' + nm + 'を見ます。',
+    'へんの両はしが、どちらも面の上にあるとき、\nそのへんは面に「ふくまれる」といいます。',
+    'かたほうのはしだけが面の上にあるとき、\nそのへんは面と「交わる」といいます。',
+    'どちらのはしも面の上にないとき、\nそのへんは面と「平行」といいます。',
+    U24_REL_TXT[g.rel] + 'へんの1つは、' + S.answer + 'です。'];
   return makeTeach(4, msgs, ['', 'ふくまれる', '交わる', '平行', S.answer], { g, kind: k });
 }
 function u24TeachDraw(area, T){
@@ -4515,7 +4837,7 @@ function u24TeachDraw(area, T){
   const upto = ['in', 'cross', 'para'].slice(0, Math.max(0, Math.min(3, n)));
   U24_EDGES.forEach(e => { const r = u24Rel(f, e); if (upto.includes(r)) mark[e] = COL[r]; });
   u24Draw(fa, { g, kind: 'edge', mark, hiEdge: n >= 4 ? S.answer : null,
-    show: n >= 4 ? (U24_REL_TXT[g.rel] + ' 辺の 1つが ' + S.answer) : null });
+    show: n >= 4 ? (U24_REL_TXT[g.rel] + 'へんの1つは ' + S.answer) : null });   
 }
 function u24KindIcon(kind, x, y, s){
   ctx.save();
@@ -4737,7 +5059,7 @@ function u25QuadDraw(area, opt){
       ctx.beginPath(); ctx.moveTo(p1[0], p1[1]); ctx.lineTo(p2[0], p2[1]); ctx.lineTo(p3[0], p3[1]); ctx.stroke();
     }
   }
-  text('かどを 1つずつ 見る', W / 2, area.y + 18, 12, CONFIG.C_INK_SOFT, 'center', '700');
+  if (!qAsked()) text('かどを 1つずつ 見る', W / 2, area.y + 18, 12, CONFIG.C_INK_SOFT, 'center', '700');
   if (opt.show) text(opt.show, W / 2, area.y + area.h - 14, 16, CONFIG.C_OK, 'center', '800');
   ctx.restore();
 }
@@ -4779,8 +5101,8 @@ function u25Draw(area, opt){
   if (k === 'sum') return u25PolyDraw(area, opt);
   if (k === 'count') return u25QuadDraw(area, opt);
   const g = opt.g || S.g;
-  text('長方形を 対角線で 2つに 切った', W / 2, area.y + 16, 13, CONFIG.C_INK_SOFT, 'center', '700');
-  text(g.ask + 'の角と 重なるのは？', W / 2, area.y + 36, 14, CONFIG.C_INK, 'center', '800');
+  if (!qAsked()) text('長方形を 対角線で 2つに 切った', W / 2, area.y + 16, 13, CONFIG.C_INK_SOFT, 'center', '700');
+  if (!qAsked()) text(g.ask + 'の角と 重なるのは？', W / 2, area.y + 36, 14, CONFIG.C_INK, 'center', '800');
   u25RectDraw(area, Object.assign({ hi: [g.ask] }, opt));
   if (opt.show) text(opt.show, W / 2, area.y + area.h - 14, 16, CONFIG.C_OK, 'center', '800');
 }
@@ -4788,32 +5110,34 @@ function u25TeachBegin(){
   const g = S.g, k = S.kind;
   if (k === 'sum') {
     
-    const msgs = ['まず 三角形で たしかめる。3つの 角に 色を つけた',
-      '3つの 角を 切りとって、1つの 点に あつめる',
-      'あつめると **まっすぐ 1本**。まっすぐは **直角 2つ分**'];
+
+    const msgs = ['三角形の3つの角を全部あわせると、\n直角いくつ分になるかを、まずたしかめます。',
+      '3つの角を切りとって、1つの点にあつめます。',
+      'あつめると、**まっすぐな1本の線**になります。\nまっすぐは、**直角2つ分**です。'];
     const labels = ['', 'あつめる', '直角2つ分'];
     if (g.n > 3) {
-      msgs.push(g.name + '角形は、1つの 頂点から 線を 引くと 三角形 ' + (g.n - 2) + 'こ');
+      msgs.push(g.name + '角形は、1つのかどからななめに線を引くと、\n三角形' + (g.n - 2) + 'こに分かれます。');
       labels.push('三角形' + (g.n - 2) + 'こ');
-      msgs.push('直角2つ分 × ' + (g.n - 2) + ' ＝ 直角 ' + ((g.n - 2) * 2) + 'つ分');
+      msgs.push('三角形1こで直角2つ分なので、\n' + (g.n - 2) + 'こで直角' + ((g.n - 2) * 2) + 'つ分です。');
       labels.push(String((g.n - 2) * 2));
     } else {
-      msgs.push('三角形の 角は ぜんぶで 直角 2つ分');
+      msgs.push('三角形の角は、全部で直角2つ分です。');
       labels.push('2');
     }
     return makeTeach(msgs.length - 1, msgs, labels, { g, kind: k });
   }
   if (k === 'count') {
-    const msgs = ['かどを 1つずつ 見る',
-      '2つの 辺が きちんと 直角に なっている かどを さがす',
-      '見つけた かどに しるしを つける',
-      'ぜんぶで ' + S.answer + 'こ'];
+    const msgs = ['かどを1つずつ見ます。',
+      '三角じょうぎの直角をあてて、\nぴったり合うかどをさがします。',
+      '直角のかどに、しるしをつけます。',
+      (String(S.answer) === '0') ? '直角のかどは1つもありません。だから0こです。' : ('直角のかどは、全部で' + S.answer + 'こです。')];
     return makeTeach(3, msgs, ['', 'かどを見る', 'しるし', S.answer + 'こ'], { g, kind: k });
   }
-  const msgs = ['長方形を 対角線で 2つの 直角三角形に 切る',
-    '下がわの 三角形を、まん中を じくに して **半分**まわす',
-    'もう **半分**まわすと、上の 三角形に ぴったり 重なった',
-    '重なった ところを 見ると、' + g.ask + 'の角に 重なるのは ' + S.answer + 'の角'];
+  
+  const msgs = ['長方形を、かどからかどへ切ると、\n三角形が2つできます。',
+    '下の三角形を、長方形のまん中を中心にして、\nまわしていきます。',
+    'さかさまになるまでまわすと、\n上の三角形にぴったり重なりました。',
+    'まわすと、' + S.answer + 'の角は' + g.ask + 'の角のところに来ます。\nだから、' + g.ask + 'と' + S.answer + 'が重なります。'];
   return makeTeach(3, msgs, ['', 'まわす', 'ぴったり', S.answer], { g, kind: k });
 }
 function u25TeachDraw(area, T){
@@ -4841,7 +5165,7 @@ function u25TeachDraw(area, T){
   else if (n === 2) spin = 0.5 + 0.5 * teachProg(T, 0.75);
   else if (n >= 3) spin = 1;
   u25RectDraw(fa, { g, room: true, spin, hi: n >= 3 ? [g.ask, S.answer] : [g.ask] });
-  text('長方形を 対角線で 2つに 切った', W / 2, fa.y + 12, 12, CONFIG.C_INK_SOFT, 'center', '700');
+  text(g.ask + 'の角と 重なるのは、どの角？', W / 2, fa.y + 12, 12, CONFIG.C_INK_SOFT, 'center', '700');   
   if (n >= 3) text(g.ask + 'の角 ＝ ' + S.answer + 'の角', W / 2, fa.y + fa.h - 12, 16, CONFIG.C_OK, 'center', '800');
 }
 function u25KindIcon(kind, x, y, s){
@@ -4903,7 +5227,7 @@ function u26Draw(area, opt){
     }
   } else {
     
-    text('2つに おって ぴったり かさなるのは？', W / 2, area.y + 26, 14, CONFIG.C_INK_SOFT, 'center', '700');
+    if (!qAsked()) text('2つに おって ぴったり かさなるのは？', W / 2, area.y + 26, 14, CONFIG.C_INK_SOFT, 'center', '700');
     const cands = opt.cands || (S.choices || []).map(c => choiceVal(c));
     const sz = Math.min(70, area.w / 3.4, area.h / 3.8);
     const gx = Math.min(150, area.w * 0.42), gy = sz * 1.55;
@@ -5018,9 +5342,9 @@ function u26RingDraw(area, opt){
     text(U26_RING[k], p[0], p[1], named ? 13 : 12,
       named ? CONFIG.C_INK : CONFIG.C_INK_SOFT, 'center', '800');
   }
-  text(U26_RING[g.i] + ' と ' + U26_RING[g.j] + ' が かさなるように おる',
+  if (!qAsked()) text(U26_RING[g.i] + ' と ' + U26_RING[g.j] + ' が かさなるように おる',
     W / 2, area.y + 16, 13, CONFIG.C_INK, 'center', '800');
-  text(U26_RING[g.k] + ' は どれと かさなる？', W / 2, bot + 13, 13, CONFIG.C_GOLD, 'center', '800');
+  if (!qAsked()) text(U26_RING[g.k] + ' は どれと かさなる？', W / 2, bot + 13, 13, CONFIG.C_GOLD, 'center', '800');
   if (opt.pairArrow) {
     const a = mid(opt.pairArrow[0]), b = mid(opt.pairArrow[1]);
     ctx.strokeStyle = CONFIG.C_OK; ctx.lineWidth = 2.4; ctx.lineCap = 'round';
@@ -5048,14 +5372,17 @@ function u26DrawQ(area, opt){
 function u26TeachBegin(){
   const g = S.g, k = S.kind;
   if (k === 'ring') {
-    const msgs = [U26_RING[g.i] + ' と ' + U26_RING[g.j] + ' が かさなるように おる',
-      'その 2つの まん中を とおる 線が **折り目**',
-      '折り目で パタンと おる。' + U26_RING[g.k] + ' の ある がわが たおれていく',
-      'おり終わった。' + U26_RING[g.k] + ' の 上に かさなったのは ' + S.answer];
-    return makeTeach(3, msgs, ['', '折り目', 'おる', S.answer], { g, kind: k });
+
+    
+    const I = U26_RING[g.i], J = U26_RING[g.j], K = U26_RING[g.k];
+    const msgs = [I + 'と' + J + 'がかさなるように、2つにおります。',
+      I + 'と' + J + 'のちょうどまん中に、線を引きます。\nこれが**おり目**です。',
+      K + 'のあるほうを、おり目でパタンとおります。',
+      'おると、' + K + 'は' + S.answer + 'にかさなりました。\nだから、答えは' + S.answer + 'です。'];
+    return makeTeach(3, msgs, ['', 'おり目', 'おる', S.answer], { g, kind: k });
   }
-  const msgs = ['たてに 折り線を 引く', '右半分を、線の ところで **パタンと** 折る',
-    '左半分と ぴったり かさなった', 'こういう 文字を さがす'];
+  const msgs = ['文字のまん中に、たての点線を引きます。', '点線のところで、右半分を**パタンと**おります。',
+    '左半分とぴったりかさなりました。', '「' + g.ch + '」は、ぴったりかさなります。\nだから、答えは' + g.ch + 'です。'];
   return makeTeach(3, msgs, ['', 'おる', 'ぴったり', g.ch], { g, kind: k });
 }
 function u26TeachDraw(area, T){
@@ -5154,8 +5481,8 @@ function u27Draw(area, opt){
   const k = opt.kind || S.kind;
   ctx.save();
   if (k === 'times') {
-    text('1まいの はばは ' + g.a + 'cm', W / 2, area.y + 18, 14, CONFIG.C_INK, 'center', '800');
-    text(g.n + 'まい まっすぐ ならべると 何cm？', W / 2, area.y + 40, 13, CONFIG.C_GOLD, 'center', '800');
+    if (!qAsked()) text('1まいの はばは ' + g.a + 'cm', W / 2, area.y + 18, 14, CONFIG.C_INK, 'center', '800');
+    if (!qAsked()) text(g.n + 'まい まっすぐ ならべると 何cm？', W / 2, area.y + 40, 13, CONFIG.C_GOLD, 'center', '800');
     const maxW = area.w - 44;
     const d = Math.min(26, maxW / g.n);
     const ox = W / 2 - (g.n - 1) * d / 2;
@@ -5177,8 +5504,8 @@ function u27Draw(area, opt){
     ctx.restore(); return;
   }
   if (k === 'stack') {
-    text('10円玉を ' + g.m + 'まい 重ねると 高さ 1cm', W / 2, area.y + 18, 13, CONFIG.C_INK, 'center', '800');
-    text('高さ ' + g.t + 'cm には 何まい？', W / 2, area.y + 40, 13, CONFIG.C_GOLD, 'center', '800');
+    if (!qAsked()) text('10円玉を ' + g.m + 'まい 重ねると 高さ 1cm', W / 2, area.y + 18, 13, CONFIG.C_INK, 'center', '800');
+    if (!qAsked()) text('高さ ' + g.t + 'cm には 何まい？', W / 2, area.y + 40, 13, CONFIG.C_GOLD, 'center', '800');
     const base = area.y + area.h * 0.76;
     const hUnit = Math.min(40, (area.h * 0.46) / g.t);
     const bw = 44;
@@ -5219,7 +5546,7 @@ function u27Draw(area, opt){
     ctx.restore(); return;
   }
   
-  text('ならべると 全体で 何cm？', W / 2, area.y + 18, 14, CONFIG.C_INK, 'center', '800');
+  if (!qAsked()) text('ならべると 全体で 何cm？', W / 2, area.y + 18, 14, CONFIG.C_INK, 'center', '800');
   const tot = g.lens.reduce((a, b) => a + b, 0);
   const maxW = Math.min(area.w - 56, 252);
   const y = area.y + area.h * 0.46;
@@ -5247,24 +5574,29 @@ function u27Draw(area, opt){
 function u27TeachBegin(){
   const g = S.g, k = S.kind;
   if (k === 'times') {
-    const msgs = ['1まいの はばが ' + g.a + 'cm。これが 「1つ分」',
-      'それが ' + g.n + 'まい ならぶ。これが 「いくつ分」',
-      '1つ分 × いくつ分 ＝ ' + g.a + ' × ' + g.n,
-      'こたえは ' + (g.a * g.n) + 'cm'];
+
+    const msgs = ['1まいのはばは' + g.a + 'cmです。これが「1つ分」です。',
+      g.a + 'cmのコインが、' + g.n + 'まいならびます。\nこの' + g.n + 'が「いくつ分」です。',
+      '長さは、1つ分×いくつ分です。\n' + g.a + '×' + g.n + 'になります。',
+      
+      (g.n > 9 ? (g.a + '×' + g.n + 'は、' + g.a + '×10＝' + (g.a * 10) + 'と' + g.a + '×' + (g.n - 10) + '＝' + (g.a * (g.n - 10)) + 'をあわせて' + (g.a * g.n) + '。\n')
+               : (g.a + '×' + g.n + '＝' + (g.a * g.n) + 'なので、')) + '答えは' + (g.a * g.n) + 'cmです。'];
     return makeTeach(3, msgs, ['', 'いくつ分', g.a + '×' + g.n, (g.a * g.n) + 'cm'], { g, kind: k });
   }
   if (k === 'stack') {
-    const msgs = [g.m + 'まいで 1cm。これが 「1つ分」',
-      'ほしい 高さは ' + g.t + 'cm。1cmの ' + g.t + 'つ分',
-      'まい数も ' + g.t + 'つ分 → ' + g.m + ' × ' + g.t,
-      'こたえは ' + (g.m * g.t) + 'まい'];
+    const msgs = [g.m + 'まい重ねると1cmです。\nこの1cmを「1つ分」とします。',
+      'つくりたい高さは' + g.t + 'cmです。\n' + g.t + 'cmは、1cmの' + g.t + 'つ分です。',
+      '高さが' + g.t + 'つ分なら、まい数も' + g.t + 'つ分です。\n' + g.m + 'まいの' + g.t + 'つ分で、' + g.m + '×' + g.t + 'です。',
+      g.m + '×' + g.t + '＝' + (g.m * g.t) + 'なので、答えは' + (g.m * g.t) + 'まいです。'];
     return makeTeach(3, msgs, ['', g.t + 'つ分', g.m + '×' + g.t, (g.m * g.t) + 'まい'], { g, kind: k });
   }
-  const msgs = ['ならべた ものを 左から 見る'];
+  const msgs = ['左から1つずつ、長さをたしていきます。'];
   const labels = [''];
   let s = 0;
-  g.lens.forEach((L, i) => { s += L; msgs.push(g.names[i] + ' ' + L + 'cm　→ ここまで ' + s + 'cm'); labels.push('+' + L); });
-  msgs.push('ぜんぶで ' + s + 'cm'); labels.push(s + 'cm');
+  g.lens.forEach((L, i) => { s += L;
+    msgs.push(i === 0 ? (g.names[i] + 'は' + L + 'cmです。ここまでで' + s + 'cmです。') : (g.names[i] + 'の' + L + 'cmをたします。\nここまでで' + s + 'cmです。'));
+    labels.push('+' + L); });
+  msgs.push('全体の長さは' + s + 'cmです。'); labels.push(s + 'cm');
   return makeTeach(msgs.length - 1, msgs, labels, { g, kind: k });
 }
 function u27TeachDraw(area, T){
@@ -5504,30 +5836,32 @@ function u28Draw(area, opt){
 function u28TateWords(Z){
   const extra = Z.tate - Z.h * 2;
   return (extra > 0)
-    ? ('外がわ ' + Z.h + '×2 ＝ ' + (Z.h * 2) + '、くぼみの 2本で ＋' + extra + ' → ' + Z.tate + 'cm')
-    : ('ずらして そろえると ' + Z.h + '×2 ＝ ' + Z.tate + 'cm');
+    ? ('外がわのたて線は、' + Z.h + 'cmが2本で' + (Z.h * 2) + 'cm。\nくぼみのたて線2本で' + extra + 'cm。あわせて' + Z.tate + 'cmです。')
+    : ('右のたて線をつなげると、左と同じ' + Z.h + 'cmです。\n' + Z.h + '×2＝' + Z.tate + 'cmです。');
 }
 function u28TeachBegin(){
   const g = S.g, k = S.kind, Z = u28Size(g);
   if (k === 'miss') {
     const other = Z.w - S.answer;
-    const msgs = ['金いろの ところが ？。よこ線を くらべて 出す',
-      '**下の 辺**は ' + Z.w + 'cm。上がわの よこ線を ぜんぶ たすと、これと 同じに なる',
-      '上がわで **青**に なって いるのは あわせて ' + other + 'cm',
-      'だから ？ は ' + Z.w + ' − ' + other + ' ＝ **' + S.answer + 'cm**'];
-    return makeTeach(3, msgs, ['', '下の辺 ' + Z.w, '青 ' + other, S.answer + 'cm'], { g, kind: k });
+
+    
+    const msgs = ['？の長さを、よこの線の長さからもとめます。',
+      'いちばん下のよこ線は' + Z.w + 'cmです。\n上のほうのよこ線をつなげても、' + Z.w + 'cmになります。',
+      '上のほうで、長さがわかっているよこ線は、\nあわせて' + other + 'cmです。',
+      'だから、？は' + Z.w + '−' + other + '＝**' + S.answer + 'cm**です。'];
+    return makeTeach(3, msgs, ['', '下 ' + Z.w + 'cm', 'わかっている ' + other + 'cm', S.answer + 'cm'], { g, kind: k });
   }
   if (k === 'tate') {
-    const msgs = ['たての 線だけを 見る',
-      'たての 線に 色を つけた',
+    const msgs = ['たての線だけを見ます。',
+      'たての線に、色をつけました。',
       u28TateWords(Z),
-      'たて線の 合計は ' + Z.tate + 'cm'];
+      'たての線の合計は' + Z.tate + 'cmです。'];
     return makeTeach(3, msgs, ['', 'たてだけ', 'そろえる', Z.tate + 'cm'], { g, kind: k });
   }
-  const msgs = ['まわりを 1本ずつ 足さない。たてと よこに 分ける',
-    'たての 線：' + u28TateWords(Z),
-    'よこの 線：ずらして そろえると ' + Z.w + '×2 ＝ ' + Z.yoko + 'cm',
-    'まわりは ' + Z.tate + ' ＋ ' + Z.yoko + ' ＝ ' + Z.peri + 'cm'];
+  const msgs = ['まわりの線を、たての線とよこの線に分けてたします。',
+    u28TateWords(Z),
+    'よこの線は、上をつなげると下と同じ' + Z.w + 'cmです。\n' + Z.w + '×2＝' + Z.yoko + 'cmです。',
+    'まわりの長さは、' + Z.tate + '＋' + Z.yoko + '＝' + Z.peri + 'cmです。'];
   return makeTeach(3, msgs, ['', 'たて ' + Z.tate, 'よこ ' + Z.yoko, Z.peri + 'cm'], { g, kind: k });
 }
 function u28TeachDraw(area, T){
@@ -5610,7 +5944,7 @@ function u29SegDraw(area, opt){
   const x0 = W / 2 - bw / 2, y = area.y + area.h * 0.48;
   const wa = bw * g.a / g.tot;
   ctx.save();
-  text('家から 学校、学校から 公園', W / 2, area.y + 18, 13, CONFIG.C_INK_SOFT, 'center', '700');
+  if (!qAsked()) text('家から 学校、学校から 公園', W / 2, area.y + 18, 13, CONFIG.C_INK_SOFT, 'center', '700');
   ctx.strokeStyle = CONFIG.C_EDGE; ctx.lineWidth = 2;
   ctx.beginPath(); ctx.moveTo(x0, y); ctx.lineTo(x0 + bw, y); ctx.stroke();
   [x0, x0 + wa, x0 + bw].forEach(px => {
@@ -5672,8 +6006,8 @@ function u29MapDraw(area, opt){
   lab(H, TS, g.d + 'm', 0); lab(TS, EK, g.e + 'm', 0);
   const head = (k === 'diff') ? '2つの 道は どちらが 何m 長い？'
     : ((g.via === 'A') ? '消ぼうしょの 前を 通って 駅まで 何m？' : '図書館の 前を 通って 駅まで 何m？');
-  text('家から 駅まで 歩く', W / 2, area.y + 14, 11, CONFIG.C_INK_SOFT, 'center', '700');
-  text(head, W / 2, area.y + 32, 13, CONFIG.C_INK, 'center', '800');
+  if (!qAsked()) text('家から 駅まで 歩く', W / 2, area.y + 14, 11, CONFIG.C_INK_SOFT, 'center', '700');
+  if (!qAsked()) text(head, W / 2, area.y + 32, 13, CONFIG.C_INK, 'center', '800');
   if (opt.show) text(opt.show, W / 2, area.y + area.h - 10, 15, CONFIG.C_OK, 'center', '800');
   ctx.restore();
 }
@@ -5685,28 +6019,35 @@ function u29Draw(area, opt){
 function u29TeachBegin(){
   const g = S.g, k = S.kind;
   if (k === 'seg') {
-    const msgs = (g.ask === 'tot')
-      ? ['家から 学校まで ' + g.a + 'm', '学校から 公園まで ' + g.b + 'm',
-         '2つを つなげた ぜんぶが 聞かれて いる', g.a + ' ＋ ' + g.b + ' ＝ ' + g.tot + 'm']
-      : ['家から 公園まで ぜんぶで ' + g.tot + 'm', 'そのうち 家から 学校までは ' + g.a + 'm',
-         'のこりが 学校から 公園まで', g.tot + ' − ' + g.a + ' ＝ ' + g.b + 'm'];
-    return makeTeach(3, msgs, ['', g.a + 'm', 'のこり', S.answer + 'm'], { g, kind: k });
+
+    
+    const tot = (g.ask === 'tot');
+    const msgs = tot
+      ? ['家から学校まで' + g.a + 'mです。', '学校から公園まで' + g.b + 'mです。',
+         '聞かれているのは、家から公園までの\n全部の長さです。', g.a + '＋' + g.b + '＝' + g.tot + 'mです。']
+      : ['家から公園まで、全部で' + g.tot + 'mです。', 'そのうち、家から学校までは' + g.a + 'mです。',
+         'のこりが、学校から公園までの長さです。', g.tot + '−' + g.a + '＝' + g.b + 'mです。'];
+    return makeTeach(3, msgs, tot ? ['', g.b + 'm', 'ぜんぶ', S.answer + 'm'] : ['', g.a + 'm', 'のこり', S.answer + 'm'], { g, kind: k });
   }
   if (k === 'diff') {
     const longer = (g.sA > g.sB) ? '消ぼうしょ' : '図書館';
-    const msgs = ['消ぼうしょの 道：' + g.a + ' ＋ ' + g.b + ' ＋ ' + g.c + ' ＝ ' + g.sA + 'm',
-      '図書館の 道：' + g.d + ' ＋ ' + g.e + ' ＝ ' + g.sB + 'm',
-      '長い方から 短い方を 引く',
-      longer + 'の道が ' + Math.abs(g.sA - g.sB) + 'm 長い'];
+    
+    const msgs = ['2つの道の長さを、くらべます。',
+      '消ぼうしょの前を通る道は、\n' + g.a + '＋' + g.b + '＋' + g.c + '＝' + g.sA + 'mです。',
+      '図書館の前を通る道は、\n' + g.d + '＋' + g.e + '＝' + g.sB + 'mです。',
+      '長い道から短い道をひくと、' + Math.abs(g.sA - g.sB) + 'mです。\n' + longer + 'の道が' + Math.abs(g.sA - g.sB) + 'm長いです。'];
     return makeTeach(3, msgs, ['', g.sA + 'm', g.sB + 'm', Math.abs(g.sA - g.sB) + 'm'], { g, kind: k });
   }
   const viaA = (g.via === 'A');
   const nums = viaA ? [g.a, g.b, g.c] : [g.d, g.e];
-  const msgs = [(viaA ? '消ぼうしょ' : '図書館') + 'の 前を 通る 道を なぞる'];
+  const msgs = [(viaA ? '消ぼうしょ' : '図書館') + 'の前を通る道を、なぞっていきます。'];
   const labels = [''];
+  const stops = viaA ? ['家', '銀行', '消ぼうしょ', '駅'] : ['家', '図書館', '駅'];
   let s = 0;
-  nums.forEach((v, i) => { s += v; msgs.push((i + 1) + '本目 ＋' + v + ' → ' + s + 'm'); labels.push('+' + v); });
-  msgs.push('ぜんぶで ' + s + 'm'); labels.push(s + 'm');
+  nums.forEach((v, i) => { s += v;
+    msgs.push(stops[i] + 'から' + stops[i + 1] + 'まで' + v + 'mです。' + (i ? '\nここまでで' + s + 'mです。' : ''));
+    labels.push('+' + v); });
+  msgs.push('全部で' + s + 'm歩きます。'); labels.push(s + 'm');
   return makeTeach(msgs.length - 1, msgs, labels, { g, kind: k });
 }
 function u29TeachDraw(area, T){
@@ -6006,12 +6347,13 @@ function basicSqDraw(area, opt){
 function basicSqTeachBegin(){
   const g = S.g, n = g.n;
   const msgs = [
-    n + '番目の 四角数を もとめる',
-    'たてに ' + n + 'こ',
-    'よこに ' + n + 'こ',
-    n + ' × ' + n + ' ＝ **' + (n * n) + '**',
+    
+    'たてとよこに、同じ数ずつならんだ点を数えます。',
+    'よこ1だんに、' + n + 'こならんでいます。',
+    'そのだんが、たてに' + n + 'だんあります。',
+    n + 'こが' + n + 'だんあるので、\n' + n + '×' + n + '＝**' + (n * n) + '**です。',
   ];
-  const labels = ['', 'たて' + n, 'よこ' + n, String(n * n)];
+  const labels = ['', 'よこ' + n, n + 'だん', String(n * n)];
   return makeTeach(3, msgs, labels, { g, mk: 'basicSq' });
 }
 function basicSqTeachDraw(area, T){
@@ -6067,7 +6409,7 @@ function sqDraw(area, opt){
   const topGut = opt.split ? 40 : 0, botGut = (opt.reveal != null) ? 26 : 0;
   const gridArea = { x: area.x, y: area.y + topGut, w: area.w, h: area.h - topGut - botGut };
   sqSplitGrid(gridArea, g.n, { split: opt.split });
-  if (opt.split) {
+  if (opt.split && !qAsked()) {
     text('黒＝' + g.n + '番目の三角数', W / 2, area.y + 16, 12, '#4a4458', 'center', '800');
     text('白＝' + (g.n - 1) + '番目の三角数', W / 2, area.y + 34, 12, CONFIG.C_INK_SOFT, 'center', '800');
   }
@@ -6076,10 +6418,10 @@ function sqDraw(area, opt){
 function sqTeachBegin(){
   const g = S.g, n = g.n, black = g.black, white = g.white;
   const msgs = [
-    n + '番目の 四角数を、2つの 三角数に 分ける',
-    '黒い三角＝' + n + '番目の 三角数（ペアで もとめる）＝**' + black + '**',
-    '白い三角＝' + (n - 1) + '番目の 三角数＝**' + white + '**',
-    '黒 ＋ 白 ＝ ' + black + ' ＋ ' + white + ' ＝ **' + (black + white) + '**',
+    '黒の三角と白の三角を、べつべつに数えます。',
+    '黒は' + n + 'だんの三角です。\n上と下のだんを組にして数えると、**' + black + 'こ**です。',
+    '白は' + (n - 1) + 'だんの三角です。\n同じように数えると、**' + white + 'こ**です。',
+    '黒と白をあわせて、' + black + '＋' + white + '＝**' + (black + white) + '**です。\nたて' + n + 'こ、よこ' + n + 'この四角と同じ数です。',
   ];
   const labels = ['', '黒' + black, '白' + white, String(black + white)];
   return makeTeach(3, msgs, labels, { g, mk: 'sq' });
@@ -6204,13 +6546,15 @@ function u11TeachBegin(){
     ? (g.A + ' ＋ ' + g.B + ' ＝ ' + g.ans)
     : (g.W + ' － ' + known + ' ＝ ' + g.ans);
   
+
+  const parts = isWhole ? ('□、中の2つが' + g.A + 'と' + g.B) : (g.W + '、中の2つが□と' + known);
   const msgs = [
-    g.stmt,
-    '1本の 線に して、上と 下に かっこを つける',
+    g.stmt.replace(/ /g, '') + 'の□にあてはまる数を考えます。',
+    '1本の線で表します。\nぜんぶが' + parts + 'です。',
     isWhole
-      ? '上の 2つを たすと 下の かっこ\n' + calc
-      : '下の かっこから わかっている 方を 引く\n' + calc,
-    calcAns,
+      ? '中の2つをたすと、ぜんぶになります。\n' + calc
+      : 'ぜんぶの' + g.W + 'から、わかっている' + known + 'をひきます。\n' + calc,
+    calcAns + 'なので、□は' + g.ans + 'です。',
   ];
   return makeTeach(3, msgs, ['', '線に する', calc, String(g.ans)], { g });
 }
@@ -6274,14 +6618,15 @@ function u12Draw(area, opt){
 }
 function u12TeachBegin(){
   const g = S.g;
+
   const msgs = [
-    g.stmt,
-    g.a + ' は ' + g.base + ' まで あと ' + g.diff,
-    g.base + ' を ' + (g.minus ? 'ひく' : 'たす'),
-    g.diff + ' ' + (g.minus ? 'ひきすぎた' : 'たしすぎた'),
-    'だから ' + g.diff + ' を ' + (g.minus ? 'たす' : 'ひく') + '\n' + g.correct,
+    g.stmt.replace(/ /g, '') + 'を、計算しやすい式に直します。\n答えは同じになるようにします。',
+    g.a + 'は、あと' + g.diff + 'で' + g.base + 'になります。',
+    g.a + 'のかわりに、きりのいい' + g.base + 'を' + (g.minus ? 'ひきます。' : 'たします。'),
+    '本当に' + (g.minus ? 'ひく' : 'たす') + 'のは' + g.a + 'なので、\n' + g.diff + 'だけ多く' + (g.minus ? 'ひきすぎます。' : 'たしすぎます。'),
+    (g.minus ? 'ひきすぎた' : 'たしすぎた') + g.diff + 'を、' + (g.minus ? 'たして' : 'ひいて') + 'もどします。\n式は' + g.correct + 'です。',
   ];
-  return makeTeach(4, msgs, ['', 'あと' + g.diff, g.minus ? '−' + g.base : '+' + g.base, 'いきすぎ', g.correct], { g });
+  return makeTeach(4, msgs, ['', 'あと' + g.diff, g.minus ? '−' + g.base : '+' + g.base, (g.minus ? 'ひきすぎ' : 'たしすぎ') + g.diff, g.correct], { g });
 }
 function u12TeachDraw(area, T){
   const g = T.g, n = T.shown;
@@ -6425,29 +6770,33 @@ function u13Draw(area, opt){
 function u13TeachBegin(){
   const g = S.g;
   if (g.k === 'zu') {
+
+    
     const msgs = [
-      (g.vis === 'line') ? ('1つ分は ' + g.per) : ('よこに ' + g.per + 'こ ならぶ'),
-      (g.vis === 'line') ? ('それが ' + g.bags + 'つ分') : ('それが たてに ' + g.bags + 'だん'),
-      g.per + ' × ' + g.bags + ' ＝ ' + (g.per * g.bags),
+      (g.vis === 'line') ? ('小さい1くぎりの長さは' + g.per + 'です。\nこれが1つ分です。') : ('よこの1だんに、点が' + g.per + 'こならんでいます。\nこれが1つ分です。'),
+      (g.vis === 'line') ? (g.per + 'のくぎりが、' + g.bags + 'こならんでいます。\n' + g.per + 'が' + g.bags + 'つ分です。') : (g.per + 'こが、たてに' + g.bags + 'だんあります。\n' + g.per + 'こが' + g.bags + 'つ分です。'),
+      'かけ算は「1つ分の数×いくつ分」の順に書きます。\nだから' + g.per + '×' + g.bags + '＝' + (g.per * g.bags) + 'です。',
     ];
     return makeTeach(2, msgs, ['', g.bags + 'つ分', g.per + '×' + g.bags], { g });
   }
   
   const P = u13Pairs(g), n = g.nums.length;
-  const msgs = ['同じ数の くり返しに できないか 見る'];
+  const msgs = [P === 0 ? 'このたし算は、同じ数をくり返したしています。' : 'このたし算は、数がそろっていません。\n同じ数にそろえられないか考えます。'];
   const labels = [''];
   for (let i = 0; i < P; i++) {
     if (g.t === 'group') {
-      msgs.push(g.nums[0] + ' と ' + g.nums[g.cnt] + ' で 1くみ ＝ ' + g.mid);
+      msgs.push(g.nums[0] + 'と' + g.nums[g.cnt] + 'を1組にすると、' + g.mid + 'になります。');
       labels.push('1くみ ' + g.mid);
     } else {
-      msgs.push(g.nums[i] + ' と ' + g.nums[n - 1 - i] + ' を ならすと どちらも ' + g.mid);
-      labels.push('ならす');
+      
+      const mv = g.nums[n - 1 - i] - g.mid;
+      msgs.push(g.nums[n - 1 - i] + 'から' + mv + 'を' + g.nums[i] + 'にうつすと、どちらも' + g.mid + 'になります。\nうつしただけなので、ぜんぶの数はかわりません。');
+      labels.push(mv + 'うつす');
     }
   }
-  msgs.push(g.t === 'group' ? (g.mid + ' が ' + g.cnt + 'くみ') : (g.mid + ' が ' + g.cnt + 'こ'));
+  msgs.push(g.t === 'group' ? (g.mid + 'の組が' + g.cnt + 'つできました。\nだから' + g.mid + '×' + g.cnt + 'です。') : (g.mid + 'が' + g.cnt + '回たされています。\nだから' + g.mid + '×' + g.cnt + 'です。'));
   labels.push(g.mid + '×' + g.cnt);
-  msgs.push(g.mid + ' × ' + g.cnt + ' ＝ ' + (g.mid * g.cnt));
+  msgs.push(g.mid + '×' + g.cnt + '＝' + (g.mid * g.cnt) + 'です。もとのたし算と同じ答えです。');
   labels.push(String(g.mid * g.cnt));
   return makeTeach(P + 2, msgs, labels, { g, P });
 }
@@ -6539,10 +6888,10 @@ function u15Draw(area, opt){
 function u15TeachBegin(){
   const g = S.g;
   const msgs = [
-    g.total + ' ÷ ' + g.div + ' を 考える',
-    g.total + ' を ' + g.tens + ' と ' + g.ones + ' に 分ける',
-    g.tens + '÷' + g.div + '＝' + (g.tens / g.div) + '、' + g.ones + '÷' + g.div + '＝' + (g.ones / g.div),
-    (g.tens / g.div) + ' ＋ ' + (g.ones / g.div) + ' ＝ ' + (g.total / g.div),
+    g.total + '÷' + g.div + 'は、そのままでは答えがすぐに出ません。\n' + g.total + 'を2つの数に分けて考えます。',
+    g.total + 'を、' + g.tens + 'と' + g.ones + 'に分けます。\nどちらも' + g.div + 'でわりきれる数です。',
+    g.tens + 'も' + g.ones + 'も、' + g.div + 'でわります。\n' + g.tens + '÷' + g.div + '＝' + (g.tens / g.div) + '、' + g.ones + '÷' + g.div + '＝' + (g.ones / g.div) + 'です。',
+    'わった答えをあわせて、' + (g.tens / g.div) + '＋' + (g.ones / g.div) + '＝' + (g.total / g.div) + 'です。\nだから、' + g.tens + 'と' + g.ones + 'に分けると計算しやすいです。',
   ];
   return makeTeach(3, msgs, ['', g.tens + 'と' + g.ones, 'それぞれ', String(g.total / g.div)], { g });
 }
@@ -6612,8 +6961,8 @@ function u17Draw(area, opt){
   opt = opt || {};
   const g = opt.g || S.g;
   ctx.save();
-  text(g.said, W / 2, area.y + 26, 17, CONFIG.C_INK, 'center', '800');
-  text('あわせて ' + g.sum + 'こ', W / 2, area.y + 50, 15, CONFIG.C_INK_SOFT, 'center', '700');
+  if (!qAsked()) text(g.said, W / 2, area.y + 26, 17, CONFIG.C_INK, 'center', '800');
+  if (!qAsked()) text('あわせて ' + g.sum + 'こ', W / 2, area.y + 50, 15, CONFIG.C_INK_SOFT, 'center', '700');
   if (opt.bars) {
     const y = area.y + area.h * 0.55, x0 = W / 2 - 100, w = 200, m = g.big;
     const bar = (yy, len, col, lab) => {
@@ -6639,7 +6988,7 @@ function u17Draw(area, opt){
     text('○', x0 - 10, y + 9, 13, CONFIG.C_INK, 'right', '800');
     text('△', x0 - 10, y + 35, 13, CONFIG.C_INK, 'right', '800');
     text('？', W / 2, y + 22, 26, CONFIG.C_GOLD, 'center', '800');
-    text('この 2本は どんな 長さ？', W / 2, y + 66, 12, CONFIG.C_INK_SOFT, 'center', '700');
+    if (!qAsked()) text('この 2本は どんな 長さ？', W / 2, y + 66, 12, CONFIG.C_INK_SOFT, 'center', '700');
   }
   if (opt.reveal) text(opt.reveal, W / 2, area.y + area.h - 12, 18, CONFIG.C_OK);
   ctx.restore();
@@ -6647,16 +6996,20 @@ function u17Draw(area, opt){
 function u17TeachBegin(){
   if (S.kind === 'ratio2' || S.kind === 'ratio3') return u17RatioTeachBegin();
   const g = S.g;
+
+  
+  const d = g.diff;
+  const alt = (g.said.indexOf('△') === 0) ? ('○は△より' + d + 'こ多い') : ('△は○より' + d + 'こ少ない');
   const msgs = [
-    g.said,
-    '○の線を、△より ' + g.diff + ' だけ 長く する',
-    
-    '「△は ○より ' + g.diff + ' 少ない」と 言いかえても\n**おなじ 図**',
-    'あわせて ' + g.sum + '。ちがいの ' + g.diff + ' を 切ると\n△が 2本 ぶん',
-    '（' + g.sum + '－' + g.diff + '）÷2 ＝ ' + g.small + ' → ○は ' + g.big,
+    '○と△の数を、線の長さで表します。\n数が多いほうを、長い線にします。',
+    '○は△より' + d + 'こ多いので、\n○の線を△の線より' + d + 'こぶん長くかきます。',
+    '「' + alt + '」と言っても、同じことです。\n図も同じになります。',
+    'あわせて' + g.sum + 'こです。○から、多い' + d + 'こぶんを切りとると、\n○と△は同じ長さの2本になります。',
+    '2本で' + (g.sum - d) + 'こなので、△は（' + g.sum + '−' + d + '）÷2＝' + g.small + 'こ。\n○は' + g.small + '＋' + d + '＝' + g.big + 'こです。',
   ];
-  return makeTeach(4, msgs, ['', '○が長い', 'おなじ図', 'きると', String(g.big)], { g });
+  return makeTeach(4, msgs, ['', '○が長い', 'おなじ図', '切りとる', String(g.big)], { g });
 }
+
 function u17TeachDraw(area, T){
   if (T.kk === 'ratio') return u17RatioTeachDraw(area, T);
   const g = T.g, n = T.shown;
@@ -6693,7 +7046,7 @@ function u17RatioDraw(area, opt){
   const g = opt.g || S.g;
   const n = g.people;
   ctx.save();
-  text('あわせて ' + g.sum + 'こ', W / 2, area.y + 20, 14, CONFIG.C_INK_SOFT, 'center', '700');
+  if (!qAsked()) text('あわせて ' + g.sum + 'こ', W / 2, area.y + 20, 14, CONFIG.C_INK_SOFT, 'center', '700');
   const m = Math.max(...g.mults);
   const w = 200, x0 = W / 2 - w / 2, bh = 20, gap = 8;
   const top = area.y + 42;
@@ -6708,29 +7061,32 @@ function u17RatioDraw(area, opt){
     ctx.strokeStyle = (i === g.ask) ? CONFIG.C_GOLD : CONFIG.C_EDGE;
     ctx.lineWidth = (i === g.ask) ? 2.4 : 1.4; ctx.stroke();
     text(NAMES[i], x0 - 12, y + bh / 2, 13, CONFIG.C_INK, 'right', '800');
-    const lab = (i === 0) ? '×1（もとに する）' : ('×' + g.mults[i]);
+    const lab = (i === 0) ? '×1（1つぶん）' : ('×' + g.mults[i]);   
     text(lab, x0 + len + 8, y + bh / 2, 11, CONFIG.C_INK_SOFT, 'left', '700');
     if (i === g.ask && !opt.reveal) text('？', x0 + len / 2, y + bh / 2 + 1, 14, CONFIG.C_GOLD, 'center', '800');
     if (i === g.ask && opt.reveal) text(String(g.vals[i]), x0 + len / 2, y + bh / 2 + 1, 14, CONFIG.C_INK, 'center', '800');
   }
-  text(NAMES[g.ask] + 'は 何こ？', W / 2, top + n * (bh + gap) + 8, 13, CONFIG.C_INK, 'center', '800');
+  if (!qAsked()) text(NAMES[g.ask] + 'は 何こ？', W / 2, top + n * (bh + gap) + 8, 13, CONFIG.C_INK, 'center', '800');
   ctx.restore();
 }
 function u17RatioTeachBegin(){
   const g = S.g, n = g.people;
   const NAMES = ['①', '②', '③'];
   const unit = g.mults.reduce((a, b) => a + b, 0);
-  const msgs = [g.sum + 'こを、' + NAMES.slice(0, n).join('・') + ' に 分ける'];
+
+  const msgs = ['あわせて' + g.sum + 'こを、' + NAMES.slice(0, n).join('と') + 'に分けます。'];
   const labels = [''];
-  msgs.push('①を **1つぶん** と 考える');
+  msgs.push('①の数を「1つぶん」とします。');
   labels.push('1つぶん');
   for (let i = 1; i < n; i++) {
-    msgs.push(NAMES[i] + ' は ①の ' + g.mults[i] + '倍 → ' + g.mults[i] + 'つぶん');
+    msgs.push(NAMES[i] + 'は①の' + g.mults[i] + '倍なので、' + g.mults[i] + 'つぶんです。');
     labels.push(g.mults[i] + 'つぶん');
   }
-  msgs.push('ぜんぶで ' + unit + 'つぶん。' + g.sum + ' ÷ ' + unit + ' ＝ ' + g.base + '（①）');
+  msgs.push('あわせると' + unit + 'つぶんで、' + g.sum + 'こです。\n1つぶんは' + g.sum + '÷' + unit + '＝' + g.base + 'こです。');
   labels.push(String(g.base));
-  msgs.push(NAMES[g.ask] + 'は ' + g.base + (g.ask === 0 ? '' : ('×' + g.mults[g.ask])) + ' ＝ ' + g.vals[g.ask]);
+  
+  msgs.push(g.ask === 0 ? ('①は1つぶんなので、' + g.base + 'こです。')
+    : (NAMES[g.ask] + 'は' + g.mults[g.ask] + 'つぶんなので、' + g.base + '×' + g.mults[g.ask] + '＝' + g.vals[g.ask] + 'こです。'));
   labels.push(String(g.vals[g.ask]));
   return makeTeach(msgs.length - 1, msgs, labels, { g, kk: 'ratio' });
 }
@@ -6801,7 +7157,7 @@ function u18Draw(area, opt){
   const s = box + GAP;
   const ox = W / 2 - (n - 1) * s / 2, oy = area.y + area.h * 0.46;
   ctx.save();
-  text((g.up ? '切り上げ' : '切り捨て') + 'て ' + U18_PLACE[g.p] + 'の位までの およその数に',
+  if (!qAsked()) text((g.up ? '切り上げ' : '切りすて') + 'て ' + U18_PLACE[g.p] + 'の くらいまでの およその数に',
        W / 2, area.y + 16, 13, CONFIG.C_INK_SOFT, 'center', '700');
   ds.forEach((d, i) => {
     const place = n - 1 - i, on = (place === g.p), x = ox + i * s;
@@ -6825,14 +7181,16 @@ function u18Draw(area, opt){
 }
 function u18TeachBegin(){
   const g = S.g;
-  const word = g.up ? '切り上げ' : '切り捨て';
-  const ans = g.up ? g.upv : g.dn;
+
+  
+  const word = g.up ? '切り上げ' : '切りすて';
+  const ans = g.up ? g.upv : g.dn, P = U18_PLACE[g.p];
   const msgs = [
-    U18_PLACE[g.p] + 'の位までの およその数に する',
-    U18_PLACE[g.p] + 'の位より 下で 切る',
-    g.up ? ('切り上げ は 下を 0 に して、' + U18_PLACE[g.p] + 'の位を 1つ ふやす')
-         : ('切り捨て は 下を そのまま 0 に する'),
-    g.n + ' を ' + word + 'ると ' + ans,
+    g.n + 'を' + word + 'て、' + P + 'のくらいまでのおよその数にします。',
+    P + 'のくらいのすぐ右で切ります。\n線より右の数を見ます。',
+    g.up ? ('切り上げは、線より右を全部0にして、\n' + P + 'のくらいを1つふやします。')
+         : ('切りすては、線より右を全部0にするだけです。\n' + P + 'のくらいは、そのままです。'),
+    g.n + 'を' + word + 'ると、' + ans + 'です。',
   ];
   return makeTeach(3, msgs, ['', 'ここで 切る', word, String(ans)], { g, mk: 'u18' });
 }
@@ -7043,7 +7401,7 @@ function u20Draw(area, opt){
     const bw = Math.max(28, Math.min(44, (area.w - 60 - (n - 1) * GAP) / n));
     const bh = bw * 1.3, s = bw + GAP;
     const ox = W / 2 - (n - 1) * s / 2, oy = area.y + 20 + bh / 2;
-    text('1〜' + n + ' の カードを うらにして ならべた', W / 2, area.y + 12, 12, CONFIG.C_INK_SOFT, 'center', '700');
+    if (!qAsked()) text('1〜' + n + ' の カードを うらにして ならべた', W / 2, area.y + 12, 12, CONFIG.C_INK_SOFT, 'center', '700');
     for (let i = 0; i < n; i++) {
       const x = ox + i * s, isAsk = (i === g.ask);
       const open = opt.open && (opt.open === 'all' || i === g.ask);
@@ -7070,14 +7428,15 @@ function u20Draw(area, opt){
 }
 function u20TeachBegin(){
   const g = S.g;
-  const msgs = ['手がかりを 1つずつ 読んで、ありえる ならび方を ならべる'];
+
+  const msgs = ['ヒントを1つずつ読んで、あてはまる数を\n表に書いていきます。'];
   const labels = [''];
-  g.clues.forEach((c, i) => { msgs.push('・' + c.t); labels.push((i + 1) + 'つめ'); });
+  g.clues.forEach((c, i) => { msgs.push('ヒント' + (i + 1) + '「' + c.t.replace(/ /g, '') + '」\nこれに合わない組み合わせは、表から消します。'); labels.push('ヒント' + (i + 1)); });
   
   const lastRow = u20Rows(g, g.clues.length)[0] || [];
   msgs.push((lastRow[g.ask] == null)
-    ? ('のこったのは この 1とおりだけ。\nつかっていない数は ' + g.sol[g.ask] + ' だけ → ' + U20_NAME[g.ask] + ' は ' + g.sol[g.ask])
-    : ('のこったのは この 1とおりだけ。\n' + U20_NAME[g.ask] + ' は ' + g.sol[g.ask]));
+    ? ('のこった組み合わせは1つだけです。' + U20_NAME[g.ask] + 'はヒントに出てこないので、\nのこりのカードの' + g.sol[g.ask] + 'です。')
+    : ('のこった組み合わせは1つだけです。\nだから、' + U20_NAME[g.ask] + 'は' + g.sol[g.ask] + 'です。'));
   labels.push(String(g.sol[g.ask]));
   return makeTeach(msgs.length - 1, msgs, labels, { g, mk: 'u20' });
 }
@@ -7149,11 +7508,15 @@ function parityDraw(area, opt){
 }
 function parityTeachBegin(){
   const g = S.g;
+
+  
+  const st = g.stmt.replace(/ /g, '');
   const msgs = [
-    g.stmt + ' を 考える',
-    '1つずつ、じゅんに 計算する',
-    g.stmt + ' ＝ ' + g.val,
-    g.val + ' は 2で わりきれる？\n' + (isEven(g.val) ? 'わりきれる → ぐう数' : 'あまる → き数'),
+    st + 'の答えが、ぐう数か、き数かを考えます。\n2でわりきれる数をぐう数、わりきれない数をき数といいます。',
+    (g.ops && g.ops.length > 1) ? '左から1つずつ、じゅんに計算します。' : ('まず、' + st + 'を計算します。'),
+    st + '＝' + g.val + 'です。',
+    isEven(g.val) ? (g.val + 'を2でわると、' + g.val + '÷2＝' + (g.val / 2) + 'で、あまりが出ません。\nだから、' + g.val + 'はぐう数です。')
+                  : (g.val + 'を2でわると、' + Math.floor(g.val / 2) + 'あまり1です。\nあまりが出るので、' + g.val + 'はき数です。'),
   ];
   const ans = isEven(g.val) ? 'ぐう数' : 'き数';
   return makeTeach(3, msgs, ['', '計算', String(g.val), ans], { g, mk: 'parity' });
@@ -7218,10 +7581,13 @@ function gridmulTeachBegin(){
   const r = Math.floor(g.ask / 2), c = g.ask % 2;
   const other = g.vals[r * 2 + (1 - c)];           
   const rowLab = g.rowLab[r];
+
+  
+  const eq = (c === 0) ? ('？×' + other) : (other + '×？');
   const msgs = [
-    'このマスの ぎょう（だん）は\n' + other + ' × ？ ＝ ' + rowLab,
-    rowLab + ' ÷ ' + other + ' ＝ ' + g.vals[g.ask],
-    'このマスは ' + g.vals[g.ask],
+    '？と同じ横のならびを見ます。\n横の2つの数をかけると、左の' + rowLab + 'になります。',
+    eq + '＝' + rowLab + 'なので、\n？は' + rowLab + '÷' + other + '＝' + g.vals[g.ask] + 'です。',
+    '？に入る数は' + g.vals[g.ask] + 'です。',
   ];
   return makeTeach(2, msgs, ['', String(g.vals[g.ask]), String(g.vals[g.ask])], { g, mk: 'gridmul' });
 }
@@ -7245,6 +7611,12 @@ const STAGES = [
     id: 'shape', no: 'No.4', name: '積み木はいくつ？', learn: '真上から見て、柱ごとに足す',
     unlocked: true, slot: 0, boss: { tint: null },
     kinds: CONFIG.KIND_BAG,
+    
+    ask(g, k){
+      if (k === 'hidden') return ['つみ木がつんであります。', 'この絵で、見えないつみ木は何こありますか。'];
+      if (k === 'cols') return ['このつみ木を上から見ます。', '上から見ると、何マスに見えますか。'];
+      return ['つみ木がつんであります。', 'つみ木は全部で何こありますか。'];
+    },
     
     intros: [
       { kind: 'all',    label: 'ぜんぶ',   g: [[2,1],[1,0]],                     answer: 4 },
@@ -7310,6 +7682,14 @@ const STAGES = [
       add:  ['？の マスは いくつに なる？'],
     },
     gen: magicGen,
+    
+    ask(g, k){
+      
+      if (k === 'add') return ['左の表の全部のマスに' + g.k + 'を' + (g.op === 'add' ? 'たして' : 'かけて') + '、', '右の表を作りました。？はいくつですか。'];
+      const two = (g.hidden || []).length > 1;
+      if (k === 'sum') return ['たて・横・ななめ、どの1列をたしても', '同じ数です。1列たすと、いくつですか。'];
+      return ['たて・横・ななめ、どの1列をたしても', '同じ数になります。' + (two ? '太いわくの？は' : '？は') + 'いくつですか。'];
+    },
     kindIcon: magicKindIcon,
     drawQ: magicDrawQ,
     teachBegin: magicTeachBegin,
@@ -7323,6 +7703,8 @@ const STAGES = [
     intros: [{ kind: 'line', label: 'めもり', g: { step: 2, n: 5, total: 8, mark: 3, label: 10 }, answer: 6 }],
     txt: { line: ['★は いくつ？'] },
     gen: lineGen,
+    
+    ask(){ return ['数の線の1めもりの長さは、どこも同じです。', '★のところの数はいくつですか。']; },
     drawQ(area){ qWrap(area, () => lineDraw(area, {})); },
     kindIcon: lineKindIcon, teachBegin: lineTeachBegin, teachDraw: lineTeachDraw,
     icon(x, y, s){ lineKindIcon('line', x, y, s * 1.4); },
@@ -7330,9 +7712,12 @@ const STAGES = [
   {
     id: 'bal', unlocked: true,
     kinds: ['bal', 'bal', 'bal', 'bal', 'bal', 'bal'],
-    intros: [{ kind: 'bal', label: 'てんびん', g: { k: 3, a: 2, b: 2, right: 6 }, answer: 6 }],
+    
+    intros: [{ kind: 'bal', label: 'てんびん', g: { k: 3, a: 2, b: 3, right: 6 }, answer: 9 }],
     txt: { bal: ['● は ▲ いくつ分？'] },
     gen: balGen,
+    
+    ask(g){ return ['てんびんがつり合っています。', '●' + g.b + 'こは、▲何こ分の重さですか。']; },
     drawQ(area){ qWrap(area, () => balDraw(area, {})); },
     kindIcon: balKindIcon, teachBegin: balTeachBegin, teachDraw: balTeachDraw,
     icon(x, y, s){ balKindIcon('bal', x, y, s * 1.3); },
@@ -7346,6 +7731,11 @@ const STAGES = [
            less: ['△は ○より ', ['何','なん'], 'こ ', ['少','すく'], 'ない？'],
            field: ['いくつ ちがう？'] },
     gen: pairGen,
+    
+    ask(g, k){
+      if (k === 'field') return ['○、△、□のうち、いちばん多い形は、', 'いちばん少ない形より何こ多いですか。'];
+      return (k === 'less') ? ['○と△があります。', '△は○より何こ少ないですか。'] : ['○と△があります。', '○は△より何こ多いですか。'];
+    },
     drawQ(area){ qWrap(area, () => (S.kind === 'field' ? fieldDraw(area, {}) : pairDraw(area, {}))); },
     kindIcon: pairKindIcon, teachBegin: pairTeachBegin, teachDraw: pairTeachDraw,
     icon(x, y, s){ pairKindIcon('more', x, y, s * 1.3); },
@@ -7354,9 +7744,17 @@ const STAGES = [
     id: 'week', unlocked: true,
     kinds: ['date', 'date', 'date', 'after', 'date', 'after'],
     
-    intros: [{ kind: 'date', label: '7日ごと', g: { start: 3, day: 24, k: 'date' }, answer: weekName((3 + 23) % 7) }],
+    intros: [{ kind: 'date', label: '7日ごと', g: { start: 3, day: 24, k: 'date' }, answer: weekName((3 + 23) % 7) },
+      
+      { kind: 'after', label: '◯日後', g: { start: 3, day: 24, k: 'after' }, answer: weekName((3 + 24) % 7) }],
     txt: { date: [['何','なん'], 'よう', ['日','び'], '？'], after: [['何','なん'], 'よう', ['日','び'], '？'] },
     gen: weekGen,
+    
+    ask(g){
+      return (g.k === 'after')
+        ? ['きょうは' + weekName(g.start) + 'です。あしたが1日後です。', g.day + '日後は何よう日ですか。']
+        : ['この月の1日は' + weekName(g.start) + 'です。', 'この月の' + g.day + '日は何よう日ですか。'];
+    },
     drawQ(area){ qWrap(area, () => weekDraw(area, {})); },
     kindIcon: weekKindIcon, teachBegin: weekTeachBegin, teachDraw: weekTeachDraw,
     icon(x, y, s){ weekKindIcon('date', x, y, s * 1.3); },
@@ -7365,8 +7763,26 @@ const STAGES = [
   {
     id: 'tree', unlocked: true,
     kinds: ['miss', 'miss', 'count', 'miss', 'count', 'miss'],
-    intros: [{ kind: 'miss', label: 'じゅけい図', g: ORD_INTRO, answer: ORD_INTRO.miss.join(',') }],
-    txt: { miss: ['まだ 出ていないのは？'], count: ['ならべ方は 何とおり？'] },
+    intros: [{ kind: 'miss', label: 'えだの 図', g: ORD_INTRO, answer: ORD_INTRO.miss.join(',') },
+      
+      { kind: 'count', label: '4つを ならべる', g: ORD_INTRO_COUNT, answer: 24 }],
+    
+    
+    txt: { miss: ['出ていない ならべかたは？'], count: ['ならべかたは ', ['何','なん'], 'とおり？'] },
+    
+    ask(g, kind){
+      const nm = (id) => ITEM_NAME[id];
+      if (g.count) {
+        if (g.firsts && g.firsts.length > 1)
+          return ['この' + g.n + 'つをならべます。', '1ばんめは' + g.firsts.map(nm).join('か') + 'です。', 'ならべ方は何通りありますか。'];
+        const head = g.firsts
+          ? ('この' + g.n + 'つをならべます。1ばんめは' + nm(g.firsts[0]) + '。')
+          : ('この' + g.n + 'つを1れつにならべます。');
+        return [head, 'ならべ方は何通りありますか。'];
+      }
+      if (g.fixed != null) return ['1ばんめを' + nm(g.fixed) + 'にして、', 'ならべ方を書き出しました。', '1つだけぬけています。どれですか。'];
+      return ['この' + g.n + 'つのならべ方を書き出しました。', '1つだけぬけています。どれですか。'];
+    },
     gen: ordGen,
     drawQ(area){ qWrap(area, () => ordDraw(area, {})); },
     kindIcon: ordKindIcon, teachBegin: ordTeachBegin, teachDraw: ordTeachDraw,
@@ -7375,8 +7791,14 @@ const STAGES = [
   {
     id: 'choose', unlocked: true,
     kinds: ['choose', 'choose', 'choose', 'choose', 'choose', 'choose'],
-    intros: [{ kind: 'choose', label: 'えらばない', g: { ids: CHOOSE_TEACH, n: 4, k: 3 }, answer: 4 }],
-    txt: { choose: ['えらび方は ', ['何','なん'], 'とおり？'] },
+    intros: [{ kind: 'choose', label: 'えらばない', g: { ids: CHOOSE_TEACH, n: 4, k: 3 }, answer: 4 },
+      
+      { kind: 'choose', label: '2こ えらぶ', g: { ids: CHOOSE_TEACH, n: 4, k: 2 }, answer: 6 }],
+    
+    
+    txt: { choose: ['くみは ぜんぶで ', ['何','なん'], 'とおり？'] },
+    
+    ask(g){ return ['この' + g.n + 'つの中から' + g.k + 'こをえらびます。', 'えらび方は何通りありますか。']; },
     gen: chooseGen,
     drawQ(area){ qWrap(area, () => chooseDraw(area, {})); },
     kindIcon: chooseKindIcon, teachBegin: chooseTeachBegin, teachDraw: chooseTeachDraw,
@@ -7388,6 +7810,9 @@ const STAGES = [
     intros: [{ kind: 'read', label: 'ねうち', g: CODE_TEACH, answer: 13 }],
     txt: { read: ['この あんごうは いくつ？'], add: ['たすと いくつ？'] },
     gen: codeGen,
+    
+    ask(g){ return g.add ? ['上のれいのように、○と｜で数を表します。', '2つのあんごうの数をたすと、いくつですか。']
+                          : ['上のれいのように、○と｜で数を表します。', 'このあんごうは、いくつを表していますか。']; },
     drawQ(area){ qWrap(area, () => codeDraw(area, {})); },
     kindIcon: codeKindIcon, teachBegin: codeTeachBegin, teachDraw: codeTeachDraw,
     icon(x, y, s){ codeKindIcon('read', x, y, s * 1.3); },
@@ -7399,6 +7824,9 @@ const STAGES = [
     intros: [{ kind: 'tri', label: 'ペアにする', g: { n: 5 }, answer: 15 }],
     txt: { tri: [['何','なん'], 'までの 数を ぜんぶ たすと？'], mixrow: ['ぜんぶで ', ['何','なん'], 'こ？'] },
     gen(lv, kind){ return kind === 'mixrow' ? mixrowGen(lv) : triGen(lv); },
+    
+    ask(g, k){ return (k === 'mixrow') ? ['黒い点と白い点がならんでいます。', '点は全部で何こありますか。']
+                                     : ['点を1こ、2こ、3こ…とならべました。', '点は全部で何こありますか。']; },
     drawQ(area){ qWrap(area, () => {
       if (S.kind === 'mixrow') return mixrowDraw(area, {});
       triDraw(area, {});
@@ -7455,6 +7883,9 @@ const STAGES = [
     intros: [{ kind: 'per', label: '1あたり', g: { total: 12, groups: 3, per: 4 }, answer: 4 }],
     txt: { per: ['1人ぶんは ', ['何','なん'], 'こ？'], rem: ['1人 何こまで ', ['分','わ'], 'けられる？'] },
     gen(lv, kind){ return (kind === 'rem') ? u14RemGen(lv) : perGen(lv); },
+    
+    ask(g, k){ return (k === 'rem') ? [g.total + 'こを' + g.groups + '人で同じ数ずつ分けます。', '1人何こまで分けられますか。']
+                                   : [g.total + 'こを' + g.groups + '人で同じ数ずつ分けます。', '1人分は何こですか。']; },
     drawQ(area){ qWrap(area, () => (S.kind === 'rem') ? u14RemDraw(area, {}) : perDraw(area, {})); },
     kindIcon(kind, x, y, s){ return (kind === 'rem') ? u14RemKindIcon(kind, x, y, s) : perKindIcon(kind, x, y, s); },
     teachBegin(){ return (S.kind === 'rem') ? u14RemTeachBegin() : perTeachBegin(); },
@@ -7479,6 +7910,8 @@ const STAGES = [
     
     txt: { u16: ['さきに ', ['計','けい'], ['算','さん'], 'すると ', ['楽','らく'], 'なのは？'] },
     gen: u16Gen,
+    
+    ask(g){ return [g.arr.join('×') + 'を計算します。', 'どの2つを先に計算すると、かんたんですか。']; },
     drawQ(area){ qWrap(area, () => u16Draw(area, {})); },
     kindIcon: u16KindIcon, teachBegin: u16TeachBegin, teachDraw: u16TeachDraw,
     icon(x, y, s){ u16KindIcon('u16', x, y, s * 1.3); },
@@ -7501,6 +7934,8 @@ const STAGES = [
       g: { n: 250, p: 3, unit: 1000, up: true, dn: 0, upv: 1000 }, answer: '1000' }],
     txt: { up: [['切','き'], 'り', ['上','あ'], 'げると？'], down: [['切','き'], 'り', ['捨','す'], 'てると？'] },
     gen: u18Gen,
+    
+    ask(g){ return [g.n + 'を' + (g.up ? '切り上げ' : '切りすて') + 'て、', U18_PLACE[g.p] + 'のくらいまでのおよその数にします。', 'いくつになりますか。']; },
     drawQ(area){ qWrap(area, () => u18Draw(area, {})); },
     kindIcon: u18KindIcon, teachBegin: u18TeachBegin, teachDraw: u18TeachDraw,
     icon(x, y, s){ u18KindIcon('up', x, y, s * 1.3); },
@@ -7528,6 +7963,9 @@ const STAGES = [
       answer: 3 }],
     txt: { u20: ['？の カードは いくつ？'] },
     gen: u20Gen,
+    
+    
+    ask(g){ return ['1から' + g.n + 'のカードが1まいずつあります。', 'うらにして、下のようにならべました。', '？のカードの数はいくつですか。']; },
     drawQ(area){ qWrap(area, () => u20Draw(area, {})); },
     kindIcon: u20KindIcon, teachBegin: u20TeachBegin, teachDraw: u20TeachDraw,
     icon(x, y, s){ u20KindIcon('u20', x, y, s * 1.3); },
@@ -7546,18 +7984,31 @@ const STAGES = [
       fuku: [['光', 'ひか'], 'った もじ は いくつ？'],
     },
     gen: u22Gen,
+    
+    ask(g, k){
+      
+      if (k === 'komachi') return ['この4つの数を全部使って、＋、−、×から', 'えらんで10をつくります。どの式ですか。'];
+      if (k === 'fuku') return ['同じ文字には、同じ数字が入ります。', '色がついた文字の数字はいくつですか。'];
+      return [(g.sub ? 'ひき算' : 'たし算') + 'の筆算です。', '□に入る数字はいくつですか。'];
+    },
     drawQ(area){ qWrap(area, () => u22Draw(area, {})); },
     kindIcon: u22KindIcon, teachBegin: u22TeachBegin, teachDraw: u22TeachDraw,
     icon(x, y, s){ u22KindIcon('mushi', x, y, s * 1.3); },
   },
   {
     id: 'u23', unlocked: true,
-    kinds: ['land', 'land', 'pair', 'land', 'pair', 'land'],
+    kinds: ['land', 'pair', 'land', 'pair', 'pair', 'pair'],   
     intros: [
       { kind: 'land', label: 'こまを すすめる', g: { n: 6, D: 4, a: 3, b: 4, p1: 3, p2: 5, back: true }, answer: 5 },
       { kind: 'pair', label: '出方を しらべる', g: { n: 6, D: 4 }, answer: 3 },
     ],
     txt: { land: ['こまは どこ？'], pair: [['何', 'なん'], 'とおり？'] },
+    
+    ask(g, kind){
+      return (kind === 'pair')
+        ? ['1から' + g.D + 'の目のさいころを2回ふります。', '2回目でちょうど「上がり」につく', '出方は何通りですか。']
+        : ['さいころを2回ふり、出た目の数だけ', 'こまを進めました。こまはどこですか。'];
+    },
     gen: u23Gen,
     drawQ(area){ qWrap(area, () => u23Draw(area, {})); },
     kindIcon: u23KindIcon, teachBegin: u23TeachBegin, teachDraw: u23TeachDraw,
@@ -7577,6 +8028,16 @@ const STAGES = [
       divide: ['2つに ', ['分', 'わ'], 'けるのは？'],
     },
     gen: u24Gen,
+    
+    ask(g, k){
+      
+      if (k === 'divide') return (g.what === '空間') ? ['空間（あつみのあるところ）を', '2つに分けるのは、どれですか。'] : [g.what + 'を2つに分けるのは、どれですか。'];
+      const f = U24_FACES.find(x => x.n === g.f), nm = u24FaceName(f).replace(/^.*の/, '');
+      if (k === 'face') return ['図は箱の形です。', nm + 'と平行な面はどれですか。'];
+      if (g.rel === 'cross') return ['図は箱の形です。', nm + 'と交わるへんはどれですか。', nm + 'の上にあるへんは入れません。'];
+      if (g.rel === 'in') return ['図は箱の形です。', nm + 'にふくまれるへんはどれですか。'];
+      return ['図は箱の形です。', nm + 'と平行なへんはどれですか。'];
+    },
     drawQ(area){ qWrap(area, () => u24Draw(area, {})); },
     kindIcon: u24KindIcon, teachBegin: u24TeachBegin, teachDraw: u24TeachDraw,
     icon(x, y, s){ u24KindIcon('edge', x, y, s * 1.3); },
@@ -7595,6 +8056,13 @@ const STAGES = [
       count: [['直', 'ちょっ'], ['角', 'かく'], 'は いくつ？'],
     },
     gen: u25Gen,
+    
+    ask(g, k){
+      
+      if (k === 'turn') return ['長方形を、かどからかどへ切りました。', '下の三角形をまわして、上に重ねます。', g.ask + 'の角と重なるのは、どの角ですか。'];
+      if (k === 'sum') return [g.name + '角形の' + g.n + 'つの角を全部あわせると、', '直角いくつ分ですか。'];
+      return ['下の四角形のかどを見ます。', '直角になっているかどは、いくつですか。'];
+    },
     drawQ(area){ qWrap(area, () => u25Draw(area, {})); },
     kindIcon: u25KindIcon, teachBegin: u25TeachBegin, teachDraw: u25TeachDraw,
     icon(x, y, s){ u25KindIcon('turn', x, y, s * 1.3); },
@@ -7608,6 +8076,11 @@ const STAGES = [
     ],
     txt: { ch: ['おって かさなるのは？'], ring: ['どれと かさなる？'] },
     gen: u26Gen,
+    
+    ask(g, k){
+      if (k === 'ring') return [U26_RING[g.i] + 'と' + U26_RING[g.j] + 'がかさなるように、2つにおります。', U26_RING[g.k] + 'は、どれとかさなりますか。'];
+      return ['点線で2つにおります。', 'ぴったりかさなる文字はどれですか。'];
+    },
     drawQ(area){ qWrap(area, () => u26DrawQ(area, {})); },
     kindIcon: u26KindIcon, teachBegin: u26TeachBegin, teachDraw: u26TeachDraw,
     icon(x, y, s){ u26KindIcon('ch', x, y, s * 1.3); },
@@ -7624,6 +8097,12 @@ const STAGES = [
       line: [['何', 'なん'], 'cm？'], times: [['何', 'なん'], 'cm？'], stack: [['何', 'なん'], 'まい？'],
     },
     gen: u27Gen,
+    
+    ask(g, k){
+      if (k === 'times') return ['はばが' + g.a + 'cmのコインを、すきまなく', g.n + 'まいならべます。全体の長さは何cmですか。'];
+      if (k === 'stack') return ['10円玉を' + g.m + 'まい重ねると、高さ1cmです。', '高さ' + g.t + 'cmにするには、何まい重ねますか。'];
+      return ['下の3つを、はしとはしをつけてならべます。', '全体の長さは何cmですか。'];
+    },
     drawQ(area){ qWrap(area, () => u27Draw(area, {})); },
     kindIcon: u27KindIcon, teachBegin: u27TeachBegin, teachDraw: u27TeachDraw,
     icon(x, y, s){ u27KindIcon('line', x, y, s * 1.3); },
@@ -7642,6 +8121,12 @@ const STAGES = [
       miss: ['？は いくつ？'],
     },
     gen: u28Gen,
+    
+    ask(g, k){
+      if (k === 'tate') return ['かどが全部直角の形です。', 'たての線の長さを全部たすと、何cmですか。'];
+      if (k === 'miss') return ['かどが全部直角の形です。', '？の長さは何cmですか。'];
+      return ['かどが全部直角の形です。', 'まわりの長さは何cmですか。'];
+    },
     drawQ(area){ qWrap(area, () => u28Draw(area, {})); },
     kindIcon: u28KindIcon, teachBegin: u28TeachBegin, teachDraw: u28TeachDraw,
     icon(x, y, s){ u28KindIcon('peri', x, y, s * 1.3); },
@@ -7659,6 +8144,14 @@ const STAGES = [
       diff: ['どちらが ', ['何', 'なん'], 'm ', ['長', 'なが'], 'い？'],
     },
     gen: u29Gen,
+    
+    ask(g, k){
+      if (k === 'map') return ['家から駅まで歩きます。', (g.via === 'A' ? '消ぼうしょ' : '図書館') + 'の前を通ると、何m歩きますか。'];
+      if (k === 'diff') return ['家から駅まで、消ぼうしょの前を通る道と、', '図書館の前を通る道があります。', 'どちらの道が、何m長いですか。'];
+      if (g.ask === 'tot') return ['家から学校まで' + g.a + 'm、', '学校から公園まで' + g.b + 'mです。', '家から学校を通って公園まで何mですか。'];
+      if (g.ask === 'b') return ['家から学校を通って公園まで' + g.tot + 'm、', '家から学校までは' + g.a + 'mです。', '学校から公園までは何mですか。'];
+      return ['家から学校を通って公園まで' + g.tot + 'm、', '学校から公園までは' + g.b + 'mです。', '家から学校までは何mですか。'];
+    },
     drawQ(area){ qWrap(area, () => u29Draw(area, {})); },
     kindIcon: u29KindIcon, teachBegin: u29TeachBegin, teachDraw: u29TeachDraw,
     icon(x, y, s){ u29KindIcon('map', x, y, s * 1.3); },
@@ -7693,6 +8186,9 @@ const STAGES = [
     
     txt: { basic: [['何','なん'], 'こ？'], sq: ['黒 ＋ 白は ', ['何','なん'], 'こ？'] },
     gen(lv, kind){ return kind === 'sq' ? sqGen(lv) : basicSqGen(lv); },
+    
+    ask(g, k){ return (k === 'sq') ? ['黒は' + g.n + '番目、白は' + (g.n - 1) + '番目の三角数です。', '黒と白をあわせると、点は何こですか。']
+                                 : ['点が、たてと横に同じ数ずつならんでいます。', '点は全部で何こありますか。']; },
     drawQ(area){ qWrap(area, () => {
       if (S.kind === 'sq') return sqDraw(area, { split: true });
       basicSqDraw(area, {});
@@ -7711,6 +8207,8 @@ const STAGES = [
     txt: { u11: ['□は ', ['何','なん'], '？'] },
     gen: u11Gen,
     
+    ask(){ return ['式の□にあてはまる数は、いくつですか。']; },
+    
     drawQ(area){ qWrap(area, () => u11Draw(area, { parts: S.lv <= 1, nums: S.lv <= 1 })); },
     kindIcon: u11KindIcon, teachBegin: u11TeachBegin, teachDraw: u11TeachDraw,
     icon(x, y, s){ u11KindIcon('u11', x, y, s * 1.3); },
@@ -7721,6 +8219,9 @@ const STAGES = [
     intros: [{ kind: 'u12', label: 'きりのいい数', g: { a: 98, b: 246, base: 100, diff: 2, stmt: '246 ＋ 98', correct: '246＋100−2', minus: false }, answer: '246＋100−2' }],
     txt: { u12: ['どの しきに ', ['直','なお'], 'す？'] },
     gen: u12Gen,
+    
+    
+    ask(g){ return [g.stmt.replace(/ /g, '') + 'を、計算しやすい式に直します。', '答えは同じになるようにします。', 'どの式に直せばよいですか。']; },
     drawQ(area){ qWrap(area, () => u12Draw(area, {})); },
     kindIcon: u12KindIcon, teachBegin: u12TeachBegin, teachDraw: u12TeachDraw,
     icon(x, y, s){ u12KindIcon('u12', x, y, s * 1.3); },
@@ -7733,6 +8234,13 @@ const STAGES = [
       g: { nums: [4, 5, 5, 6], mid: 5, cnt: 4, d: 1, t: 'ends', k: 'kufu' }, answer: '5×4' }],
     txt: { zu: ['どの しき？'], kufu: ['かけ ', ['算','ざん'], 'に ', ['直','なお'], 'すと？'] },
     gen: u13Gen,
+    
+    
+    ask(g, k){
+      if (k === 'zu') return (g.vis === 'line') ? ['□に入る数を、かけ算の式で表します。', 'どの式になりますか。']
+        : ['よこにならんだ点の数を1つ分にして、', '点の数をかけ算の式で表します。', 'どの式になりますか。'];
+      return ['このたし算と、答えが同じになる', 'かけ算の式はどれですか。'];
+    },
     drawQ(area){ qWrap(area, () => u13Draw(area, {})); },
     kindIcon: u13KindIcon, teachBegin: u13TeachBegin, teachDraw: u13TeachDraw,
     icon(x, y, s){ u13KindIcon('kufu', x, y, s * 1.3); },
@@ -7743,6 +8251,9 @@ const STAGES = [
     intros: [{ kind: 'u15', label: 'くらいで分ける', g: { total: 84, div: 4, tens: 80, ones: 4 }, answer: '80と4' }],
     txt: { u15: ['どう ', ['分','わ'], 'ける？'] },
     gen: u15Gen,
+    
+    
+    ask(g){ return [g.total + '÷' + g.div + 'を計算します。', g.total + 'を2つの数に分けてから、わります。', 'どう分けると計算しやすいですか。']; },
     drawQ(area){ qWrap(area, () => u15Draw(area, {})); },
     kindIcon: u15KindIcon, teachBegin: u15TeachBegin, teachDraw: u15TeachDraw,
     icon(x, y, s){ u15KindIcon('u15', x, y, s * 1.3); },
@@ -7755,6 +8266,17 @@ const STAGES = [
     txt: { fig: ['どの ', ['図','ず'], '？'], rev: ['どの ', ['図','ず'], '？'], num: ['○は いくつ？'],
            ratio2: ['？は 何こ？'], ratio3: ['？は 何こ？'] },
     gen: u17Gen,
+    
+    ask(g, k){
+      if (k === 'ratio2' || k === 'ratio3') {
+        const nm = ['①', '②', '③'];
+        const rel = g.mults.slice(1).map((m, i) => nm[i + 1] + 'は①の' + m + '倍').join('、');
+        return [rel + 'です。', 'あわせて' + g.sum + 'こです。' + nm[g.ask] + 'は何こですか。'];
+      }
+      const c1 = '○と△はあわせて' + g.sum + 'こです。', c2 = g.said.replace(/ /g, '') + 'です。';
+      if (k === 'num') return [c1, c2, '○は何こですか。'];
+      return [c1, c2, 'このようすを表す図はどれですか。'];
+    },
     drawQ(area){ qWrap(area, () => {
       if (S.kind === 'ratio2' || S.kind === 'ratio3') return u17RatioDraw(area, {});
       u17Draw(area, { bars: S.kind === 'num' });
@@ -7772,6 +8294,9 @@ const STAGES = [
     
     txt: { parity: ['こたえは ぐう', ['数','すう'], '？ き', ['数','すう'], '？'], gridmul: ['？の ますは いくつ？'] },
     gen(lv, kind){ return kind === 'gridmul' ? gridmulGen(lv) : parityGen(lv); },
+    
+    ask(g, k){ return (k === 'gridmul') ? ['たての2つをかけると、上の数になります。', '横の2つをかけると、左の数になります。', '？はいくつですか。']
+                                        : [g.stmt.replace(/ /g, '') + 'の答えを考えます。', '答えはぐう数ですか、き数ですか。']; },
     drawQ(area){ qWrap(area, () => {
       if (S.kind === 'gridmul') return gridmulDraw(area, {});
       parityDraw(area, {});
@@ -8771,12 +9296,15 @@ function enemyHit(){
     S.boss.dmg += dmg;
     if (crit) S.boss.crits++;
     
+    S.boss.maxHit = Math.max(S.boss.maxHit || 0, dmg);
+    const tier = powTier(dmg);
+    
     const seq = S.results.filter(Boolean).length;
-    S.dmgPops.push({ v: dmg, crit, t: 0,
+    S.dmgPops.push({ v: dmg, crit, tier, t: 0,
       x: W/2 + ((seq % 3) - 1) * 62 + (Math.random() * 14 - 7),
       y: AREA.enemy.y + 104 + (seq % 2) * 14 });
     if (S.dmgPops.length > 4) S.dmgPops.shift();
-    startBreath();
+    startBreath(tier);
   }
   
   S.finish = S.boss
@@ -8841,6 +9369,10 @@ function finishBoss(){
   const gain = Math.max(1, Math.floor(S.boss.dmg / 10)) + (won ? 20 : 0);
   addBossExp(gi, gain);
   const after = bossState(gi);
+  
+  if (!save.maxHit) save.maxHit = {};
+  const best0 = save.maxHit['d' + gi] || 0, hit = S.boss.maxHit || 0;
+  if (hit > best0) { save.maxHit['d' + gi] = hit; putSave(); }
   if (!save.bossWin) save.bossWin = {};
   if (won) { save.bossWin['d' + gi] = (save.bossWin['d' + gi] || 0) + 1; putSave(); }
   S.win = {
@@ -8848,6 +9380,7 @@ function finishBoss(){
     ok, n: CONFIG.BOSS_QS, won, killed, reached, gi,
     dmg: S.boss.dmg, crits: S.boss.crits, gain,
     lv0: before.lv, lv1: after.lv, up: after.lv - before.lv,
+    hit, newRec: hit > best0 && best0 > 0, look: lookGained(before.lv, after.lv),
     atk0: before.atk, atk1: after.atk,
     cur: after.cur, need: after.need,
     wins: (save.bossWin && save.bossWin['d' + gi]) || 0,
@@ -8904,19 +9437,20 @@ function startTeach(){
     msgFn(){
       const k = this.shown - 1, n = this.cols.length;
       if (k < 0) {
-        if (kind === 'hidden') return '真上から見て、柱ごとに\nかくれている数を 数える';
-        if (kind === 'cols')   return '真上から見た形を出して\nマスを1つずつ 数える';
-        return '真上から見て、柱ごとに\n何こ積んであるか 数える';
+        
+        if (kind === 'hidden') return '左の絵で見えないつみ木を、柱ごとに数えます。\n右の図は、真上から見た形です。';
+        if (kind === 'cols')   return '右の図は、真上から見た形です。高い柱も\n1マスです。つみ木があるマスを数えます。';
+        return 'たてにつんだ1列を「柱」とよびます。\n右の図は真上から見た形で、1マスが柱1本です。';
       }
       if (k < n) {
         const c = this.cols[k], v = this.val(c.i, c.j);
-        if (kind === 'hidden') return 'この柱で かくれているのは ' + v + 'こ\n（' + (k + 1) + '本目 ／ ぜんぶで ' + n + '本）';
-        if (kind === 'cols')   return 'ここに 柱が 1本 立っている\n（' + (k + 1) + 'マス目）';
-        return 'この柱は ' + v + 'こ\n（' + (k + 1) + '本目 ／ ぜんぶで ' + n + '本）';
+        if (kind === 'hidden') return (k + 1) + '本目の柱では、' + v + 'こが見えません。\n（柱はぜんぶで' + n + '本）';
+        if (kind === 'cols')   return 'ここに柱があります。' + (k + 1) + 'マス目です。';
+        return (k + 1) + '本目の柱には、つみ木が' + v + 'こあります。\n（柱はぜんぶで' + n + '本）';
       }
-      if (kind === 'hidden') return 'たすと ' + this.sum + '。\nかくれているのは ' + this.sum + 'こ';
-      if (kind === 'cols')   return '上から見ると\n' + this.sum + 'マス';
-      return 'たすと ' + this.sum + '。\nぜんぶで ' + this.sum + 'こ';
+      if (kind === 'hidden') return 'ぜんぶたすと' + this.sum + '。\n見えないつみ木は' + this.sum + 'こです。';
+      if (kind === 'cols')   return '上から見ると、' + this.sum + 'マスに見えます。';
+      return 'ぜんぶたすと' + this.sum + '。\nつみ木は、ぜんぶで' + this.sum + 'こです。';
     },
   };
   S.teach = T;
@@ -9001,6 +9535,7 @@ function update(dt){
   
   if (S.freeze > 0) { S.freeze = Math.max(0, S.freeze - dt); return; }
   S.t += dt;
+  if (S.mode === 'bookView') updateCard(dt);
   if (S.flash > 0) S.flash = Math.max(0, S.flash - dt * 2.2);
   if (S.kindPop > 0) S.kindPop = Math.max(0, S.kindPop - dt * 2.0);
   if (S.comboPop > 0) S.comboPop = Math.max(0, S.comboPop - dt * 1.8);
@@ -9162,9 +9697,37 @@ function drawHud(){
 
 
 const Q_ROW_Y = AREA.fig.y + 18;
+
+const Q_LINE_H = 22;   
+function qLines(){
+  const st = stageById(S.stage);
+  if (!st || !st.ask || !S.g) return null;
+  const L = st.ask(S.g, S.kind);
+  return (L && L.length) ? L : null;
+}
+
+function qAsked(){ return S.mode !== 'teach' && !!qLines(); }
+function qExtra(){
+  if (S.mode === 'win' || S.mode === 'map' || S.mode === 'book' || S.mode === 'bookView' || S.mode === 'title') return 0;
+  const L = qLines();
+  return L ? (L.length - 1) * Q_LINE_H : 0;
+}
+
+function drawAsk(st, L){
+  let size = 16;
+  const wOf = (sz) => { ctx.font = '800 ' + sz + 'px ' + FONT; return Math.max(...L.map(l => ctx.measureText(l).width)); };
+  while (size > 13 && wOf(size) > W - 52) size--;   
+  const tw = wOf(size);
+  const x0 = W / 2 - tw / 2;
+  ctx.save();
+  L.forEach((l, i) => text(l, x0, Q_ROW_Y + i * Q_LINE_H + 1, size, CONFIG.C_INK, 'left', '800'));
+  ctx.restore();
+}
 function drawQuestion(){
   if (S.mode === 'win' || S.mode === 'map' || S.mode === 'book' || S.mode === 'bookView' || S.mode === 'title') return;
   const st = stageById(S.stage);
+  const L = qLines();
+  if (L) { drawAsk(st, L); return; }
   const parts = (st.txt && st.txt[S.kind]) || TXT[S.kind] || TXT.all;
   const size = 19;
   const tw = measureRuby(parts, size);
@@ -9394,7 +9957,7 @@ function teachAreas(){
 }
 
 function figArea(){
-  const a = AREA.fig, top = Q_ROW_Y + 20;
+  const a = AREA.fig, top = Q_ROW_Y + 20 + qExtra();
   return { x: a.x, y: top, w: a.w, h: a.y + a.h - top };
 }
 
@@ -9855,12 +10418,17 @@ function drawHpBar(x, y, w, h){
 
 
 
-function startBreath(){
+
+const POW_STEP = [40, 80, 160, 320, 640];
+function powTier(dmg){ let t = 0; while (t < POW_STEP.length && dmg >= POW_STEP[t]) t++; return t; }
+
+const ELEM_COL = { flame: '#ff8a3c', thunder: '#8fd4ff', ice: '#a8ecff', forest: '#86e07a', shine: '#fff0a0', dark: '#c08cff', beam: '#cfd6ff' };
+function startBreath(tier){
   const d = DRAGONS[S.boss.gi];
   const kind = d.breath || 'beam';
   const a = AREA.enemy;
   const ty = a.y + a.h * 0.44;
-  const fx = { kind, bolts: [], sparks: [] };
+  const fx = { kind, bolts: [], sparks: [], tier: tier || 0 };
   if (kind === 'thunder' || kind === 'beam') {
     
     const mx = -20, my = a.y - 4;                    
@@ -9958,6 +10526,10 @@ function drawBreath(){
   const p = 1 - b;                                  
   ctx.save();
   ctx.beginPath(); ctx.rect(a.x, a.y, a.w, a.h); ctx.clip();
+  
+  const pw = fx.tier || 0;
+  ctx.save();
+  if (pw > 0) { const sc = 1 + 0.1 * pw; ctx.translate(W / 2, ty); ctx.scale(sc, sc); ctx.translate(-W / 2, -ty); }
 
   if (fx.kind === 'thunder' || fx.kind === 'beam') {
     const col = (fx.kind === 'thunder') ? '#8fd4ff' : (d.c2 || '#cfd6ff');
@@ -10276,6 +10848,8 @@ function drawBreath(){
       ctx.globalAlpha = 1;
     }
   }
+  ctx.restore();                                   
+  drawBreathPower(fx, a, ty, p, b);
   ctx.restore();
   if (b > 0.88) {
     ctx.save();
@@ -10283,6 +10857,61 @@ function drawBreath(){
     ctx.fillStyle = '#ffffff'; ctx.fillRect(a.x, a.y, a.w, a.h);
     ctx.restore();
   }
+}
+
+function drawBreathPower(fx, a, ty, p, b){
+  const pw = fx.tier || 0;
+  if (pw <= 0) return;
+  const col = ELEM_COL[fx.kind] || '#ffffff';
+  const cx = W / 2;
+  ctx.save();
+  if (pw >= 3 && b > 0.6) {
+    ctx.globalAlpha = (b - 0.6) / 0.4 * (0.12 + 0.05 * pw);
+    ctx.fillStyle = col; ctx.fillRect(a.x, a.y, a.w, a.h);
+    ctx.globalAlpha = 1;
+  }
+  ctx.globalCompositeOperation = 'lighter';
+  if (pw >= 2) {
+    const n = 6 + pw * 3, rot = p * 0.6;
+    const len = (60 + pw * 26) * Math.min(1, p * 3);
+    ctx.globalAlpha = Math.min(1, b * 1.6) * 0.55;
+    ctx.strokeStyle = col; ctx.lineCap = 'round';
+    for (let i = 0; i < n; i++) {
+      const ang = rot + i * Math.PI * 2 / n;
+      const l = len * (i % 2 ? 0.62 : 1);
+      ctx.lineWidth = (i % 2 ? 2 : 3.5);
+      ctx.beginPath();
+      ctx.moveTo(cx + Math.cos(ang) * 18, ty + Math.sin(ang) * 18);
+      ctx.lineTo(cx + Math.cos(ang) * l, ty + Math.sin(ang) * l);
+      ctx.stroke();
+    }
+  }
+  const rings = Math.min(3, pw);
+  for (let i = 0; i < rings; i++) {
+    const q = Math.max(0, Math.min(1, (p - i * 0.1) * 1.8));
+    if (q <= 0 || q >= 1) continue;
+    ctx.globalAlpha = (1 - q) * 0.9;
+    ctx.strokeStyle = col; ctx.lineWidth = 3 + pw;
+    ctx.beginPath(); ctx.arc(cx, ty, 20 + q * (70 + pw * 22), 0, Math.PI * 2); ctx.stroke();
+  }
+  if (pw >= 4) {
+    const q = Math.min(1, p * 2.5);
+    const r = 18 + 30 * q;
+    const g = ctx.createRadialGradient(cx, ty, 0, cx, ty, r * 2);
+    g.addColorStop(0, 'rgba(255,255,255,' + (0.55 * (1 - q * 0.6)) + ')');
+    g.addColorStop(1, 'rgba(255,255,255,0)');
+    ctx.globalAlpha = Math.min(1, b * 1.8);
+    ctx.fillStyle = g; ctx.fillRect(cx - r * 2, ty - r * 2, r * 4, r * 4);
+  }
+  if (pw >= 5) {
+    const q = Math.max(0, Math.min(1, (p - 0.15) * 1.6));
+    if (q > 0 && q < 1) {
+      ctx.globalAlpha = (1 - q);
+      ctx.strokeStyle = '#ffd162'; ctx.lineWidth = 5;
+      ctx.beginPath(); ctx.arc(cx, ty, 30 + q * 150, 0, Math.PI * 2); ctx.stroke();
+    }
+  }
+  ctx.restore();
 }
 
 function drawDmgPops(){
@@ -10295,7 +10924,10 @@ function drawDmgPops(){
     ctx.save();
     ctx.globalAlpha = al;
     ctx.translate(p.x, y); ctx.scale(sc, sc);
-    ctx.font = '800 ' + (p.crit ? 24 : 19) + 'px ' + FONT;
+    
+    const tr = p.tier || 0;
+    ctx.font = '800 ' + ((p.crit ? 24 : 19) + tr * 2) + 'px ' + FONT;   
+    if (tr >= 3 && S.boss) { ctx.shadowColor = ELEM_COL[DRAGONS[S.boss.gi].breath] || '#fff'; ctx.shadowBlur = 8 + tr * 3; }
     ctx.textAlign = 'center'; ctx.textBaseline = 'middle'; ctx.lineJoin = 'round';
     ctx.strokeStyle = 'rgba(30,16,50,0.92)'; ctx.lineWidth = 5;
     ctx.strokeText(String(p.v), 0, 0);
@@ -10385,15 +11017,32 @@ function richAtoms(line){
   const out = [];
   String(line).split('**').forEach((part, i) => {
     const b = (i % 2) === 1;
-    part.split(/(\s+)/).forEach(t => { if (t) out.push({ t, b, nb: NO_HEAD.test(t) }); });
+    
+    part.split(/(\s+)/).forEach(t => { if (!t) return;
+      (/^\s+$/.test(t) ? [t] : t.split(/(?<=[、。])/)).forEach(u => { if (u) out.push({ t: u, b, nb: NO_HEAD.test(u) }); });
+    });
   });
   return out;
 }
 
 function wrapRich(atoms, maxW, fs){
   const lines = []; let cur = [], w = 0;
-  for (const a of atoms) {
+  
+  const q = atoms.slice();
+  while (q.length) {
+    const a = q.shift();
     const aw = textWidth(a.t, fs, a.b ? '900' : '700');
+    if (w + aw > maxW && a.t.length > 1 && !/^\s+$/.test(a.t) && aw > maxW * 0.4) {
+      let k = 0;
+      while (k < a.t.length && w + textWidth(a.t.slice(0, k + 1), fs, a.b ? '900' : '700') <= maxW) k++;
+      while (k > 0 && k < a.t.length && NO_HEAD.test(a.t[k])) k--;
+      if (k > 0) {
+        cur.push({ t: a.t.slice(0, k), b: a.b, nb: a.nb });
+        lines.push(cur); cur = []; w = 0;
+        q.unshift({ t: a.t.slice(k), b: a.b, nb: NO_HEAD.test(a.t[k]) });
+        continue;
+      }
+    }
     if (w + aw > maxW && cur.length && !a.nb) {
       while (cur.length && /^\s+$/.test(cur[cur.length - 1].t)) cur.pop();
       lines.push(cur); cur = []; w = 0;
@@ -10627,6 +11276,13 @@ function drawLogoSword(cx, cy, sc, len){
 }
 
 
+function drawKeyGlow(box){
+  const cx = box.x + box.w/2, cy = box.y + box.h/2;
+  const gg = ctx.createRadialGradient(cx, cy, 10, cx, cy, box.w * 0.62);
+  gg.addColorStop(0, 'rgba(255,150,70,0.32)');
+  gg.addColorStop(1, 'rgba(255,150,70,0)');
+  ctx.fillStyle = gg; ctx.fillRect(box.x - 44, box.y - 44, box.w + 88, box.h + 88);
+}
 function drawGoldAura(box){
   ctx.save();
   const cx = box.x + box.w/2, cy = box.y + box.h/2;
@@ -10635,15 +11291,121 @@ function drawGoldAura(box){
   ctx.fillStyle = g; ctx.fillRect(box.x - box.w, box.y - box.h * 0.6, box.w * 3, box.h * 2.2);
   ctx.restore();
 }
-function drawKeyArt(box, d, al, gold){
+
+const LOOKS = [
+  { lv: 3,  name: 'きらめき' },
+  { lv: 6,  name: 'オーラ' },
+  { lv: 10, name: 'まほうじん' },
+  { lv: 15, name: 'ひかりの わく' },
+  { lv: 20, name: 'こうりん' },
+];
+function lookNext(lv){ return LOOKS.find(L => L.lv > lv) || null; }
+function lookGained(lv0, lv1){ let g = null; for (const L of LOOKS) if (L.lv > lv0 && L.lv <= lv1) g = L; return g; }
+function lookCol(gi){ return ELEM_COL[DRAGONS[gi].breath] || '#ffffff'; }
+function hexA(hex, al){
+  const n = parseInt(hex.slice(1), 16);
+  return 'rgba(' + ((n >> 16) & 255) + ',' + ((n >> 8) & 255) + ',' + (n & 255) + ',' + al + ')';
+}
+
+function drawLookBack(box, gi, lv, small){
+  if (lv < 6) return;
+  
+  const col = lookCol(gi), t = S.t;
+  const cx = box.x + box.w / 2, cy = box.y + box.h / 2;
+  ctx.save();
+  if (lv >= 20 && !small) {
+    ctx.globalCompositeOperation = 'lighter';
+    const n = 12, R = box.h * 0.78;
+    for (let i = 0; i < n; i++) {
+      const a0 = t * 0.25 + i * Math.PI * 2 / n;
+      ctx.globalAlpha = 0.16 + 0.06 * Math.sin(t * 2 + i);
+      ctx.fillStyle = col;
+      ctx.beginPath(); ctx.moveTo(cx, cy);
+      ctx.arc(cx, cy, R, a0 - 0.07, a0 + 0.07); ctx.closePath(); ctx.fill();
+    }
+    ctx.globalCompositeOperation = 'source-over';
+  }
+  const pl = 0.75 + 0.25 * Math.sin(t * 1.8);
+  const g = ctx.createRadialGradient(cx, cy, box.w * 0.3, cx, cy, box.w * (small ? 0.72 : 0.95));
+  g.addColorStop(0, hexA(col, (small ? 0.5 : 0.75) * pl)); g.addColorStop(1, hexA(col, 0));   
+  ctx.globalAlpha = 1;
+  ctx.fillStyle = g; ctx.fillRect(box.x - box.w, box.y - box.h * 0.6, box.w * 3, box.h * 2.2);
+  if (lv >= 10 && !small) {
+    ctx.strokeStyle = hexA(col, 0.7); ctx.lineWidth = 2;
+    const r1 = box.w * 0.74, r2 = box.w * 0.62;
+    ctx.save(); ctx.translate(cx, cy);
+    ctx.rotate(t * 0.35);
+    ctx.setLineDash([10, 6]); ctx.beginPath(); ctx.arc(0, 0, r1, 0, Math.PI * 2); ctx.stroke();
+    ctx.rotate(-t * 0.8);
+    ctx.setLineDash([3, 7]); ctx.lineWidth = 3; ctx.beginPath(); ctx.arc(0, 0, r2, 0, Math.PI * 2); ctx.stroke();
+    ctx.setLineDash([]);
+    ctx.restore();
+  }
+  ctx.restore();
+}
+
+
+function drawLookFront(box, gi, lv, part){
+  if (lv < 3) return;
+  const col = lookCol(gi), kind = DRAGONS[gi].breath, t = S.t;
+  const cx = box.x + box.w / 2, cy = box.y + box.h / 2;
+  ctx.save();
+  if (lv >= 15 && part !== 'parts') {
+    ctx.shadowColor = col; ctx.shadowBlur = 16 + 6 * Math.sin(t * 2.4);
+    rrect(box.x, box.y, box.w, box.h, 10);
+    ctx.strokeStyle = col; ctx.lineWidth = 3; ctx.stroke();
+    ctx.shadowBlur = 0;
+  }
+  if (part === 'frame') { ctx.restore(); return; }
+  
+  const n = lv >= 20 ? 18 : (lv >= 15 ? 12 : 8);
+  ctx.shadowColor = col; ctx.shadowBlur = 10;
+  for (let i = 0; i < n; i++) {
+    const ph = ((i / n) + t * (0.07 + (i % 3) * 0.02)) % 1;
+    const side = (i % 2) ? 1 : -1;
+    let x, y, al = Math.sin(ph * Math.PI);
+    if (kind === 'flame' || kind === 'ice' || kind === 'forest') {
+      const down = (kind !== 'flame');
+      x = cx + side * (box.w * 0.46 + 6 + 12 * Math.sin(i * 2.7 + t * 1.5)) + (i % 4 < 2 ? 0 : side * -box.w * 0.3);
+      y = box.y - box.h * 0.06 + box.h * 1.12 * (down ? ph : 1 - ph);
+    } else {
+      const a = ph * Math.PI * 2 + i;
+      x = cx + Math.cos(a) * box.w * 0.62; y = cy + Math.sin(a) * box.h * 0.56;
+    }
+    const sz = 4.5 + (i % 3) * 1.2;
+    ctx.globalAlpha = al;
+    if (kind === 'ice') {
+      ctx.strokeStyle = col; ctx.lineWidth = 2.2;
+      ctx.save(); ctx.translate(x, y); ctx.rotate(t * 0.8 + i);
+      for (let k = 0; k < 3; k++) { ctx.rotate(Math.PI / 3); ctx.beginPath(); ctx.moveTo(-sz * 1.5, 0); ctx.lineTo(sz * 1.5, 0); ctx.stroke(); }
+      ctx.restore();
+    } else if (kind === 'forest') {
+      breathLeaf(x, y, sz * 1.4, t * 1.2 + i, col, al);
+    } else if (kind === 'thunder') {
+      ctx.strokeStyle = col; ctx.lineWidth = 2;
+      ctx.beginPath(); ctx.moveTo(x - sz, y - sz * 1.6); ctx.lineTo(x + sz * 0.4, y - sz * 0.2);
+      ctx.lineTo(x - sz * 0.4, y + sz * 0.2); ctx.lineTo(x + sz, y + sz * 1.6); ctx.stroke();
+    } else if (kind === 'shine') {
+      ctx.fillStyle = col;
+      ctx.beginPath();
+      for (let k = 0; k < 8; k++) { const r = (k % 2) ? sz * 0.45 : sz * 1.8, a = k * Math.PI / 4 + t; ctx.lineTo(x + Math.cos(a) * r, y + Math.sin(a) * r); }
+      ctx.closePath(); ctx.fill();
+    } else {
+      ctx.shadowColor = col; ctx.shadowBlur = 10;
+      ctx.fillStyle = (kind === 'dark') ? '#3a1f55' : col;
+      ctx.beginPath(); ctx.arc(x, y, sz, 0, Math.PI * 2); ctx.fill();
+      ctx.strokeStyle = col; ctx.lineWidth = 1.2; ctx.stroke();
+    }
+  }
+  ctx.restore();
+}
+function drawKeyArt(box, d, al, gold, noGlow){
   const im = dragonImage(d);
   ctx.save();
   ctx.globalAlpha = (al == null) ? 1 : al;
   const cx = box.x + box.w/2, cy = box.y + box.h/2;
-  const gg = ctx.createRadialGradient(cx, cy, 10, cx, cy, box.w * 0.62);
-  gg.addColorStop(0, 'rgba(255,150,70,0.32)');
-  gg.addColorStop(1, 'rgba(255,150,70,0)');
-  ctx.fillStyle = gg; ctx.fillRect(box.x - 44, box.y - 44, box.w + 88, box.h + 88);
+  
+  if (!noGlow) drawKeyGlow(box);
 
   ctx.save();
   rrect(box.x, box.y, box.w, box.h, 10); ctx.clip();
@@ -10671,6 +11433,7 @@ function drawKeyArt(box, d, al, gold){
 }
 
 const HOLO_HUES = ['#ff5fa2', '#ffd84d', '#5dff9b', '#4fd8ff', '#9d7bff', '#ff5fa2'];
+let HOLO_SHIFT = 0;          
 function drawSparkle(box){
   const t = S.t;
   ctx.save();
@@ -10679,7 +11442,7 @@ function drawSparkle(box){
 
   
   for (let k = 0; k < 2; k++) {
-    const ph = ((t * (0.13 + k * 0.05) + k * 0.5) % 1);
+    const ph = (((t * (0.13 + k * 0.05) + k * 0.5 + HOLO_SHIFT) % 1) + 1) % 1;
     const off = -diag + diag * 2 * ph;
     const g = ctx.createLinearGradient(box.x + off, box.y, box.x + off + diag * 0.9, box.y + box.h);
     for (let i = 0; i < HOLO_HUES.length; i++) {
@@ -11078,11 +11841,13 @@ function drawBossWin(){
   const rows = [];
   if (w.killed) rows.push({ t: 'ボスに ' + w.dmg + ' ダメージを あたえた！', s: 14, c: '#f3ecff' });
   if (w.crits)  rows.push({ t: '（クリティカル ' + w.crits + '回）', s: 12, c: '#ffe9a0' });
+  if (w.hit) rows.push(w.newRec ? { t: 'しんきろく！ いちばん大きい ダメージ ' + w.hit, s: 13, c: '#ffd162' }
+                                : { t: 'いちばん大きい ダメージ ' + w.hit, s: 12, c: '#e7d6ff' });
   rows.push({ t: w.n + '問中 ' + w.ok + '問 正解', s: 15, c: '#f3ecff' });
   if (!w.killed) rows.push({ t: 'ぜんぶ正解で BOSS を たおせる', s: 11, c: 'rgba(255,255,255,0.62)' });
 
   const barH = 12, gap = 21;
-  const panelH = 16 + rows.length * gap + 10 + barH + 26 + (w.up > 0 ? 42 : 20) + 8;
+  const panelH = 16 + rows.length * gap + 10 + barH + 26 + (w.up > 0 ? (w.look ? 62 : 42) : 20) + 8;
   const py = y + 6;
   ctx.save();
   rrect(24, py, W - 48, panelH, 16);
@@ -11113,6 +11878,7 @@ function drawBossWin(){
     text('レベルアップ！　Lv.' + w.lv0 + ' → Lv.' + w.lv1, W/2, by + 50, 15, '#ffd162', 'center', '800');
     ctx.restore();
     text('こうげき ' + w.atk0 + ' → ' + w.atk1, W/2, by + 70, 12, '#ffe9a0', 'center', '700');
+    if (w.look) text('あたらしい すがた「' + w.look.name + '」！', W/2, by + 90, 13, hexA(lookCol(w.gi), 1), 'center', '800');
   } else {
     text('こうげき ' + w.atk1 + '　つぎまで あと ' + (w.need - w.cur), W/2, by + 50, 12, '#e7d6ff', 'center', '700');
   }
@@ -11125,8 +11891,10 @@ function drawBossWin(){
     const box2 = { x: W/2 - aw2/2, y: artTop + (artH - aw2 * 4 / 3) / 2, w: aw2, h: aw2 * 4 / 3 };
     const fy2 = Math.sin(S.t * 1.1) * 3;
     ctx.save(); ctx.translate(0, fy2);
+    drawLookBack(box2, w.gi, w.lv1);
     if (dragonGold(w.gi)) drawGoldAura(box2);
     drawKeyArt(box2, w.dragon, 1, dragonGold(w.gi));
+    drawLookFront(box2, w.gi, w.lv1);
     ctx.restore();
   }
 
@@ -11362,6 +12130,8 @@ function drawBook(){
     const k = box.k, d = DRAGONS[k], n = groupSize(k), sl = clearedSlots(k), done = dragonDone(k);
     const isG = dragonGold(k);
     if (done) {
+      const tlv = bossLv(k);
+      drawLookBack(box, k, tlv, true);                
       if (isG) drawGoldAura(box);
       ctx.save(); ctx.shadowColor = isG ? 'rgba(255,200,90,0.85)' : 'rgba(255,170,80,0.6)'; ctx.shadowBlur = isG ? 20 : 14;
       rrect(box.x - 3, box.y - 3, box.w + 6, box.h + 6, 8);
@@ -11374,7 +12144,7 @@ function drawBook(){
       drawDragonPuzzle(box, d, sl, { n, dark: true, gold: perfectSlots(k) });
     }
     text(done ? dragonName(k, true) : '？？？', box.x + box.w/2, box.y + box.h + 16, 11, done ? CONFIG.C_GOLD : 'rgba(243,236,255,0.5)', 'center', done ? '800' : '700');
-    text((done ? n : sl.length) + '/' + n + '　★' + perfectSlots(k).length, box.x + box.w/2, box.y + box.h + 30, 10, isG ? '#ffd162' : (done ? CONFIG.C_GOLD : 'rgba(255,255,255,0.55)'), 'center', '600');
+    text((done ? 'Lv.' + bossLv(k) : sl.length + '/' + n) + '　★' + perfectSlots(k).length, box.x + box.w/2, box.y + box.h + 30, 10, isG ? '#ffd162' : (done ? CONFIG.C_GOLD : 'rgba(255,255,255,0.55)'), 'center', '600');
   }
 
   drawBackLight(30, 44, 13);
@@ -11389,15 +12159,136 @@ function drawBook(){
   text(CONFIG.VERSION, 12, H - 12, 11, 'rgba(255,255,255,0.35)', 'left', '600');
 }
 
+
+const CARD = { ry: 0, rx: 0, vy: 0, vx: 0, drag: null };
+const CARD_M = 18;                       
+const CARD_RY = 32, CARD_RX = 24;        
+let cardTex = null;
+function cardReset(){ CARD.ry = 0; CARD.rx = 0; CARD.vy = 0; CARD.vx = 0; CARD.drag = null; }
+function bookViewBox(){
+  const aw = Math.min(232, Math.max(160, (H - 300) * 0.7)), ah = aw * 4 / 3;
+  return { x: W/2 - aw/2, y: 78, w: aw, h: ah };
+}
+function cardDown(lx, ly){
+  const b = bookViewBox();
+  if (lx < b.x - 10 || lx > b.x + b.w + 10 || ly < b.y - 10 || ly > b.y + b.h + 10) return false;
+  CARD.drag = { x: lx, y: ly };
+  return true;
+}
+function cardMove(lx, ly){
+  const D = CARD.drag; if (!D) return;
+  const lim = (v, m) => Math.max(-m, Math.min(m, v));
+  CARD.ry = lim(CARD.ry + (lx - D.x) * 0.45, CARD_RY);
+  CARD.rx = lim(CARD.rx - (ly - D.y) * 0.35, CARD_RX);
+  D.x = lx; D.y = ly;
+}
+function cardUp(){ CARD.drag = null; }
+function updateCard(dt){
+  if (CARD.drag) return;
+  
+  const ty = 6 * Math.sin(S.t * 0.9), tx = 4 * Math.sin(S.t * 1.3 + 1);
+  CARD.vy += ((ty - CARD.ry) * 70 - CARD.vy * 10) * dt; CARD.ry += CARD.vy * dt;
+  CARD.vx += ((tx - CARD.rx) * 70 - CARD.vx * 10) * dt; CARD.rx += CARD.vx * dt;
+}
+
+function renderCardSide(box, gi, lv, k){
+  const tw = box.w + CARD_M * 2, th = box.h + CARD_M * 2;
+  const w = Math.ceil(tw * k), h = Math.ceil(th * k);
+  if (!cardTex) cardTex = document.createElement('canvas');
+  if (cardTex.width !== w || cardTex.height !== h) { cardTex.width = w; cardTex.height = h; }
+  const g = cardTex.getContext('2d'), main = ctx;
+  g.setTransform(1, 0, 0, 1, 0, 0); g.clearRect(0, 0, w, h);
+  g.setTransform(w / tw, 0, 0, h / th, 0, 0);
+  const b = { x: CARD_M, y: CARD_M, w: box.w, h: box.h };
+  const rel = CARD.ry;
+  ctx = g;
+  try {
+    HOLO_SHIFT = rel / 90;
+    drawKeyArt(b, DRAGONS[gi], 1, dragonGold(gi), true);
+    drawLookFront(b, gi, lv, 'frame');
+    
+    const gx = b.x + b.w * (0.5 - rel / 70), gy = b.y + b.h * (0.5 + CARD.rx / 56);
+    ctx.save(); rrect(b.x, b.y, b.w, b.h, 10); ctx.clip();
+    const gr = ctx.createRadialGradient(gx, gy, 0, gx, gy, b.w * 0.8);
+    gr.addColorStop(0, 'rgba(255,255,255,0.30)'); gr.addColorStop(0.45, 'rgba(255,255,255,0.07)'); gr.addColorStop(1, 'rgba(255,255,255,0)');
+    ctx.globalCompositeOperation = 'lighter'; ctx.fillStyle = gr; ctx.fillRect(b.x, b.y, b.w, b.h);
+    
+    const c = Math.abs(Math.cos(CARD.ry * Math.PI / 180) * Math.cos(CARD.rx * Math.PI / 180));
+    ctx.globalCompositeOperation = 'source-over';
+    ctx.fillStyle = 'rgba(8,4,18,' + (0.45 * (1 - c)) + ')'; ctx.fillRect(b.x, b.y, b.w, b.h);
+    ctx.restore();
+  } finally { ctx = main; HOLO_SHIFT = 0; }
+  return cardTex;
+}
+
+function drawCard3D(box, gi, lv){
+  const k = Math.min(3, dpr * scale);
+  const tex = renderCardSide(box, gi, lv, k);
+  const cx = box.x + box.w / 2, cy = box.y + box.h / 2;
+  const tw = box.w + CARD_M * 2, th = box.h + CARD_M * 2;
+  const ry = CARD.ry * Math.PI / 180, rx = CARD.rx * Math.PI / 180, DIST = 760;
+  const cY = Math.cos(ry), sY = Math.sin(ry), cX = Math.cos(rx), sX = Math.sin(rx);
+  const proj = (x, y) => {
+    const x1 = x * cY, z1 = x * sY;
+    const y2 = y * cX - z1 * sX, z2 = y * sX + z1 * cX;
+    const f = DIST / (DIST + z2);
+    return [cx + x1 * f, cy + y2 * f];
+  };
+  
+  ctx.save();
+  ctx.globalAlpha = 0.35; ctx.fillStyle = '#05020c';
+  ctx.shadowColor = '#05020c'; ctx.shadowBlur = 16;
+  ctx.beginPath(); ctx.ellipse(cx, box.y + box.h + 14, box.w * 0.42 * Math.max(0.15, Math.abs(cY)) + 8, 8, 0, 0, Math.PI * 2); ctx.fill();
+  ctx.restore();
+  const NX = 6, NY = 8, P = [];
+  for (let j = 0; j <= NY; j++) for (let i = 0; i <= NX; i++) {
+    const u = i / NX, v = j / NY;
+    P.push({ s: [u * tex.width, v * tex.height], d: proj((u - 0.5) * tw, (v - 0.5) * th) });
+  }
+  for (let j = 0; j < NY; j++) for (let i = 0; i < NX; i++) {
+    const a = P[j * (NX + 1) + i], b = P[j * (NX + 1) + i + 1], c = P[(j + 1) * (NX + 1) + i], d = P[(j + 1) * (NX + 1) + i + 1];
+    texTri(tex, a, b, d); texTri(tex, a, d, c);
+  }
+}
+function texTri(img, p0, p1, p2){
+  const [x0, y0] = p0.d, [x1, y1] = p1.d, [x2, y2] = p2.d;
+  const [u0, v0] = p0.s, [u1, v1] = p1.s, [u2, v2] = p2.s;
+  const den = u0 * (v1 - v2) + u1 * (v2 - v0) + u2 * (v0 - v1);
+  if (Math.abs(den) < 1e-6) return;
+  
+  const mx = (x0 + x1 + x2) / 3, my = (y0 + y1 + y2) / 3;
+  const ex = (x, y) => { const dx = x - mx, dy = y - my, l = Math.hypot(dx, dy) || 1; return [x + dx / l * 0.7, y + dy / l * 0.7]; };
+  ctx.save();
+  ctx.beginPath();
+  let q = ex(x0, y0); ctx.moveTo(q[0], q[1]);
+  q = ex(x1, y1); ctx.lineTo(q[0], q[1]);
+  q = ex(x2, y2); ctx.lineTo(q[0], q[1]);
+  ctx.closePath(); ctx.clip();
+  ctx.transform(
+    (x0 * (v1 - v2) + x1 * (v2 - v0) + x2 * (v0 - v1)) / den,
+    (y0 * (v1 - v2) + y1 * (v2 - v0) + y2 * (v0 - v1)) / den,
+    (x0 * (u2 - u1) + x1 * (u0 - u2) + x2 * (u1 - u0)) / den,
+    (y0 * (u2 - u1) + y1 * (u0 - u2) + y2 * (u1 - u0)) / den,
+    (x0 * (u1 * v2 - u2 * v1) + x1 * (u2 * v0 - u0 * v2) + x2 * (u0 * v1 - u1 * v0)) / den,
+    (y0 * (u1 * v2 - u2 * v1) + y1 * (u2 * v0 - u0 * v2) + y2 * (u0 * v1 - u1 * v0)) / den);
+  ctx.drawImage(img, 0, 0);
+  ctx.restore();
+}
+
 function drawBookView(){
   drawArena({ x: 0, y: 0, w: W, h: H }, { moonY: H * 0.42, moonR: 130, still: true });
   const gi = S.bookSel, d = DRAGONS[gi], n = groupSize(gi), sl = clearedSlots(gi), done = dragonDone(gi);
   const list = pageStages(gi);
-  const aw = Math.min(232, Math.max(160, (H - 300) * 0.7)), ah = aw * 4 / 3;
-  const box = { x: W/2 - aw/2, y: 78, w: aw, h: ah };
+  const box = bookViewBox(), aw = box.w, ah = box.h;
   const fy = Math.sin(S.t * 1.1) * 3;
   ctx.save(); ctx.translate(0, fy);
-  if (done) { if (dragonGold(gi)) drawGoldAura(box); drawKeyArt(box, d, 1, dragonGold(gi)); }
+  const vlv = done ? bossLv(gi) : 1;
+  if (done) {
+    drawLookBack(box, gi, vlv); if (dragonGold(gi)) drawGoldAura(box);
+    drawKeyGlow(box);
+    drawCard3D(box, gi, vlv);                       
+    drawLookFront(box, gi, vlv, 'parts');
+  }
   else {
     ctx.save();
     const gg = ctx.createRadialGradient(W/2, box.y + box.h/2, 10, W/2, box.y + box.h/2, box.w * 0.7);
@@ -11415,13 +12306,19 @@ function drawBookView(){
     const bs = bossState(gi);
     const line = 'Lv.' + bs.lv + '　こうげき ' + bs.atk + (bs.awake ? '（2ばい）' : '');
     text(line, W/2, box.y + ah + 46, 13, bs.awake ? '#ffd162' : '#e7d6ff', 'center', '800');
-    if (!bs.awake) text('★を ぜんぶ 集めると こうげきが 2ばい', W/2, box.y + ah + 64, 10, 'rgba(255,255,255,0.55)', 'center', '700');
+    
+    const best = (save.maxHit && save.maxHit['d' + gi]) || 0;
+    const nx = lookNext(bs.lv);
+    const sub = (best ? 'いちばん大きい ダメージ ' + best : '') + (best && nx ? '　' : '')
+              + (nx ? 'Lv.' + nx.lv + ' で「' + nx.name + '」' : (best ? '' : 'すがたは ぜんぶ そろった'));
+    if (sub) text(sub, W/2, box.y + ah + 64, 10, hexA(lookCol(gi), 0.9), 'center', '800');
+    if (!bs.awake) text('★を ぜんぶ 集めると こうげきが 2ばい', W/2, box.y + ah + 80, 10, 'rgba(255,255,255,0.55)', 'center', '700');
   } else {
     text('かけら ' + sl.length + '/' + n + '　★' + gl2.length + '/' + n,
          W/2, box.y + ah + 46, 12, 'rgba(255,255,255,0.6)', 'center', '700');
   }
   
-  let ly = box.y + ah + (done ? 88 : 74);
+  let ly = box.y + ah + (done ? 102 : 74);
   for (let i = 0; i < list.length; i++) {
     const st = list[i], on = sl.indexOf(st.slot) >= 0;
     ctx.save(); ctx.globalAlpha = st.unlocked ? 1 : 0.5;
@@ -11612,7 +12509,7 @@ function onDown(lx, ly){
     {
       const tb = mapTabletRect();
       if (lx >= tb.x - 10 && lx <= tb.x + tb.w + 10 && ly >= tb.y - 10 && ly <= tb.y + tb.h + 10) {
-        S.bookSel = curPage(); S.bookFrom = 'map'; S.mode = 'bookView'; S.t = 0; sfxTap(); return;
+        S.bookSel = curPage(); S.bookFrom = 'map'; S.mode = 'bookView'; S.t = 0; cardReset(); sfxTap(); return;
       }
     }
     
@@ -11647,12 +12544,14 @@ function onDown(lx, ly){
     if (lx < 76 && ly < 84) { S.mode = 'map'; S.t = 0; sfxTap(); return; }
     for (const b of bookTiles()) {
       if (lx >= b.x - 6 && lx <= b.x + b.w + 6 && ly >= b.y - 6 && ly <= b.y + b.h + 36) {
-        S.bookSel = b.k; S.bookFrom = 'book'; S.mode = 'bookView'; S.t = 0; sfxTap(); return;
+        S.bookSel = b.k; S.bookFrom = 'book'; S.mode = 'bookView'; S.t = 0; cardReset(); sfxTap(); return;
       }
     }
     return;
   }
   if (S.mode === 'bookView') {
+    
+    if (dragonDone(S.bookSel) && cardDown(lx, ly)) return;
     
     S.mode = (S.bookFrom === 'map') ? 'map' : 'book'; S.t = 0; sfxTap();
     return;
@@ -11733,6 +12632,12 @@ cv.addEventListener('pointerdown', (e) => {
   const p = toLocal(e.clientX, e.clientY);
   onDown(p.x, p.y);
 }, { passive: true });
+
+cv.addEventListener('pointermove', (e) => {
+  if (!CARD.drag) return;
+  const p = toLocal(e.clientX, e.clientY); cardMove(p.x, p.y);
+}, { passive: true });
+['pointerup', 'pointercancel', 'pointerleave'].forEach(t => cv.addEventListener(t, () => cardUp(), { passive: true }));
 cv.addEventListener('touchstart', (e) => {
   if (Date.now() - lastTouch < 600) return;
   lastTouch = Date.now();
@@ -11844,7 +12749,7 @@ resize();
 requestAnimationFrame(frame);
 
 
-window.__cube = { CONFIG, S, startBreath, genShape, shapeTotal, allTopsVisible, noInvisibleAddition, playBasis, basisIso, basisOblique, STAGES, mapRect, onDown, submit, visibleCubeCount, columnCount, cubeList, cubeFaces, visibleFlags, pointInPoly, figArea, choiceRect, get H(){ return H; }, visiblePerColumn, teachStep, introList, introTabRects, teachArea, toLocal, get offX(){ return offX; }, get offY(){ return offY; }, get scale(){ return scale; }, QUIT_BTN, quitPanel, bossBarRect, mapTabletRect, enemyFor, ENEMY_ART, ENEMY_STAGE_ART, ENEMY_GROUP, isPerfect, perfectSlots, dragonGold, lineGen, balGen, pairGen, weekGen, WEEK, weekName, sfxHit, sfxSlash, sfxCritical, sfxHurt, sfxPiece, sfxCorrect, sfxWrong, sfxDefeat, sfxIntro, audioCtl: { set(a){ audio = a; master = null; }, get(){ return audio; } }, bgmRender, bgmStart, bgmStop, BGM, clearedSlots, groupSize, dragonDone, curPage, setPage, pageStages, DRAGONS, dragonName, startBoss, bossState, bossOpen, bossBag, finishBoss, bossWinButtons, PIECE_SHAPES, makeKindBag, nextQuestion, newQuestion, newBattle, enterStage, startIntro, teachNext, magicGen, magicLines, magicHas, stageLv, save, makeCode, makeKidCode, applyKidCode, applyCode, openCode, BTN_EXPORT, BTN_IMPORT };
+window.__cube = { CONFIG, S, CARD, cardDown, cardMove, cardUp, bookViewBox, startTeach, startBreath, genShape, shapeTotal, allTopsVisible, noInvisibleAddition, playBasis, basisIso, basisOblique, STAGES, mapRect, onDown, submit, visibleCubeCount, columnCount, cubeList, cubeFaces, visibleFlags, pointInPoly, figArea, choiceRect, get H(){ return H; }, visiblePerColumn, teachStep, introList, introTabRects, teachArea, toLocal, get offX(){ return offX; }, get offY(){ return offY; }, get scale(){ return scale; }, QUIT_BTN, quitPanel, bossBarRect, mapTabletRect, enemyFor, ENEMY_ART, ENEMY_STAGE_ART, ENEMY_GROUP, isPerfect, perfectSlots, dragonGold, lineGen, balGen, pairGen, weekGen, WEEK, weekName, sfxHit, sfxSlash, sfxCritical, sfxHurt, sfxPiece, sfxCorrect, sfxWrong, sfxDefeat, sfxIntro, audioCtl: { set(a){ audio = a; master = null; }, get(){ return audio; } }, bgmRender, bgmStart, bgmStop, BGM, clearedSlots, groupSize, dragonDone, curPage, setPage, pageStages, DRAGONS, dragonName, startBoss, bossState, bossOpen, bossBag, finishBoss, bossWinButtons, PIECE_SHAPES, makeKindBag, nextQuestion, newQuestion, newBattle, enterStage, startIntro, teachNext, magicGen, magicLines, magicHas, stageLv, save, makeCode, makeKidCode, applyKidCode, applyCode, openCode, BTN_EXPORT, BTN_IMPORT };
 </script>
 </body>
 </html>
