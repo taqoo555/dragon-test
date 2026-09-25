@@ -92,7 +92,7 @@
 
 
 const CONFIG = {
-  VERSION: 'v73',
+  VERSION: 'v74',
 
   
   
@@ -4083,19 +4083,22 @@ function u22KindIcon(kind, x, y, s){
 
 
 
-const U23_LV = [[5, 6, 4, 4], [5, 7, 4, 4], [5, 7, 4, 5], [6, 8, 4, 5], [6, 8, 4, 6]];
+const U23_LV = [[5, 8, 4, 4], [5, 8, 4, 4], [5, 8, 4, 4], [5, 8, 4, 4], [5, 8, 4, 4]];
+
+const U23_RULE = ['上がりに ぴったり とまったら ゴール', '目が のこったら、のこりの 数だけ 上がりから もどる'];   
 function u23Label(i, n){ return (i === 0) ? 'ふりだし' : (i === n ? '上がり' : String(i)); }
 function u23Move(p, d, n){
   const q = p + d;
   return (q > n) ? (n - (q - n)) : q;
 }
 function u23Gen(lv, kind){
-  return uPick('u23' + kind, (kind === 'pair') ? 1 : 3, () => u23Gen1(lv, kind));
+  return uPick('u23' + kind, 3, () => u23Gen1(lv, kind));
 }
 function u23Gen1(lv, kind){
   const P = U23_LV[Math.min(lv, U23_LV.length - 1)];
-  const n = randInt(P[0], P[1]), D = randInt(P[2], P[3]);
+  const D = randInt(P[2], P[3]);
   if (kind === 'pair') {
+    const n = randInt(P[0], P[1]);
     let cnt = 0;
     for (let a = 1; a <= D; a++) for (let b = 1; b <= D; b++) {
       const p1 = u23Move(0, a, n);
@@ -4106,6 +4109,8 @@ function u23Gen1(lv, kind){
       choices: numChoices(cnt, [cnt + 1, cnt - 1, cnt + 2, D, D * D - cnt]) };
   }
   
+  const n = randInt(P[0], Math.min(P[1], 7));
+  
   const wantBack = Math.random() < 0.55;
   for (let t = 0; t < 300; t++) {
     const a = randInt(1, D), b = randInt(1, D);
@@ -4114,28 +4119,43 @@ function u23Gen1(lv, kind){
     const p2 = u23Move(p1, b, n);
     const back = (p1 + b > n);                      
     if (t < 200 && wantBack !== back) continue;
-    const wrong = [p1 + b, p1, a + b, n];
+    
+    const cand = [p1 + b, p1, a + b, n, p2 + 1, p2 - 1, p2 - 2, p1 + 1, n - 1, p2 + 2];
     const out = [{ v: p2, txt: u23Label(p2, n) }];
-    shuffleArr(wrong.concat([p2 + 1, p2 - 1, n - 1])).forEach(v => {
-      if (out.length >= CONFIG.CHOICES) return;
-      if (v < 0 || v > n) return;
+    shuffleArr(cand).forEach(v => {
+      if (out.length >= Math.min(CONFIG.CHOICES, n)) return;
+      if (v < 1 || v > n) return;
       if (out.some(o => o.v === v)) return;
+      out.push({ v, txt: u23Label(v, n) });
+    });
+    
+    for (let d = 1; out.length < Math.min(4, n) && d <= n; d++) [p2 - d, p2 + d].forEach(v => {
+      if (out.length >= Math.min(4, n) || v < 1 || v > n || out.some(o => o.v === v)) return;
       out.push({ v, txt: u23Label(v, n) });
     });
     return { g: { n, D, a, b, p1, p2, back }, answer: p2, kind: 'land', choices: shuffleArr(out) };
   }
   return u23Gen1(0, 'land');
 }
+
 function u23Board(area, g, opt){
   opt = opt || {};
-  const n = g.n, cells = n + 1;
-  const cw = Math.max(opt.small ? 18 : 26, Math.min(opt.small ? 30 : 46, (area.w - 20) / cells - 5));
+  const n = g.n, ghost = opt.ghost || 0, cells = n + 1 + ghost;
+  const cw = Math.max(opt.small ? 18 : 24, Math.min(opt.small ? 30 : 46, (area.w - 20) / cells - 5));
   const s = cw + 5;
   const ox = W / 2 - (cells - 1) * s / 2;
   const y = area.y + (opt.y != null ? opt.y : area.h * 0.42);
   ctx.save();
-  for (let i = 0; i <= n; i++) {
+  for (let i = 0; i <= n + ghost; i++) {
     const x = ox + i * s;
+    if (i > n) {                                    
+      ctx.save(); ctx.setLineDash([4, 3]);
+      rrect(x - cw / 2, y - cw / 2, cw, cw, 8);
+      ctx.strokeStyle = CONFIG.C_NG; ctx.lineWidth = 1.4; ctx.stroke();
+      ctx.restore();
+      text('のこり', x, y + 1, Math.max(8, Math.round(cw * 0.27)), CONFIG.C_NG, 'center', '800');
+      continue;
+    }
     const on = (opt.hi != null && opt.hi === i);
     rrect(x - cw / 2, y - cw / 2, cw, cw, 8);
     ctx.fillStyle = on ? CONFIG.C_HI_T : '#ffffff'; ctx.fill();
@@ -4143,8 +4163,20 @@ function u23Board(area, g, opt){
     const lab = u23Label(i, n);
     const fs = (lab.length > 1) ? Math.max(8, Math.round(cw * 0.27)) : Math.round(cw * 0.5);
     text(lab, x, y + 1, fs, CONFIG.C_INK, 'center', '800');
+    if (i === n && opt.goalNum) text('（' + n + '）', x, y + cw * 0.5 + 10, Math.max(9, Math.round(cw * 0.3)), CONFIG.C_INK, 'center', '800');
     if (i < n) { ctx.strokeStyle = CONFIG.C_GRID; ctx.lineWidth = 1.3;
       ctx.beginPath(); ctx.moveTo(x + cw / 2, y); ctx.lineTo(x + s - cw / 2, y); ctx.stroke(); }
+  }
+  (opt.trail || []).forEach(t => {
+    const x = ox + t.at * s;
+    text(t.label, x, y + cw * 0.5 + 11, Math.max(10, Math.round(cw * 0.3)), CONFIG.C_GOLD, 'center', '800');
+  });
+  if (opt.back) {
+    const x1 = ox + opt.back.from * s, x2 = ox + opt.back.to * s, yy = y + cw * 0.5 + 24;
+    ctx.strokeStyle = CONFIG.C_NG; ctx.lineWidth = 2; ctx.lineCap = 'round';
+    ctx.beginPath(); ctx.moveTo(x1, yy); ctx.lineTo(x2, yy); ctx.stroke();
+    ctx.beginPath(); ctx.moveTo(x2, yy); ctx.lineTo(x2 + 7, yy - 5); ctx.moveTo(x2, yy); ctx.lineTo(x2 + 7, yy + 5); ctx.stroke();
+    if (opt.back.label) text(opt.back.label, (x1 + x2) / 2, yy + 13, 11, CONFIG.C_NG, 'center', '800');
   }
   if (opt.piece != null) {
     
@@ -4157,6 +4189,7 @@ function u23Board(area, g, opt){
   ctx.restore();
   return { ox, s, y, cw };
 }
+
 function u23Dice(x, y, s, d, on){
   ctx.save();
   rrect(x - s / 2, y - s / 2, s, s, 6);
@@ -4164,56 +4197,71 @@ function u23Dice(x, y, s, d, on){
   ctx.strokeStyle = on ? CONFIG.C_GOLD : CONFIG.C_EDGE; ctx.lineWidth = on ? 2 : 1.4; ctx.stroke();
   const r = s * 0.09, q = s * 0.22;
   const pos = { 1: [[0, 0]], 2: [[-q, -q], [q, q]], 3: [[-q, -q], [0, 0], [q, q]],
-    4: [[-q, -q], [q, -q], [-q, q], [q, q]] }[d] || [[0, 0]];
+    4: [[-q, -q], [q, -q], [-q, q], [q, q]],
+    5: [[-q, -q], [q, -q], [0, 0], [-q, q], [q, q]],
+    6: [[-q, -q], [q, -q], [-q, 0], [q, 0], [-q, q], [q, q]] }[d];
   ctx.fillStyle = CONFIG.C_INK;
-  pos.forEach(([dx, dy]) => { ctx.beginPath(); ctx.arc(x + dx, y + dy, r, 0, Math.PI * 2); ctx.fill(); });
+  if (pos) pos.forEach(([dx, dy]) => { ctx.beginPath(); ctx.arc(x + dx, y + dy, r, 0, Math.PI * 2); ctx.fill(); });
+  else text(String(d), x, y + 1, Math.round(s * 0.5), CONFIG.C_INK, 'center', '800');
   ctx.restore();
+}
+
+
+function u23Rules(area, y0, fs, one){
+  text(U23_RULE[0], W / 2, area.y + y0, fs, CONFIG.C_INK, 'center', '700');
+  if (!one) text(U23_RULE[1], W / 2, area.y + y0 + fs + 5, fs, CONFIG.C_INK, 'center', '700');
 }
 function u23Draw(area, opt){
   opt = opt || {};
   const g = opt.g || S.g;
   const k = opt.kind || S.kind;
   ctx.save();
-  
-  if (!(k === 'pair' && opt.table != null)) {
-    text('ちょうど 上がりに つくと ゴール。こえたぶんは もどる',
-      W / 2, area.y + 16, 12, CONFIG.C_INK_SOFT, 'center', '700');
-  }
   if (k === 'pair') {
     
     if (opt.table != null) {
-      text('ちょうど 上がりに つくと ゴール。こえたぶんは もどる',
-        W / 2, area.y + 10, 11, CONFIG.C_INK_SOFT, 'center', '700');
-      u23Board(area, g, { y: 38, small: true });
-      text('さいころの 目は 1〜' + g.D, W / 2, area.y + 66, 11, CONFIG.C_INK_SOFT, 'center', '700');
-      u23Table(area, g, opt.table, area.y + 82);
+      u23Rules(area, 8, 10, true);
+      u23Board(area, g, { y: 42, small: true, goalNum: true });
+      text('この さいころは 1から ' + g.D + 'までの 目しか ない', W / 2, area.y + 82, 11, CONFIG.C_INK_SOFT, 'center', '700');
+      u23Table(area, g, opt.table, area.y + 90, opt.count);
       ctx.restore(); return;
     }
-    u23Board(area, g, { y: area.h * 0.38, piece: 0 });
-    text('さいころの 目は 1〜' + g.D, W / 2, area.y + area.h * 0.66, 14, CONFIG.C_INK, 'center', '800');
-    text('2回 ふって ちょうど 上がりに つく 出方は？', W / 2, area.y + area.h * 0.66 + 24, 13, CONFIG.C_GOLD, 'center', '800');
+    u23Rules(area, 12, 12, true);
+    u23Board(area, g, { y: area.h * 0.36, piece: 0, goalNum: true });
+    
+    const ty = area.y + area.h * 0.60;
+    text('この さいころは 1から ' + g.D + 'までの 目しか ない', W / 2, ty, 12, CONFIG.C_INK_SOFT, 'center', '700');
+    
+    text('2回 ふって、上がりに ぴったり とまる 出方を 数える', W / 2, ty + 24, 13, CONFIG.C_GOLD, 'center', '800');
+    text('「1回め 1・2回め 2」と「1回め 2・2回め 1」は', W / 2, ty + 48, 12, CONFIG.C_GOLD, 'center', '800');
+    text('べつに 数える', W / 2, ty + 68, 12, CONFIG.C_GOLD, 'center', '800');
     ctx.restore(); return;
   }
+  u23Rules(area, 12, 12);
   const piece = (opt.piece != null) ? opt.piece : 0;
-  u23Board(area, g, { y: area.h * 0.36, piece, hop: opt.hop, hi: opt.hi });
+  u23Board(area, g, { y: area.h * 0.36, piece, hop: opt.hop, hi: opt.hi,
+    ghost: opt.ghost, trail: opt.trail, back: opt.back });
+  
+  
+  if (!opt.teach) text('さいころを 2回 ふって、こまを うごかした', W / 2, area.y + area.h * 0.56, 13, CONFIG.C_GOLD, 'center', '800');
   const ds = Math.min(40, area.w * 0.13);
   const by = area.y + area.h * 0.72;
-  u23Dice(W / 2 - ds * 0.85, by, ds, g.a, opt.step >= 1);
-  u23Dice(W / 2 + ds * 0.85, by, ds, g.b, opt.step >= 2);
-  text('1回め', W / 2 - ds * 0.85, by + ds * 0.78, 11, CONFIG.C_INK_SOFT, 'center', '700');
-  text('2回め', W / 2 + ds * 0.85, by + ds * 0.78, 11, CONFIG.C_INK_SOFT, 'center', '700');
+  u23Dice(W / 2 - ds * 0.9, by, ds, g.a, opt.step == null || opt.step >= 1);
+  u23Dice(W / 2 + ds * 0.9, by, ds, g.b, opt.step == null || opt.step >= 2);
+  text('1回め　' + g.a, W / 2 - ds * 0.9, by + ds * 0.78, 11, CONFIG.C_INK_SOFT, 'center', '800');
+  text('2回め　' + g.b, W / 2 + ds * 0.9, by + ds * 0.78, 11, CONFIG.C_INK_SOFT, 'center', '800');
   if (opt.note) text(opt.note, W / 2, area.y + area.h - 12, 14, CONFIG.C_GOLD, 'center', '800');
   ctx.restore();
 }
 
-function u23Table(area, g, upto, top){
+function u23Table(area, g, upto, top, count){
   const D = g.D, n = g.n;
   const t0 = (top != null) ? top : (area.y + 26);
   const avail = area.y + area.h - t0 - 16;
   
   const cw = Math.max(14, Math.min(30, (area.w - 96) / (D + 1), avail / (D + 1)));
   const ox = W / 2 - (D + 1) * cw / 2 + 10;
-  const oy = t0 + Math.max(0, (avail - (D + 1) * cw) / 2);
+  const oy = t0 + Math.min(24, Math.max(0, (avail - (D + 1) * cw) / 2));   
+  let k = 0;
   ctx.save();
   for (let r = 0; r <= D; r++) for (let c = 0; c <= D; c++) {
     const x = ox + c * cw, y = oy + r * cw;
@@ -4222,11 +4270,11 @@ function u23Table(area, g, upto, top){
     else if (c === 0 && r > 0) text(String(r), x + cw / 2, y + cw / 2, 13, CONFIG.C_INK, 'center', '800');
     else if (r > 0 && c > 0 && (upto == null || r <= upto)) {
       const p1 = u23Move(0, r, n);
-      const v = (p1 === n) ? null : u23Move(p1, c, n);
-      if (v == null) { text('—', x + cw / 2, y + cw / 2, 11, CONFIG.C_INK_SOFT); continue; }
-      const goal = (v === n);
-      if (goal) { rrect(x + 1.5, y + 1.5, cw - 3, cw - 3, 4); ctx.fillStyle = 'rgba(74,157,95,0.18)'; ctx.fill(); }
-      text(goal ? '上' : String(v), x + cw / 2, y + cw / 2, goal ? 12 : 11,
+      if (p1 === n) { text('—', x + cw / 2, y + cw / 2, 11, CONFIG.C_INK_SOFT); continue; }
+      if (p1 + c > n) { text('×', x + cw / 2, y + cw / 2, 12, '#b9b1a1', 'center', '800'); continue; }
+      const v = p1 + c, goal = (v === n);
+      if (goal) { rrect(x + 1.5, y + 1.5, cw - 3, cw - 3, 4); ctx.fillStyle = 'rgba(74,157,95,0.18)'; ctx.fill(); k++; }
+      text(goal ? (count ? '①②③④⑤⑥⑦⑧'[k - 1] : '上') : String(v), x + cw / 2, y + cw / 2, goal ? 12 : 11,
         goal ? CONFIG.C_OK : CONFIG.C_INK_SOFT, 'center', '800');
     }
   }
@@ -4235,45 +4283,90 @@ function u23Table(area, g, upto, top){
   ctx.restore();
 }
 
-function u23Anim(from, d, n, prog){
-  const total = Math.abs(d);
+function u23Walk(from, to, prog){
+  const total = Math.abs(to - from), dir = (to >= from) ? 1 : -1;
+  if (!total) return { pos: from, hop: 0 };
   const f = Math.max(0, Math.min(total, prog * total));
   const k = Math.floor(f);
   const frac = Math.min(1, (f - k) * 2.0);
-  const cellAt = (i) => { const q = from + i; return (q > n) ? (n - (q - n)) : q; };
-  const a = cellAt(Math.min(k, total)), b = cellAt(Math.min(k + 1, total));
+  const a = from + dir * Math.min(k, total), b = from + dir * Math.min(k + 1, total);
   return { pos: a + (b - a) * frac, hop: (k < total) ? frac : 0 };
 }
+const U23_MARU = ['①', '②', '③', '④', '⑤', '⑥', '⑦', '⑧'];
 function u23TeachBegin(){
   const g = S.g, k = S.kind;
   if (k === 'pair') {
-    const msgs = ['この すごろくを 2回で ちょうど 上がりに したい'];
-    const labels = [''];
-    for (let r = 1; r <= g.D; r++) { msgs.push('1回目が ' + r + ' のとき'); labels.push(r + 'のだん'); }
-    msgs.push('「上」と 書けた ますを 数える'); labels.push('数える');
-    return makeTeach(msgs.length - 1, msgs, labels, { g, kind: k });
+    const n = g.n, D = g.D;
+    const msgs = ['2回めで 上がり（' + n + '）に ぴったり とまる 出方を、表で しらべる',
+      'たてが 1回め、よこが 2回め。ますには こまが とまる ところを 書く。上がりを こえる ところは ×'];
+    const labels = ['', '表の 見かた'];
+    let firstGoal = true, cnt = 0;
+    for (let r = 1; r <= D; r++) {
+      const need = n - r;
+      let m;
+      if (need >= 1 && need <= D) {
+        cnt++;
+        m = '1回めが ' + r + ' なら、' + r + '＋' + need + '＝' + n + ' で 上がり。「上」と 書く'
+          + (firstGoal ? '（「上」は 上がりの こと）' : '')
+          + (need < D ? '。2回めが それより 大きいと、上がりを こえる' : '');
+        firstGoal = false;
+      } else if (need > D) {
+        m = '1回めが ' + r + ' なら、いちばん 大きい ' + D + ' が 出ても ' + r + '＋' + D + '＝' + (r + D) + '。上がりに とどかない';
+      } else {
+        m = '1回めが ' + r + ' なら、どの 目が 出ても 上がりを こえる';
+      }
+      msgs.push(m); labels.push('1回めが ' + r);
+    }
+    msgs.push('「上」の ますを 数える → ' + cnt + 'とおり');
+    labels.push(cnt + 'とおり');
+    const pairs = [];
+    for (let r = 1; r <= D; r++) { const c = n - r; if (c >= 1 && c <= D) pairs.push(r + 'と' + c); }
+    msgs.push('表が なくても、足して ' + n + ' に なる 2つの 目を さがせば いい。じゅんばんが ちがえば べつに 数える（' + pairs.join('、') + '）');
+    labels.push('たし算で');
+    return makeTeach(msgs.length - 1, msgs, labels, { g, kind: k, cnt });
   }
   const over = (g.p1 + g.b > g.n);
-  const msgs = ['ふりだしに こまを 置く',
-    '1回目は ' + g.a + '。' + g.a + 'マス すすむ → ' + u23Label(g.p1, g.n),
-    over ? ('2回目は ' + g.b + '。' + (g.p1 + g.b) + 'マスめは 上がりを ' + (g.p1 + g.b - g.n) + ' こえる')
-         : ('2回目は ' + g.b + '。' + g.b + 'マス すすむ'),
-    over ? ('こえたぶん ' + (g.p1 + g.b - g.n) + ' だけ もどる → ' + u23Label(g.p2, g.n))
+  const walk = (from, d) => Array.from({ length: d }, (_, i) => String(from + i + 1)).join('、');
+  const msgs = ['1回めは ' + g.a + '、2回めは ' + g.b + ' が 出た。こまは どこ？',
+    '1回めは ' + g.a + '。' + walk(0, g.a) + ' と すすむ → ' + u23Label(g.p1, g.n),
+    over ? ('2回めは ' + g.b + '。' + g.p1 + 'から ' + g.b + 'つ すすむと、上がりで ' + (g.p1 + g.b - g.n) + 'つ のこる')
+         : ('2回めは ' + g.b + '。' + g.p1 + 'から ' + g.b + 'つ すすむ'),
+    over ? ('のこりの ' + (g.p1 + g.b - g.n) + 'つは、上がりから もどる → ' + u23Label(g.p2, g.n))
          : ('ついたのは ' + u23Label(g.p2, g.n))];
   return makeTeach(3, msgs, ['', '1回め', '2回め', u23Label(g.p2, g.n)], { g, kind: k, over });
 }
 function u23TeachDraw(area, T){
   const g = T.g, n = T.shown, k = T.kind;
   const fa = teachFigArea(area);
-  if (k === 'pair') { u23Draw(fa, { g, kind: k, table: Math.min(n, g.D) }); return; }
+  if (k === 'pair') {
+    
+    const rows = Math.max(0, Math.min(g.D, n - 1));
+    u23Draw(fa, { g, kind: k, table: rows, count: n >= g.D + 2 });
+    return;
+  }
   
-  let piece = 0, hop = 0;
-  if (n === 1) { const a = u23Anim(0, g.a, g.n, teachProg(T, 0.28 * g.a + 0.2)); piece = a.pos; hop = a.hop; }
-  else if (n === 2) { const a = u23Anim(g.p1, g.b, g.n, teachProg(T, 0.28 * g.b + 0.2)); piece = a.pos; hop = a.hop; }
-  else if (n >= 3) { piece = g.p2; }
-  u23Draw(fa, { g, kind: 'land', piece, hop, step: n, hi: n >= 3 ? g.p2 : null,
+  const over = T.over;
+  const end2 = g.p1 + g.b;                           
+  let piece = 0, hop = 0, trail = [], back = null;
+  const ghost = over ? (end2 - g.n) : 0;
+  if (n === 1) {
+    const a = u23Walk(0, g.a, teachProg(T, 0.3 * g.a + 0.2)); piece = a.pos; hop = a.hop;
+    trail = Array.from({ length: g.a }, (_, i) => ({ at: i + 1, label: U23_MARU[i] }));
+  } else if (n === 2) {
+    const a = u23Walk(g.p1, end2, teachProg(T, 0.3 * g.b + 0.2)); piece = a.pos; hop = a.hop;
+    trail = Array.from({ length: g.b }, (_, i) => ({ at: g.p1 + i + 1, label: U23_MARU[i] }));
+  } else if (n >= 3) {
+    if (over) {
+      const a = u23Walk(end2, g.p2, teachProg(T, 0.35 * (end2 - g.p2) + 0.2)); piece = a.pos; hop = a.hop;
+      back = { from: end2, to: g.p2, label: 'もどる' };
+    } else piece = g.p2;
+  }
+  u23Draw(fa, { g, kind: 'land', teach: true, piece, hop, step: n, trail, back,
+    ghost: (n >= 2) ? ghost : 0,
+    hi: n >= 3 ? g.p2 : null,
     note: n >= 3 ? ('こたえは ' + u23Label(g.p2, g.n)) : null });
 }
+
 function u23KindIcon(kind, x, y, s){
   ctx.save();
   if (kind === 'pair') {
@@ -7552,7 +7645,7 @@ const STAGES = [
   },
   {
     id: 'u23', unlocked: true,
-    kinds: ['land', 'land', 'pair', 'land', 'pair', 'land'],
+    kinds: ['land', 'pair', 'land', 'pair', 'pair', 'pair'],   
     intros: [
       { kind: 'land', label: 'こまを すすめる', g: { n: 6, D: 4, a: 3, b: 4, p1: 3, p2: 5, back: true }, answer: 5 },
       { kind: 'pair', label: '出方を しらべる', g: { n: 6, D: 4 }, answer: 3 },
