@@ -92,7 +92,7 @@
 
 
 const CONFIG = {
-  VERSION: 'v74',
+  VERSION: 'v75',
 
   
   
@@ -2116,24 +2116,29 @@ function pairKindIcon(kind, x, y, s){
 
 const WEEK = ['日', '月', '火', '水', '木', '金', '土'];
 function weekName(i){ return WEEK[((i % 7) + 7) % 7] + 'よう日'; }
-function weekGen(lv, kind){
+
+function weekGen(lv, kind){ return uPick('week', 5, () => weekGen1(lv, kind)); }
+function weekGen1(lv, kind){
   
   
   const start = randInt(0, 6);
   const k = (kind === 'after' && lv >= 2) ? 'after' : 'date';
+  
   const R = (k === 'after')
-    ? [[9, 20], [9, 28], [9, 40], [8, 52], [8, 60]][Math.min(lv, 4)]
-    : [[9, 20], [9, 25], [9, 30], [9, 30], [9, 30]][Math.min(lv, 4)];
+    ? [[8, 20], [8, 20], [8, 20], [8, 31], [15, 45]][Math.min(lv, 4)]
+    : [[9, 14], [9, 21], [9, 28], [15, 30], [22, 30]][Math.min(lv, 4)];
   let day = randInt(R[0], R[1]);
   const diff = (k === 'after') ? day : day - 1;
   if (diff < 8) day += 8;                       
   if (k === 'date' && day > 30) day = 30;       
   const g = { start, day, k };
   const idx = (start + ((k === 'after') ? g.day : g.day - 1)) % 7;
-  return { g, answer: weekName(idx), kind: k, choices: weekChoices(idx) };
+  return { g, answer: weekName(idx), kind: k, choices: weekChoices(idx, start) };
 }
-function weekChoices(idx){
+
+function weekChoices(idx, start){
   const out = [weekName(idx), weekName(idx + 1), weekName(idx - 1)];
+  if (start != null && out.indexOf(weekName(start)) < 0) out.push(weekName(start));
   const rest = shuffleArr([0, 1, 2, 3, 4, 5, 6].map(weekName).filter(w => out.indexOf(w) < 0));
   while (out.length < CONFIG.CHOICES) out.push(rest.pop());
   return shuffleArr(out);
@@ -2168,15 +2173,21 @@ function weekDraw(area, opt){
   const info = weekInfo(g);
   const list = weekRows(g, !!opt.expand);
   const rows = list.length;
-  const cs = Math.min((area.w - 16) / 7, (area.h - 104) / (rows + 0.5), 44);
-  const blockH = 14 + cs * rows + 34 + 44;
+  const cs = Math.min((area.w - 16) / 7, (area.h - 124) / (rows + 0.5), 44);
+  const head = opt.expand ? 0 : 20;              
+  const blockH = 14 + head + cs * rows + 34 + 44;
   const top = area.y + Math.max(8, (area.h - blockH) / 2);
-  const ox = W / 2 - cs * 3.5, oy = top + 16;
+  const ox = W / 2 - cs * 3.5, oy = top + 16 + head;
+  
+  
+  if (!opt.expand) text(g.k === 'after' ? 'きょうの だん。あしたが 1日後' : 'カレンダーの いちばん上の だん',
+    W / 2, oy - 32, 12, g.k === 'after' ? CONFIG.C_GOLD : CONFIG.C_INK_SOFT, 'center', '800');
   const target = info.diff + (g.k === 'after' ? 0 : 1);   
   const first0 = (g.k === 'after') ? 0 : 1;
   
   const showNum = (n, c) => {
     if (opt.nums === 'all') return true;
+    if (opt.fill != null && n >= first0 && n <= opt.fill) return true;
     if (c === g.start) return opt.colMax != null && n <= opt.colMax;
     return !!opt.walk && n >= info.base && n <= target;
   };
@@ -2254,7 +2265,8 @@ function weekDraw(area, opt){
     by += 20;
   }
   
-  const label = (g.k === 'after') ? (g.day + '日後 は ？') : (g.day + '日 は ？');
+  
+  const label = (g.k === 'after') ? ('きょう から ' + g.day + '日後 は ？') : ('この カレンダーの ' + g.day + '日 は ？');
   if (opt.reveal) {
     const sc = 0.6 + 0.4 * Math.min(1, Math.max(0, S.t) / 0.2);
     ctx.save(); ctx.translate(W / 2, by + 40); ctx.scale(sc, sc);
@@ -2280,13 +2292,18 @@ function weekTeachBegin(){
   const folded = i.q > hops;                     
   
   const wshort = (k) => WEEK[((g.start + k) % 7 + 7) % 7];
+  
   const walkTxt = (i.r <= 4)
-    ? Array.from({ length: i.r + 1 }, (_, k) => wshort(k)).join(' → ')
-    : (wshort(0) + ' → ' + wshort(1) + ' → … → ' + wshort(i.r));
+    ? Array.from({ length: i.r }, (_, k) => wshort(k + 1) + '(' + (k + 1) + ')').join(' → ')
+    : (wshort(1) + '(1) → … → ' + wshort(i.r) + '(' + i.r + ')');
 
-  const msgs = ['1しゅうかんは 7日。\n日・月・火・水・木・金・土 で 7つ'];
-  const labels = ['1しゅうかん'];
-  const colMax = [first0];                       
+  
+  const msgs = [after
+    ? ('きょうは ' + startName + '。きょうは 数えない。あしたが 1日後。\n1しゅうかんは 日・月・火・水・木・金・土 の 7日')
+    : ('1日は ' + startName + '。\n1しゅうかんは 日・月・火・水・木・金・土 の 7日'),
+    '1日ずつ すすむと、土の つぎは 下の だんへ。\n' + d(first0 + 7) + ' は ' + d(first0) + ' の すぐ下'];
+  const labels = ['1しゅうかん', 'すぐ下'];                 
+  const colMax = [first0, first0];               
   for (let k = 1; k <= hops; k++) {
     const head = (k === 1) ? ('7日 たつと また ' + startName + '。') : 'もう 7日。';
     const lastHop = (k === hops) && !folded;
@@ -2297,7 +2314,7 @@ function weekTeachBegin(){
       msgs.push(head + '\n' + dayTxt + ' に ぴったり とどいた');
       labels.push('ぴったり');
     } else {
-      msgs.push(head.replace('。', 'で ') + d(nth(k)) + '。\nつぎの ' + d(nth(k + 1)) + ' は ' + dayTxt + ' を こえる');
+      msgs.push(head.replace('。', 'で ') + d(nth(k)) + '。\nつぎの ' + d(nth(k + 1)) + ' は ' + dayTxt + ' を こえる。だから ここで とめる');
       labels.push(d(nth(k)) + ' で とめる');
     }
     colMax.push(nth(k));
@@ -2305,26 +2322,29 @@ function weekTeachBegin(){
   if (folded) {
     msgs.push((i.r === 0)
       ? ('同じように 7ずつ。\n' + dayTxt + ' に ぴったり とどいた')
-      : ('同じように 7ずつ。\n' + d(i.base) + ' まで。つぎは ' + dayTxt + ' を こえる'));
+      : ('同じように 7ずつ。\n' + d(i.base) + ' まで。つぎの ' + d(i.base + 7) + ' は ' + dayTxt + ' を こえる'));
     labels.push((i.r === 0) ? 'ぴったり' : (d(i.base) + ' で とめる'));
     colMax.push(i.base);
   }
+  
   msgs.push((i.r === 0)
-    ? ('すすまないので ' + startName + ' のまま')
-    : (d(i.base) + ' から ' + i.r + 'つ 数える。\n' + walkTxt));
-  labels.push((i.r === 0) ? 'そのまま' : (i.r + 'つ 数える'));
+    ? (dayTxt + ' は ' + d(first0) + ' と おなじ たての れつ。\nだから ' + startName)
+    : (d(i.base) + ' から すすむ。' + dayTxt + ' まで あと ' + i.r + '日。\n' + walkTxt));
+  labels.push((i.r === 0) ? 'おなじ れつ' : (i.r + '日 すすむ'));
   colMax.push(i.base);
   msgs.push('こたえは ' + weekName(i.idx));
   labels.push(weekName(i.idx));
   colMax.push(i.base);
-  return makeTeach(msgs.length - 1, msgs, labels, { info: i, colMax: colMax });
+  return makeTeach(msgs.length - 1, msgs, labels, { info: i, colMax: colMax, first0 });
 }
 function weekTeachDraw(area, T){
   const i = T.info, n = T.shown, tot = T.total;
   
   
+  
+  const fill = (n === 1) ? T.first0 + Math.min(7, Math.floor(teachProg(T, 1.4) * 8)) : (n > 1 ? T.first0 + 7 : null);
   weekDraw(teachFigArea(area), {
-    expand: true,
+    expand: true, fill,
     colMax: T.colMax[Math.min(n, T.colMax.length - 1)],
     col: n >= 1,
     base: n >= tot - 2,
@@ -2402,13 +2422,15 @@ function lineSegs(area, segs, opt){
 const ORD_FRUIT = [0, 1, 2, 3];      
 const ORD_MARK  = [10, 11, 12, 13];  
 
+
 const U06_LV = [
-  { mark: 0.0, ns: [3, 3, 3] },
-  { mark: 0.0, ns: [3, 3, 3] },
-  { mark: 0.4, ns: [3, 3, 3] },
-  { mark: 0.5, ns: [3, 3, 4] },
-  { mark: 0.6, ns: [3, 4, 4] },
+  { mark: 0.0, ns: [3, 3, 3], sorted: true,  counts: ['fix3', 'free3'] },
+  { mark: 0.0, ns: [3, 3, 3], sorted: false, counts: ['fix3', 'free3'] },
+  { mark: 0.4, ns: [3, 3, 3], sorted: false, counts: ['fix3', 'free3', 'fix4'] },
+  { mark: 0.5, ns: [3, 3, 4], sorted: false, counts: ['free3', 'fix4', 'two4'] },
+  { mark: 0.6, ns: [3, 4, 4], sorted: false, counts: ['fix4', 'two4', 'free4'] },
 ];
+function ordFact(n){ return n <= 1 ? 1 : n * ordFact(n - 1); }
 function ordItem(id, x, y, s){
   ctx.save();
   ctx.lineWidth = 1.3; ctx.strokeStyle = CONFIG.C_EDGE;
@@ -2460,6 +2482,12 @@ function ordItem(id, x, y, s){
       i === 0 ? ctx.moveTo(px, py) : ctx.lineTo(px, py);
     }
     ctx.closePath(); ctx.fillStyle = '#e8c23f'; ctx.fill(); ctx.stroke();
+  } else if (id === 16) {                           
+    ctx.beginPath();
+    ctx.moveTo(x, y + s * 0.86);
+    ctx.bezierCurveTo(x - s * 1.2, y + s * 0.02, x - s * 0.72, y - s * 0.98, x, y - s * 0.38);
+    ctx.bezierCurveTo(x + s * 0.72, y - s * 0.98, x + s * 1.2, y + s * 0.02, x, y + s * 0.86);
+    ctx.closePath(); ctx.fillStyle = '#ee8fa6'; ctx.fill(); ctx.stroke();
   } else if (id === 15) {                           
     ctx.beginPath(); ctx.moveTo(x, y - s * 0.94); ctx.lineTo(x + s * 0.72, y);
     ctx.lineTo(x, y + s * 0.94); ctx.lineTo(x - s * 0.72, y); ctx.closePath();
@@ -2508,35 +2536,55 @@ function ordPerms(arr){
   });
   return out;
 }
-function ordMake(ids, n){
+function ordMake(ids, n, sorted){
   const pool = shuffleArr(ids.slice()).slice(0, n);
   
   const fixed = (n === 4) ? pool[0] : null;
   const arr = (n === 4) ? pool.slice(1) : pool;
   const perms = ordPerms(arr);
-  const missIdx = randInt(0, perms.length - 1);
+  
+  const missIdx = randInt(1, perms.length - 1);
   const full = (pm) => (fixed == null ? pm : [fixed].concat(pm));
-  const shown = shuffleArr(perms.filter((_, i) => i !== missIdx).map(full));
+  const left = perms.filter((_, i) => i !== missIdx).map(full);
+  const shown = sorted ? left : shuffleArr(left);
   const miss = full(perms[missIdx]);
   return { fixed, arr, n, shown, miss, all: perms.map(full) };
 }
+
+function ordMakeCount(ids, mode){
+  const n = (mode === 'fix3' || mode === 'free3') ? 3 : 4;
+  const pool = shuffleArr(ids.slice()).slice(0, n);
+  const firsts = (mode === 'fix3' || mode === 'fix4') ? [pool[0]]
+    : (mode === 'two4' ? [pool[0], pool[1]] : null);
+  return { count: true, mode, pool, firsts, n };
+}
+function ordCountAns(g){ return (g.firsts ? g.firsts.length : g.n) * ordFact(g.n - 1); }
 
 const ORD_INTRO = (function(){
   const arr = [0, 1, 2], perms = ordPerms(arr);
   return { fixed: null, arr, n: 3, shown: perms.filter((_, i) => i !== 2), miss: perms[2], all: perms };
 })();
+
+const ORD_INTRO_COUNT = { count: true, mode: 'free4', pool: [0, 1, 2, 3], firsts: null, n: 4 };
 function ordGen(lv, kind){
   const cfg = U06_LV[Math.min(lv, U06_LV.length - 1)];
   const ids = (Math.random() < cfg.mark) ? ORD_MARK : ORD_FRUIT;
-  const n = cfg.ns[randInt(0, cfg.ns.length - 1)];
-  const g = ordMake(ids, n);
   
   if (kind === 'count') {
-    g.count = true;
-    const ans = g.all.length;
+    
+    const modes = cfg.counts.filter(m => m !== ordGen.lastMode);
+    const mode = modes[randInt(0, modes.length - 1)];
+    ordGen.lastMode = mode;
+    const g = ordMakeCount(ids, mode);
+    const ans = ordCountAns(g), n = g.n;
+    
+    const noRule = g.firsts ? ordFact(n) : ordFact(n - 1);
     return { g, answer: ans, kind: 'count',
-      choices: numChoices(ans, [n, n * (n - 1), ans + 2, Math.max(2, ans - 2), ans + 6, n + 1]) };
+      
+      choices: numChoices(ans, [noRule, n, ans + 2, Math.max(1, ans - 2), ans * 2, n + 1]) };
   }
+  const n = cfg.ns[randInt(0, cfg.ns.length - 1)];
+  const g = ordMake(ids, n, cfg.sorted);
   const choices = shuffleArr(g.all.map(o => ({ v: o.join(','), draw: (q, ink) => ordChoiceDraw(q, o) })));
   return { g, answer: g.miss.join(','), kind: 'miss', choices };
 }
@@ -2546,35 +2594,53 @@ function ordChoiceDraw(q, list){
   const s = Math.min((q.w - 10) / ((list.length - 1) * gapK + 2), q.h * 0.34);
   ordRow(list, q.x + q.w / 2, q.y + q.h / 2, s, null, gapK);
 }
+
+
+function ordFirstLine(firsts, cy){
+  if (!firsts) return;
+  const s = 11;
+  if (firsts.length === 1) {
+    ordItem(firsts[0], W / 2 - 70, cy, s);
+    text('は かならず 1ばんめ', W / 2 - 54, cy, 13, CONFIG.C_INK, 'left', '800');
+    return;
+  }
+  text('1ばんめに なれるのは', W / 2 - 16, cy, 13, CONFIG.C_INK, 'right', '800');
+  ordItem(firsts[0], W / 2, cy, s);
+  text('と', W / 2 + 18, cy, 13, CONFIG.C_INK, 'center', '800');
+  ordItem(firsts[1], W / 2 + 36, cy, s);
+  text('だけ', W / 2 + 52, cy, 13, CONFIG.C_INK, 'left', '800');
+}
+
+function ordOneLine(list, cy){
+  text('れい：', W / 2 - 92, cy, 12, CONFIG.C_INK_SOFT, 'right', '700');
+  ordRow(list, W / 2 - 34, cy, 8, null, 3.0);
+  text('で 1とおり', W / 2 + 22, cy, 12, CONFIG.C_INK_SOFT, 'left', '700');
+}
 function ordDraw(area, opt){
   opt = opt || {};
   const g = opt.g || S.g;
   ctx.save();
   if (g.count) {
     
-    const all = (g.fixed == null ? g.arr : [g.fixed].concat(g.arr));
-    text('この ' + all.length + 'つを ならべる', W / 2, area.y + 20, 14, CONFIG.C_INK_SOFT, 'center', '800');
-    const s = Math.min(22, (area.w - 60) / all.length / 2.6);
-    const gap = s * 2.9, w0 = (all.length - 1) * gap;
-    all.forEach((id, i) => ordItem(id, W / 2 - w0 / 2 + i * gap, area.y + 74, s));
-    if (g.fixed != null) {
-      text('1ばんめは', W / 2 - 70, area.y + 116, 12, CONFIG.C_INK_SOFT, 'right', '700');
-      ordItem(g.fixed, W / 2 - 56, area.y + 116, 11);
-      text('に きめる', W / 2 - 40, area.y + 116, 12, CONFIG.C_INK_SOFT, 'left', '700');
-    }
+    text('この ' + g.n + 'つを 1れつに ならべる', W / 2, area.y + 20, 14, CONFIG.C_INK, 'center', '800');
+    ordFirstLine(g.firsts, area.y + 46);
+    const s = Math.min(22, (area.w - 60) / g.n / 2.6);
+    const gap = s * 2.9, w0 = (g.n - 1) * gap;
+    const iy = area.y + (g.firsts ? 96 : 74);
+    g.pool.forEach((id, i) => ordItem(id, W / 2 - w0 / 2 + i * gap, iy, s));
     
+    const one = g.firsts ? [g.firsts[0]].concat(g.pool.filter(v => v !== g.firsts[0])) : g.pool.slice();
+    ordOneLine(one, iy + s + 30);
     if (opt.reveal != null) text(opt.reveal + 'とおり', W / 2, area.y + 170, 20, CONFIG.C_OK, 'center', '800');
     ctx.restore();
     return;
   }
   
   const all = (g.fixed == null ? g.arr : [g.fixed].concat(g.arr));
-  text('この ' + all.length + 'つを ならべる', W / 2, area.y + 16, 12, CONFIG.C_INK_SOFT, 'center', '700');
+  text('この ' + all.length + 'つを 1れつに ならべる', W / 2, area.y + 16, 12, CONFIG.C_INK, 'center', '700');
   const ts = 13, tgap = ts * 2.9, tw0 = (all.length - 1) * tgap;
   all.forEach((id, i) => ordItem(id, W / 2 - tw0 / 2 + i * tgap, area.y + 42, ts));
-  if (g.fixed != null) {
-    text('1ばんめは ずっと おなじ', W / 2, area.y + 66, 11, CONFIG.C_INK_SOFT, 'center', '700');
-  }
+  if (g.fixed != null) ordFirstLine([g.fixed], area.y + 66);
   const rows = g.shown.length;
   const top = area.y + (g.fixed != null ? 80 : 62);
   
@@ -2589,81 +2655,145 @@ function ordDraw(area, opt){
   ctx.fillStyle = 'rgba(255,255,255,0.55)'; ctx.fill();
   ctx.strokeStyle = CONFIG.C_GRID; ctx.lineWidth = 1.4; ctx.stroke();
   g.shown.forEach((o, i) => ordRow(o, W / 2, top + 6 + rowH / 2 + i * rowH, s, null));
-  text('↑ もう 出ている', W / 2, top + listH + 14, 11, CONFIG.C_INK_SOFT, 'center', '700');
+  text('↑ ならべかたが ' + rows + 'つ 出ている', W / 2, top + listH + 14, 12, CONFIG.C_INK, 'center', '800');
   if (opt.reveal) ordRow(g.miss, W / 2, top + listH + 46, s, null);
   if (opt.reveal) text('これが ぬけていた', W / 2, top + listH + 46 + rowH * 0.7, 13, CONFIG.C_OK, 'center', '800');
   ctx.restore();
 }
 
-const ORD_TEACH = [0, 1, 2];          
-const ORD_NAME  = ['りんご', 'みかん', 'ぶどう', 'バナナ'];
+
+
 
 function ordTeachBegin(){
-  const g = S.g, a = g.arr;
+  const g = S.g;
+  if (g.count && (g.mode === 'two4' || g.mode === 'free4')) {
+    const cands = g.firsts || g.pool, first = cands[0];
+    const a = g.pool.filter(v => v !== first), ans = ordCountAns(g);
+    const msgs = [
+      'この 4つの ならべかたを しらべる' + (g.firsts ? '。\n1ばんめに なれるのは 2つだけ' : ''),
+      '1ばんめを これに きめる。のこり 3つの ならべかたは、\n3つの ときと おなじ **6とおり**',
+      '1ばんめを かえても、のこりは 3つ\n→ また **6とおり**',
+      cands.map(() => '6').join(' ＋ ') + ' ＝ **' + ans + 'とおり**',
+    ];
+    return makeTeach(3, msgs, ['', '6とおり', '1ばんめを かえる', ans + 'とおり'],
+      { g, k: 'ord', plan: 'sum', root: first, a, cands, ans });
+  }
+  if (g.count && g.mode === 'fix3') {
+    const root = g.firsts[0], a = g.pool.filter(v => v !== root);
+    const msgs = [
+      'これは かならず 1ばんめ。\nのこりの 2つの ならべかたを しらべる',
+      '2ばんめは のこりの 2つの どちらか',
+      '3ばんめは のこった 1つ',
+      '線を 1本 なぞると、1つの ならべかた\n→ 線が 2本で **2とおり**',
+    ];
+    return makeTeach(3, msgs, ['', '2ばんめ', '3ばんめ', '2とおり'],
+      { g, k: 'ord', plan: 'fix3', root, a,
+        steps: [{ depth: [0, 0] }, { depth: [1, 1] }, { depth: [2, 2] }, { depth: [2, 2], seq: true }] });
+  }
+  
+  const root = g.count ? (g.firsts ? g.firsts[0] : null) : g.fixed;
+  const a = g.count ? g.pool.filter(v => v !== root) : g.arr;
+  const nm = (root != null) ? ['2ばんめ', '3ばんめ', '4ばんめ'] : ['1ばんめ', '2ばんめ', '3ばんめ'];
   const msgs = [
-    (g.fixed != null ? '1ばんめは いつも おなじに する。のこり3つの' : 'この3つの') +
-      ' じゅんばんを\n**ぜんぶ** しらべる',
-    'まず 1ばんめを これに する',
-    '2ばんめは のこりの 2つ。3ばんめは のこりの 1つ\n→ **2とおり**',
-    '1ばんめを かえても **2とおり**',
-    '1ばんめを かえても **2とおり**',
+    (root != null ? 'これは かならず 1ばんめ。\nのこり 3つの' : 'この 3つの') + ' ならべかたを **ぜんぶ** しらべる',
+    nm[0] + 'を これに する',
+    'これは もう ならべた。\n' + nm[1] + 'は のこりの 2つの どちらか',
+    nm[2] + 'は のこった 1つ。\n線を 1本 なぞると 1つの ならべかた → **2とおり**',
+    nm[0] + 'を かえても **2とおり**。\nあわせて 4とおり',
+    nm[0] + 'を かえても **2とおり**。\nあわせて 6とおり',
     '2 ＋ 2 ＋ 2 ＝ **6とおり**',
   ];
-  const labels = ['', 'まず', '2とおり', '4とおり', '6とおり', '6とおり'];
+  const labels = ['', nm[0], nm[1], '2とおり', '4とおり', '6とおり', '6とおり'];
+  const steps = [{ depth: [0, 0, 0] }, { depth: [1, 0, 0] }, { depth: [2, 0, 0] }, { depth: [3, 0, 0] },
+    { depth: [3, 3, 0] }, { depth: [3, 3, 3] }, { depth: [3, 3, 3], sums: true }];
   if (!g.count) {
-    msgs.push('この もんだいで まだ 出ていなかったのは\nこれ');
-    labels.push('これ！');
+    
+    const pre = !!S.intro;
+    msgs[6] = '2 ＋ 2 ＋ 2 ＝ **6とおり**。\n' + (pre ? 'もしも ' + g.shown.length + 'つ しか 出ていなかったら？'
+      : 'さっきの もんだいには ' + g.shown.length + 'つ しか なかった');
+    msgs.push((pre ? 'その ' : 'さっきの もんだいに 出ていた ') + g.shown.length + 'つに ✓ を つける');
+    msgs.push('✓ が つかなかった 1本が、出ていない ならべかた');
+    labels.push('✓', 'これ！');
+    steps.push({ depth: [3, 3, 3], checks: true }, { depth: [3, 3, 3], checks: true, miss: true });
   }
-  return makeTeach(msgs.length - 1, msgs, labels, { g, a, k: 'ord' });
+  return makeTeach(msgs.length - 1, msgs, labels, { g, k: 'ord', plan: 'tree', root, a, steps });
 }
-function ordTeachDraw(area, T){
-  const a = T.a || ORD_TEACH, n = T.shown, g = T.g;
-  const ar = teachFigArea(area);
-  const full = (n <= 1) ? 0 : (n === 2 ? 1 : n === 3 ? 2 : 3);
-  const hi1 = (n === 1) ? 0 : -1;
+
+function ordTree(ar, root, a, st, g){
+  const L = a.length, perms = ordPerms(a), leaves = perms.length, grp = ordFact(L - 1);
+  const rowH = Math.min(38, (ar.h - 50) / leaves);
+  const top = ar.y + 30 + Math.min(24, Math.max(0, (ar.h - 50 - rowH * leaves) / 2));   
+  const dx = Math.min(66, 250 / L), x0 = W / 2 - (L * dx) / 2 - 20;
+  const s = Math.min(12, rowH * 0.34);
+  const colX = (c) => x0 + c * dx;
+  const yOf = (j, c) => { const m = ordFact(L - c); return top + (Math.floor(j / m) * m + m / 2) * rowH; };
+  const full = (p) => (root == null ? p : [root].concat(p));
+  const missKey = (st.miss && g) ? g.miss.join(',') : null;
+  const shownKeys = (st.checks && g && g.shown) ? g.shown.map(o => o.join(',')) : [];
   
-  const showMiss = n >= 6 && g && !g.count;
-  const missTail = showMiss ? (g.fixed != null ? g.miss.slice(1) : g.miss) : null;
-  const missTopIdx = showMiss ? a.indexOf(missTail[0]) : -1;
-  const rows = 6;
-  const s = Math.min(12, (ar.h - 30) / rows / 2.6);
-  const rowH = Math.min(38, (ar.h - 30) / rows);
-  const top = ar.y + (ar.h - rowH * rows) / 2 + rowH / 2;
-  const x0 = W / 2 - 128, x1 = W / 2 - 62, x2 = W / 2 + 10, x3 = W / 2 + 82;
+  const onMiss = (p, c) => !missKey
+    || missKey.split(',').slice(0, (root == null ? 0 : 1) + c).join(',') === full(p.slice(0, c)).join(',');
+  const heads = (root != null) ? ['1ばんめ', '2ばんめ', '3ばんめ', '4ばんめ'] : ['', '1ばんめ', '2ばんめ', '3ばんめ'];
   ctx.save();
-  text('1ばんめ', x1, ar.y + 12, 10, CONFIG.C_INK_SOFT, 'center', '700');
-  text('2ばんめ', x2, ar.y + 12, 10, CONFIG.C_INK_SOFT, 'center', '700');
-  text('3ばんめ', x3, ar.y + 12, 10, CONFIG.C_INK_SOFT, 'center', '700');
-  ctx.beginPath(); ctx.arc(x0, top + rowH * 2.5, s * 0.5, 0, Math.PI * 2);
-  ctx.fillStyle = CONFIG.C_INK_SOFT; ctx.fill();
-  
-  for (let i = 0; i < 3; i++) {
-    const rest = a.filter(v => v !== a[i]);
-    const y1 = top + (i * 2 + 0.5) * rowH;
-    const on = (i < full) || (i === hi1);
-    const topOn = showMiss ? (i === missTopIdx) : on;
-    ctx.save(); ctx.globalAlpha = topOn ? 1 : 0.2;
-    ctx.strokeStyle = topOn ? CONFIG.C_GOLD : CONFIG.C_GRID; ctx.lineWidth = 1.6;
-    ctx.beginPath(); ctx.moveTo(x0 + s * 0.6, top + rowH * 2.5); ctx.lineTo(x1 - s, y1); ctx.stroke();
-    ordItem(a[i], x1, y1, s);
-    ctx.restore();
-    if (!showMiss && i >= full) continue;
-    for (let j = 0; j < 2; j++) {
-      const y2 = top + (i * 2 + j) * rowH;
-      const isMiss = showMiss && missTail[0] === a[i] && missTail[1] === rest[j] && missTail[2] === rest[1 - j];
-      ctx.save(); ctx.globalAlpha = showMiss ? (isMiss ? 1 : 0.2) : 1;
-      ctx.strokeStyle = (showMiss ? (isMiss ? CONFIG.C_GOLD : CONFIG.C_GRID) : CONFIG.C_GOLD);
-      ctx.lineWidth = isMiss ? 2.4 : 1.5;
-      ctx.beginPath(); ctx.moveTo(x1 + s, y1); ctx.lineTo(x2 - s, y2); ctx.stroke();
-      ordItem(rest[j], x2, y2, isMiss ? s * 1.15 : s);
-      ctx.beginPath(); ctx.moveTo(x2 + s, y2); ctx.lineTo(x3 - s, y2); ctx.stroke();
-      ordItem(rest[1 - j], x3, y2, isMiss ? s * 1.15 : s);
+  for (let c = (root != null ? 0 : 1); c <= L; c++) text(heads[c], colX(c), ar.y + 12, 10, CONFIG.C_INK_SOFT, 'center', '700');
+  const ry = top + rowH * leaves / 2;
+  if (root == null) { ctx.beginPath(); ctx.arc(colX(0), ry, s * 0.5, 0, Math.PI * 2); ctx.fillStyle = CONFIG.C_INK_SOFT; ctx.fill(); }
+  else ordItem(root, colX(0), ry, s);
+  perms.forEach((p, j) => {
+    const b = Math.floor(j / grp);
+    for (let c = 1; c <= L; c++) {
+      if ((st.depth[b] || 0) < c) break;
+      const m = ordFact(L - c);
+      const y = yOf(j, c), py = (c === 1) ? ry : yOf(j, c - 1);
+      const on = onMiss(p, c);
+      ctx.save(); ctx.globalAlpha = on ? 1 : 0.2;
+      ctx.strokeStyle = CONFIG.C_GOLD; ctx.lineWidth = (missKey && on) ? 2.4 : 1.5;
+      ctx.beginPath(); ctx.moveTo(colX(c - 1) + s, py); ctx.lineTo(colX(c) - s, y); ctx.stroke();
+      if (j % m === 0) ordItem(p[c - 1], colX(c), y, s);
       ctx.restore();
     }
-  }
-  if (n >= 5 && !showMiss) text(g.count ? 'ぜんぶで 6とおり' : 'まず ぜんぶで 6とおり', W / 2, top + rowH * 5.9, 14, CONFIG.C_OK, 'center', '800');
-  if (showMiss) text('これが ぬけていた', W / 2, top + rowH * 5.9, 15, CONFIG.C_GOLD, 'center', '800');
+    const yl = yOf(j, L), xr = colX(L) + s + 12;
+    if ((st.depth[b] || 0) >= L && shownKeys.indexOf(full(p).join(',')) >= 0)
+      text('✓', xr, yl, 15, CONFIG.C_OK, 'center', '800');
+    if (st.seq && (st.depth[b] || 0) >= L) ordRow(full(p), xr + 44, yl, s * 0.62, null, 3.0);
+  });
+  if (st.sums && L === 3) for (let b = 0; b < 3; b++)
+    text('2', colX(L) + s + 16, top + (b * 2 + 1) * rowH, 16, CONFIG.C_GOLD, 'center', '800');
   ctx.restore();
+  return top + rowH * leaves;
+}
+
+function ordSum(ar, cands, n, sofar){
+  const gap = Math.min(78, (ar.w - 20) / cands.length), x0 = W / 2 - gap * (cands.length - 1) / 2;
+  const y = ar.y + ar.h * 0.42;
+  ctx.save();
+  cands.forEach((id, i) => {
+    const x = x0 + i * gap, on = i < sofar;
+    ctx.save(); ctx.globalAlpha = on ? 1 : 0.25;
+    text('1ばんめ', x, y - 34, 10, CONFIG.C_INK_SOFT, 'center', '700');
+    ordItem(id, x, y - 10, 13);
+    rrect(x - 28, y + 12, 56, 28, 8); ctx.fillStyle = CONFIG.C_HI_T; ctx.fill();
+    ctx.strokeStyle = CONFIG.C_GOLD; ctx.lineWidth = 1.6; ctx.stroke();
+    text('6とおり', x, y + 26, 12, CONFIG.C_INK, 'center', '800');
+    ctx.restore();
+    if (i > 0) text('＋', x - gap / 2, y + 26, 14, CONFIG.C_INK_SOFT, 'center', '800');
+  });
+  ctx.restore();
+}
+function ordTeachDraw(area, T){
+  const n = T.shown, g = T.g;
+  const ar = teachFigArea(area);
+  
+  if (T.plan === 'sum') {
+    if (n <= 1) { if (n === 1) ordTree(ar, T.root, T.a, { depth: [3, 3, 3] }, null);
+      else ordDraw(ar, { g }); return; }
+    const k = (n === 2) ? Math.min(T.cands.length, 1 + Math.floor(teachProg(T, 1.6) * T.cands.length)) : T.cands.length;
+    ordSum(ar, T.cands, n, k);
+    return;
+  }
+  const st = T.steps[Math.min(n, T.steps.length - 1)];
+  const bottom = ordTree(ar, T.root, T.a, st, g);
+  
 }
 function ordKindIcon(kind, x, y, s){
   ctx.save();
@@ -2678,14 +2808,17 @@ function ordKindIcon(kind, x, y, s){
 
 
 const CHOOSE_SET_F = [0, 1, 2, 3, 4, 5];      
-const CHOOSE_SET_M = [10, 11, 12, 13, 14, 15]; 
+
+const CHOOSE_SET_M = [10, 11, 16, 13, 14, 15]; 
+
+
 
 const CHOOSE_LV = [
-  { mark: 0.0, nk: [[4, 1], [4, 2], [4, 3]] },
-  { mark: 0.0, nk: [[4, 1], [4, 2], [4, 3], [3, 2]] },
-  { mark: 0.4, nk: [[4, 2], [4, 3], [5, 1], [5, 4], [3, 2]] },
-  { mark: 0.5, nk: [[5, 2], [5, 3], [4, 2], [5, 4], [5, 1]] },
-  { mark: 0.6, nk: [[5, 2], [5, 3], [6, 1], [6, 5], [4, 2], [5, 4]] },
+  { mark: 0.0, nk: [[3, 2], [4, 3], [4, 2], [5, 2]] },
+  { mark: 0.0, nk: [[3, 2], [4, 2], [4, 3], [5, 4], [5, 2]] },
+  { mark: 0.4, nk: [[4, 2], [4, 3], [5, 4], [5, 2], [3, 2]] },
+  { mark: 0.5, nk: [[5, 2], [4, 2], [5, 4], [5, 3], [6, 5]] },
+  { mark: 0.6, nk: [[5, 2], [5, 3], [6, 2], [4, 2], [6, 5]] },
 ];
 function combos(n, k){
   const out = [];
@@ -2696,14 +2829,25 @@ function combos(n, k){
   rec(0, []);
   return out;
 }
+function choosePermCount(n, k){ let v = 1; for (let i = 0; i < k; i++) v *= (n - i); return v; }
 function chooseGen(lv){
   const cfg = CHOOSE_LV[Math.min(lv, CHOOSE_LV.length - 1)];
-  const [n, k] = cfg.nk[randInt(0, cfg.nk.length - 1)];
+  
+  const hist = chooseGen.hist || (chooseGen.hist = []);
+  const eqN = hist.filter(h => h.eq).length;
+  let n, k;
+  for (let t = 0; t < 40; t++) {
+    [n, k] = cfg.nk[randInt(0, cfg.nk.length - 1)];
+    const a = combos(n, k).length;
+    if ((a === n && eqN >= 2) || hist.filter(h => h.a === a).length >= 2) continue;
+    break;
+  }
   const ids = shuffleArr(((Math.random() < cfg.mark) ? CHOOSE_SET_M : CHOOSE_SET_F).slice()).slice(0, n);
   const ans = combos(n, k).length;
+  hist.push({ eq: ans === n, a: ans }); if (hist.length > 5) hist.shift();
   
   return { g: { ids, n, k }, answer: ans, kind: 'choose',
-    choices: numChoices(ans, [n, k, n * k, ans + 1, Math.max(1, ans - 1), n + k]) };
+    choices: numChoices(ans, [n, k, choosePermCount(n, k), ans + 1, Math.max(1, ans - 1), n + k]) };
 }
 
 function chooseRow(ids, pick, cx, cy, s){
@@ -2722,6 +2866,16 @@ function chooseRow(ids, pick, cx, cy, s){
     }
   });
 }
+
+function chooseSame(ids, k, cy, es){
+  if (k < 2) return;
+  const egap = es * 2.5, w = (k - 1) * egap;
+  const row = (cx, rev) => { for (let i = 0; i < k; i++) ordItem(ids[rev ? k - 1 - i : i], cx - w / 2 + i * egap, cy, es); };
+  const off = w / 2 + 34;
+  row(W / 2 - off, false);
+  text('＝', W / 2, cy, 15, CONFIG.C_INK_SOFT, 'center', '800');
+  row(W / 2 + off, true);
+}
 function chooseDraw(area, opt){
   opt = opt || {};
   const g = opt.g || S.g;
@@ -2729,67 +2883,102 @@ function chooseDraw(area, opt){
   const s = Math.min(20, (area.w - 50) / g.n / 2.6);
   chooseRow(g.ids, g.ids.map((_, i) => i), W / 2, area.y + 44, s);
   
-  rrect(W / 2 - 62, area.y + 74, 124, 28, 9);
+  rrect(W / 2 - 92, area.y + 74, 184, 28, 9);
   ctx.fillStyle = CONFIG.C_HI_T; ctx.fill();
   ctx.strokeStyle = CONFIG.C_GOLD; ctx.lineWidth = 2; ctx.stroke();
-  text('この うち ' + g.k + 'こ', W / 2, area.y + 88, 15, CONFIG.C_INK, 'center', '800');
+  text('この ' + g.n + 'つから ' + g.k + 'こ えらぶ', W / 2, area.y + 88, 15, CONFIG.C_INK, 'center', '800');
   
-  text('じゅんばんは 関係ない', W / 2, area.y + 118, 12, CONFIG.C_INK_SOFT, 'center', '800');
-  const es = 11, ey = area.y + 148, egap = es * 2.5;
-  const rowX = (cx, rev) => {
-    ordItem(g.ids[rev ? 1 : 0], cx - egap / 2, ey, es);
-    ordItem(g.ids[rev ? 0 : 1], cx + egap / 2, ey, es);
-  };
-  rowX(W / 2 - 58, false);
-  text('＝', W / 2, ey, 15, CONFIG.C_INK_SOFT, 'center', '800');
-  rowX(W / 2 + 58, true);
+  if (g.k >= 2) {
+    text('じゅんばんが ちがっても、おなじ くみ', W / 2, area.y + 118, 13, CONFIG.C_INK, 'center', '800');
+    chooseSame(g.ids, g.k, area.y + 148, 11);
+  }
   ctx.restore();
 }
-
 const CHOOSE_TEACH = [0, 1, 2, 3];    
-function chooseList(ids, k, cx, top, s, rowH, label){
-  const list = combos(ids.length, k);
-  text(label, cx, top - 12, 12, CONFIG.C_GOLD, 'center', '800');
-  list.forEach((pick, i) => chooseRow(ids, pick, cx, top + rowH / 2 + i * rowH, s));
-  text(list.length + 'とおり', cx, top + list.length * rowH + 12, 14, CONFIG.C_OK, 'center', '800');
-  return list.length;
-}
-
 
 function chooseTeachBegin(){
   const g = S.g, n = g.n, k = g.k, k2 = n - k, ans = S.answer;
-  const useReframe = k > k2;
-  const listK = useReframe ? k2 : k;
-  let msgs, labels;
-  if (useReframe) {
-    msgs = [
-      'この ' + n + 'つ の うち から ' + k + 'こ えらぶ',
-      k + 'こ えらぶ ＝ **' + k2 + 'こ えらばない** を きめる ほうが\n書く 数が すくない',
-      k2 + 'こ の 書き方を 書き出すと **' + ans + 'とおり**',
-      'だから ' + k + 'こ えらぶも **' + ans + 'とおり**',
-    ];
-    labels = ['', '言いかえ', String(ans), String(ans)];
+  const reframe = k > k2;
+  const listK = reframe ? k2 : k;
+  const msgs = ['この ' + n + 'つから ' + k + 'こ えらぶ。\n' + k + 'この くみは 何とおり？'];
+  const labels = [''];
+  const steps = [{ rows: 0 }];
+  if (reframe) {
+    
+    msgs.push(k + 'こ えらぶのは、' + k2 + 'こ えらばないのと おなじ'); labels.push('えらばない ' + k2 + 'こ'); steps.push({ one: true });
+    msgs.push('✕ が ほかへ うつると、えらぶ ' + k + 'こも かわる。\nだから、えらばない ' + k2 + 'こを きめれば いい'); labels.push('✕ が うごくと'); steps.push({ one: true, move: true });
   } else {
-    msgs = [
-      'この ' + n + 'つ の うち から ' + k + 'こ えらぶ',
-      k + 'こ の えらび方を そのまま 書き出す',
-      '書き出すと **' + ans + 'とおり**',
-    ];
-    labels = ['', '書き出す', String(ans)];
+    msgs.push('じゅんばんが ちがっても、おなじ くみ。\nおなじ くみを 2かい 数えない'); labels.push('おなじ くみ'); steps.push({ same: true });
   }
-  return makeTeach(msgs.length - 1, msgs, labels, { g, listK, mk: 'choose' });
+  const head = reframe ? ('えらばない ' + k2 + 'こ') : ('えらぶ ' + k + 'こ');
+  if (listK === 1) {
+    msgs.push('えらばない 1こは、' + n + 'つの どれか → **' + ans + 'とおり**'); labels.push(ans + 'とおり');
+    steps.push({ rows: n, groups: 0 });
+  } else {
+    
+    let done = 0;
+    const parts = [];
+    for (let a = 0; a < n - 1; a++) {
+      const c = n - 1 - a;
+      done += c; parts.push(c);
+      msgs.push(a === 0
+        ? (head + 'を、よこ 1れつずつ ならべる。\nいちばん 左の ものと くむのは、右に ある ' + c + 'つ → ' + c + 'とおり')
+        : ('左から ' + (a + 1) + 'ばんめの ものは、右に ある ものと だけ くむ → ' + c + 'とおり\n（左の ものとの くみは、上に もう ある）'));
+      labels.push(c + 'とおり'); steps.push({ rows: done, groups: a + 1 });
+    }
+    msgs.push(parts.join(' ＋ ') + ' ＝ **' + ans + 'とおり**'); labels.push(ans + 'とおり');
+    steps.push({ rows: done, groups: n - 1, sum: true });
+  }
+  if (reframe) {
+    msgs.push('よこ 1れつが 1とおり。\nだから ' + k + 'この くみも **' + ans + 'とおり**'); labels.push(ans + 'とおり');
+    const last = steps[steps.length - 1];
+    steps.push(Object.assign({}, last, { box: true }));
+  }
+  return makeTeach(msgs.length - 1, msgs, labels, { g, listK, reframe, steps, mk: 'choose' });
 }
 function chooseTeachDraw(area, T){
-  const g = T.g, n = T.shown;
+  const g = T.g, n = T.shown, st = T.steps[Math.min(n, T.steps.length - 1)];
   const ar = teachFigArea(area);
+  const all = g.ids.map((_, i) => i);
+  const comp = (c) => all.filter(i => c.indexOf(i) < 0);          
   ctx.save();
-  chooseRow(g.ids, g.ids.map((_, i) => i), W / 2, ar.y + 18, 12);
-  if (n >= T.total - 1) {
-    const rowsCount = combos(g.n, T.listK).length;
-    const top = ar.y + 58;
-    const rowH = Math.max(14, Math.min(26, (ar.h - top + ar.y - 34) / rowsCount));
-    const sSize = Math.max(6, Math.min(10, rowH * 0.35));
-    chooseList(g.ids, T.listK, W / 2, top, sSize, rowH, T.listK + 'こ の えらび方');
+  chooseRow(g.ids, all, W / 2, ar.y + 18, 12);
+  
+  if (T.listK === 2 && st.groups && !st.sum && !st.box) {
+    const a = st.groups - 1, gap = 12 * 2.5, x = W / 2 - (g.n - 1) * gap / 2 + a * gap;
+    ctx.save(); ctx.strokeStyle = CONFIG.C_GOLD; ctx.lineWidth = 2.2;
+    ctx.beginPath(); ctx.arc(x, ar.y + 18, 17, 0, Math.PI * 2); ctx.stroke(); ctx.restore();
+  }
+  text('この ' + g.n + 'つから ' + g.k + 'こ えらぶ', W / 2, ar.y + 44, 12, CONFIG.C_GOLD, 'center', '800');
+  const list = combos(g.n, T.listK);
+  if (st.same) {
+    chooseSame(g.ids, g.k, ar.y + 90, 16);
+    text('おなじ くみ', W / 2, ar.y + 124, 14, CONFIG.C_OK, 'center', '800');
+  } else if (st.one) {
+    
+    const idx = st.move ? Math.min(list.length - 1, Math.floor(teachProg(T, 2.2) * Math.min(list.length, 4))) : 0;
+    chooseRow(g.ids, comp(list[idx]), W / 2, ar.y + 96, 16);
+    text('✕ ＝ えらばない ' + T.listK + 'こ', W / 2, ar.y + 128, 12, '#c15c4e', 'center', '800');
+  } else if (st.rows) {
+    const rows = st.rows;
+    const top = ar.y + 64;
+    const rowH = Math.max(14, Math.min(26, (ar.h - 64 - 40) / list.length));
+    const sz = Math.max(6, Math.min(10, rowH * 0.36));
+    for (let r = 0; r < rows; r++) {
+      const c = list[r];
+      chooseRow(g.ids, T.reframe ? comp(c) : c, W / 2, top + rowH / 2 + r * rowH, sz);
+    }
+    
+    if (T.listK === 2) {
+      let r0 = 0;
+      for (let a = 0; a < (st.groups || 0); a++) {
+        const c = g.n - 1 - a;
+        text(String(c), W / 2 + g.n * sz * 1.25 + 22, top + (r0 + c / 2) * rowH, 14, CONFIG.C_GOLD, 'center', '800');
+        r0 += c;
+      }
+    }
+    if (st.sum || st.box || T.listK === 1)
+      text('ぜんぶで ' + list.length + 'とおり', W / 2, Math.min(ar.y + ar.h - 8, top + rows * rowH + 16), 14, CONFIG.C_OK, 'center', '800');
   }
   ctx.restore();
 }
@@ -7447,7 +7636,9 @@ const STAGES = [
     id: 'week', unlocked: true,
     kinds: ['date', 'date', 'date', 'after', 'date', 'after'],
     
-    intros: [{ kind: 'date', label: '7日ごと', g: { start: 3, day: 24, k: 'date' }, answer: weekName((3 + 23) % 7) }],
+    intros: [{ kind: 'date', label: '7日ごと', g: { start: 3, day: 24, k: 'date' }, answer: weekName((3 + 23) % 7) },
+      
+      { kind: 'after', label: '◯日後', g: { start: 3, day: 24, k: 'after' }, answer: weekName((3 + 24) % 7) }],
     txt: { date: [['何','なん'], 'よう', ['日','び'], '？'], after: [['何','なん'], 'よう', ['日','び'], '？'] },
     gen: weekGen,
     drawQ(area){ qWrap(area, () => weekDraw(area, {})); },
@@ -7458,8 +7649,12 @@ const STAGES = [
   {
     id: 'tree', unlocked: true,
     kinds: ['miss', 'miss', 'count', 'miss', 'count', 'miss'],
-    intros: [{ kind: 'miss', label: 'じゅけい図', g: ORD_INTRO, answer: ORD_INTRO.miss.join(',') }],
-    txt: { miss: ['まだ 出ていないのは？'], count: ['ならべ方は 何とおり？'] },
+    intros: [{ kind: 'miss', label: 'えだの 図', g: ORD_INTRO, answer: ORD_INTRO.miss.join(',') },
+      
+      { kind: 'count', label: '4つを ならべる', g: ORD_INTRO_COUNT, answer: 24 }],
+    
+    
+    txt: { miss: ['出ていない ならべかたは？'], count: ['ならべかたは ', ['何','なん'], 'とおり？'] },
     gen: ordGen,
     drawQ(area){ qWrap(area, () => ordDraw(area, {})); },
     kindIcon: ordKindIcon, teachBegin: ordTeachBegin, teachDraw: ordTeachDraw,
@@ -7468,8 +7663,12 @@ const STAGES = [
   {
     id: 'choose', unlocked: true,
     kinds: ['choose', 'choose', 'choose', 'choose', 'choose', 'choose'],
-    intros: [{ kind: 'choose', label: 'えらばない', g: { ids: CHOOSE_TEACH, n: 4, k: 3 }, answer: 4 }],
-    txt: { choose: ['えらび方は ', ['何','なん'], 'とおり？'] },
+    intros: [{ kind: 'choose', label: 'えらばない', g: { ids: CHOOSE_TEACH, n: 4, k: 3 }, answer: 4 },
+      
+      { kind: 'choose', label: '2こ えらぶ', g: { ids: CHOOSE_TEACH, n: 4, k: 2 }, answer: 6 }],
+    
+    
+    txt: { choose: ['くみは ぜんぶで ', ['何','なん'], 'とおり？'] },
     gen: chooseGen,
     drawQ(area){ qWrap(area, () => chooseDraw(area, {})); },
     kindIcon: chooseKindIcon, teachBegin: chooseTeachBegin, teachDraw: chooseTeachDraw,
@@ -11937,7 +12136,7 @@ resize();
 requestAnimationFrame(frame);
 
 
-window.__cube = { CONFIG, S, startBreath, genShape, shapeTotal, allTopsVisible, noInvisibleAddition, playBasis, basisIso, basisOblique, STAGES, mapRect, onDown, submit, visibleCubeCount, columnCount, cubeList, cubeFaces, visibleFlags, pointInPoly, figArea, choiceRect, get H(){ return H; }, visiblePerColumn, teachStep, introList, introTabRects, teachArea, toLocal, get offX(){ return offX; }, get offY(){ return offY; }, get scale(){ return scale; }, QUIT_BTN, quitPanel, bossBarRect, mapTabletRect, enemyFor, ENEMY_ART, ENEMY_STAGE_ART, ENEMY_GROUP, isPerfect, perfectSlots, dragonGold, lineGen, balGen, pairGen, weekGen, WEEK, weekName, sfxHit, sfxSlash, sfxCritical, sfxHurt, sfxPiece, sfxCorrect, sfxWrong, sfxDefeat, sfxIntro, audioCtl: { set(a){ audio = a; master = null; }, get(){ return audio; } }, bgmRender, bgmStart, bgmStop, BGM, clearedSlots, groupSize, dragonDone, curPage, setPage, pageStages, DRAGONS, dragonName, startBoss, bossState, bossOpen, bossBag, finishBoss, bossWinButtons, PIECE_SHAPES, makeKindBag, nextQuestion, newQuestion, newBattle, enterStage, startIntro, teachNext, magicGen, magicLines, magicHas, stageLv, save, makeCode, makeKidCode, applyKidCode, applyCode, openCode, BTN_EXPORT, BTN_IMPORT };
+window.__cube = { CONFIG, S, startTeach, startBreath, genShape, shapeTotal, allTopsVisible, noInvisibleAddition, playBasis, basisIso, basisOblique, STAGES, mapRect, onDown, submit, visibleCubeCount, columnCount, cubeList, cubeFaces, visibleFlags, pointInPoly, figArea, choiceRect, get H(){ return H; }, visiblePerColumn, teachStep, introList, introTabRects, teachArea, toLocal, get offX(){ return offX; }, get offY(){ return offY; }, get scale(){ return scale; }, QUIT_BTN, quitPanel, bossBarRect, mapTabletRect, enemyFor, ENEMY_ART, ENEMY_STAGE_ART, ENEMY_GROUP, isPerfect, perfectSlots, dragonGold, lineGen, balGen, pairGen, weekGen, WEEK, weekName, sfxHit, sfxSlash, sfxCritical, sfxHurt, sfxPiece, sfxCorrect, sfxWrong, sfxDefeat, sfxIntro, audioCtl: { set(a){ audio = a; master = null; }, get(){ return audio; } }, bgmRender, bgmStart, bgmStop, BGM, clearedSlots, groupSize, dragonDone, curPage, setPage, pageStages, DRAGONS, dragonName, startBoss, bossState, bossOpen, bossBag, finishBoss, bossWinButtons, PIECE_SHAPES, makeKindBag, nextQuestion, newQuestion, newBattle, enterStage, startIntro, teachNext, magicGen, magicLines, magicHas, stageLv, save, makeCode, makeKidCode, applyKidCode, applyCode, openCode, BTN_EXPORT, BTN_IMPORT };
 </script>
 </body>
 </html>
