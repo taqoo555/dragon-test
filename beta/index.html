@@ -92,7 +92,7 @@
 
 
 const CONFIG = {
-  VERSION: 'v80',
+  VERSION: 'v81',
 
   
   
@@ -12159,10 +12159,10 @@ function drawBook(){
   text(CONFIG.VERSION, 12, H - 12, 11, 'rgba(255,255,255,0.35)', 'left', '600');
 }
 
-const CARD = { ry: 0, rx: 0, vy: 0, target: 0, drag: null };
+const CARD = { ry: 0, rx: 0, vy: 0, target: 0, drag: null, coast: false };
 const CARD_M = 18;                       
 let cardTex = null;
-function cardReset(){ CARD.ry = 0; CARD.rx = 0; CARD.vy = 0; CARD.target = 0; CARD.drag = null; }
+function cardReset(){ CARD.ry = 0; CARD.rx = 0; CARD.vy = 0; CARD.target = 0; CARD.drag = null; CARD.coast = false; }
 function bookViewBox(){
   const aw = Math.min(232, Math.max(160, (H - 300) * 0.7)), ah = aw * 4 / 3;
   return { x: W/2 - aw/2, y: 78, w: aw, h: ah };
@@ -12188,16 +12188,19 @@ function cardMove(lx, ly){
 function cardUp(){
   const D = CARD.drag; if (!D) return;
   CARD.drag = null;
-  if (!D.moved) { CARD.target = Math.round(CARD.ry / 180) * 180 + 180; CARD.vy = 0; sfxTap(); return; }
+  if (!D.moved) { CARD.target = Math.round(CARD.ry / 180) * 180 + 360; CARD.vy = 0; sfxTap(); return; }   
   CARD.vy = (performance.now() - D.t > 120) ? 0 : Math.max(-1800, Math.min(1800, D.v));
   CARD.target = Math.round(CARD.ry / 180) * 180;
+  CARD.coast = Math.abs(CARD.vy) > 140;          
 }
 function updateCard(dt){
   if (CARD.drag) return;
-  if (Math.abs(CARD.vy) > 140 && Math.abs(CARD.ry - CARD.target) > 1 || Math.abs(CARD.vy) > 500) {
+  
+  if (CARD.coast) {
     CARD.ry += CARD.vy * dt;                                         
     CARD.vy *= Math.pow(0.18, dt);
     CARD.target = Math.round(CARD.ry / 180) * 180;
+    if (Math.abs(CARD.vy) < 140) CARD.coast = false;
   } else {
     const wob = 6 * Math.sin(S.t * 0.9);                             
     CARD.vy += ((CARD.target + wob - CARD.ry) * 60 - CARD.vy * 9) * dt;
@@ -12218,12 +12221,10 @@ function renderCardSide(box, gi, lv, back, k){
   const rel = back ? cardDeg(CARD.ry - 180) : cardDeg(CARD.ry);
   ctx = g;
   try {
-    if (back) drawCardBack(b, gi, lv);
-    else {
-      HOLO_SHIFT = rel / 90;
-      drawKeyArt(b, DRAGONS[gi], 1, dragonGold(gi), true);
-      drawLookFront(b, gi, lv, 'frame');
-    }
+    
+    HOLO_SHIFT = rel / 90;
+    drawKeyArt(b, DRAGONS[gi], 1, dragonGold(gi), true);
+    drawLookFront(b, gi, lv, 'frame');
     
     const gx = b.x + b.w * (0.5 - rel / 70), gy = b.y + b.h * (0.5 + CARD.rx / 56);
     ctx.save(); rrect(b.x, b.y, b.w, b.h, 10); ctx.clip();
@@ -12237,38 +12238,6 @@ function renderCardSide(box, gi, lv, back, k){
     ctx.restore();
   } finally { ctx = main; HOLO_SHIFT = 0; }
   return cardTex;
-}
-
-function drawCardBack(b, gi, lv){
-  const d = DRAGONS[gi], col = lookCol(gi), cx = b.x + b.w / 2, cy = b.y + b.h / 2;
-  ctx.save();
-  rrect(b.x, b.y, b.w, b.h, 10); ctx.clip();
-  const bg = ctx.createLinearGradient(b.x, b.y, b.x + b.w, b.y + b.h);
-  bg.addColorStop(0, '#231a3e'); bg.addColorStop(0.5, '#15102a'); bg.addColorStop(1, '#2a1d48');
-  ctx.fillStyle = bg; ctx.fillRect(b.x, b.y, b.w, b.h);
-  const gl = ctx.createRadialGradient(cx, cy, 4, cx, cy, b.w * 0.6);
-  gl.addColorStop(0, hexA(col, 0.55)); gl.addColorStop(1, hexA(col, 0));
-  ctx.fillStyle = gl; ctx.fillRect(b.x, b.y, b.w, b.h);
-  ctx.strokeStyle = hexA(col, 0.55); ctx.lineWidth = 1.4;
-  for (let r = 18; r < b.w * 0.8; r += 16) { ctx.beginPath(); ctx.arc(cx, cy, r, 0, Math.PI * 2); ctx.stroke(); }
-  ctx.strokeStyle = hexA(col, 0.35);
-  for (let i = 0; i < 16; i++) {
-    const a = i * Math.PI / 8;
-    ctx.beginPath(); ctx.moveTo(cx + Math.cos(a) * 20, cy + Math.sin(a) * 20); ctx.lineTo(cx + Math.cos(a) * b.w, cy + Math.sin(a) * b.w); ctx.stroke();
-  }
-  
-  ctx.save(); ctx.translate(cx, cy);
-  ctx.shadowColor = col; ctx.shadowBlur = 18;
-  ctx.beginPath(); ctx.moveTo(0, -38); ctx.lineTo(28, 0); ctx.lineTo(0, 38); ctx.lineTo(-28, 0); ctx.closePath();
-  ctx.fillStyle = '#1a1430'; ctx.fill(); ctx.strokeStyle = col; ctx.lineWidth = 3; ctx.stroke();
-  ctx.beginPath(); ctx.ellipse(0, 0, 13, 7, 0, 0, Math.PI * 2); ctx.fillStyle = col; ctx.fill();
-  ctx.beginPath(); ctx.ellipse(0, 0, 2.6, 6.5, 0, 0, Math.PI * 2); ctx.fillStyle = '#1a1430'; ctx.fill();
-  ctx.restore();
-  ctx.restore();
-  text('DRAGON TEST', cx, b.y + 26, 13, hexA(col, 0.95), 'center', '800');
-  text(d.sname + '　Lv.' + lv, cx, b.y + b.h - 24, 13, '#f3ecff', 'center', '800');
-  rrect(b.x, b.y, b.w, b.h, 10);
-  ctx.strokeStyle = dragonGold(gi) ? '#ffd162' : '#e9b45c'; ctx.lineWidth = dragonGold(gi) ? 4 : 2.5; ctx.stroke();
 }
 
 function drawCard3D(box, gi, lv){
